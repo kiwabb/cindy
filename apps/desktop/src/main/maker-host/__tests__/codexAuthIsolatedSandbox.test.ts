@@ -502,6 +502,34 @@ describe('dev 沙箱凭证隔离(XDT_ISOLATED_AUTH)', () => {
     expect(fs.readFileSync(localAuth)).not.toEqual(releaseBytes);
   });
 
+  // Regression: native auth on C: and Dev profile on D: cannot share a hardlink (EXDEV).
+  // Existing Release snapshot tests did not exercise native fallback. Unit: explicit local
+  // login must succeed without linking, and child writes must leave native auth unchanged.
+  it('read-only Dev connects native Codex across filesystems without sharing credentials by link', async () => {
+    const { systemAuth, localAuth } = fixture();
+    h.dataOwnerId = 'owner-a';
+    const before = fs.readFileSync(systemAuth);
+    const statSync = fs.statSync;
+    // Model distinct mounted volumes without requiring a second CI disk.
+    vi.spyOn(fs, 'statSync').mockImplementation(((...args: Parameters<typeof fs.statSync>) => {
+      const stat = statSync(...args);
+      if (!stat || String(args[0]) !== systemAuth) return stat;
+      return new Proxy<fs.Stats | fs.BigIntStats>(stat, { get(target, key) {
+        if (key === 'dev') return typeof target.dev === 'bigint' ? target.dev + 1n : target.dev + 1;
+        return Reflect.get(target, key);
+      } });
+    }) as typeof fs.statSync);
+    vi.spyOn(fs.promises, 'link').mockRejectedValue(Object.assign(new Error('cross-device'), { code: 'EXDEV' }));
+    const adapter = new DesktopCodexAuthAdapter();
+    await expect(adapter.triggerLogin({ mode: 'local' })).resolves.toMatchObject({
+      authenticated: true, credentialScope: 'system-shared',
+    });
+    expect(fs.readFileSync(localAuth)).toEqual(before);
+    expect(fs.statSync(localAuth).ino).not.toBe(fs.statSync(systemAuth).ino);
+    fs.writeFileSync(localAuth, 'child-refreshed-test-token');
+    expect(fs.readFileSync(systemAuth)).toEqual(before);
+  });
+
   it('dev 默认只读共享:断开只停用 Cindy，重启不复活，显式本机连接可恢复', async () => {
     const { codexHome, localAuth, systemAuth } = fixture();
     h.dataOwnerId = 'owner-a';

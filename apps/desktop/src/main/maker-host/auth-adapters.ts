@@ -968,13 +968,21 @@ export class DesktopCodexAuthAdapter implements AuthAdapter {
   }
 
   /**
-   * An isolated Dev may consume the Release login, but its Codex child must not
-   * receive the Release auth inode: Codex can refresh auth.json in place.
+   * A read-only Dev may consume the native or Release login, but its Codex child must not
+   * receive the source auth inode: Codex can refresh auth.json in place.
    */
-  private shouldSnapshotReleaseCodexAuth(systemAuth: string, myAuth: string): boolean {
+  private shouldSnapshotSharedCodexAuth(systemAuth: string, myAuth: string): boolean {
     if (!this.devOAuthWritesBlocked()) return false;
-    if (path.resolve(systemAuth) !== path.resolve(getReleaseCodexAuthPath())) return false;
-    return path.resolve(systemAuth) !== path.resolve(myAuth);
+    if (path.resolve(systemAuth) === path.resolve(myAuth)) return false;
+    if (path.resolve(systemAuth) === path.resolve(getReleaseCodexAuthPath())) return true;
+    // Native auth and the Dev profile may live on different volumes. A shared
+    // hardlink cannot cross that boundary; retain the existing read-only policy.
+    try {
+      return fs.statSync(systemAuth, { bigint: true }).dev !==
+        fs.statSync(path.dirname(myAuth), { bigint: true }).dev;
+    } catch {
+      return false;
+    }
   }
 
   private warnDevOAuthWriteOverride(action: string): void {
@@ -1234,16 +1242,16 @@ export class DesktopCodexAuthAdapter implements AuthAdapter {
       markNativeProviderAuthSharedSystemCredential('openai');
     }
     if (topology.healthy && (process.platform === 'win32' || topology.linkType === 'symlink')) {
-      if (this.shouldSnapshotReleaseCodexAuth(systemAuth, myAuth)) {
+      if (this.shouldSnapshotSharedCodexAuth(systemAuth, myAuth)) {
         const snapshot = await copyCodexAuthSnapshot(systemAuth, myAuth);
         if (snapshot.kind === 'copied') {
           markNativeProviderAuthSharedSystemCredential('openai');
-          log.info('codex auth.json detached into a read-only Release snapshot');
+          log.info('codex auth.json detached into a read-only shared login snapshot');
         } else {
-          credPathLog.warn('failed to detach Release auth snapshot; shared link left intact', {
+          credPathLog.warn('failed to detach shared auth snapshot; shared link left intact', {
             error: snapshot.error?.message,
           });
-          throw snapshot.error ?? new Error('Failed to detach Release auth snapshot');
+          throw snapshot.error ?? new Error('Failed to detach shared auth snapshot');
         }
       }
       this.lastKnownCodexCredentialScope = 'system-shared';
@@ -1303,7 +1311,7 @@ export class DesktopCodexAuthAdapter implements AuthAdapter {
     // 建共享链接前幂等确保 codexHome 目录存在: 首启时 assets 预热可能尚未建好目录, ENOENT
     // 会让 relink 走 link-unsupported 回退, splash 后首次 auth 查询短暂误报未登录。
     await fsp.mkdir(this.codexHome, { recursive: true }).catch(() => undefined);
-    if (this.shouldSnapshotReleaseCodexAuth(systemAuth, myAuth)) {
+    if (this.shouldSnapshotSharedCodexAuth(systemAuth, myAuth)) {
       const snapshot = await copyCodexAuthSnapshot(systemAuth, myAuth);
       if (hasLocalEntry && !topology.healthy) {
         this.lastOrphanRepair = snapshot.kind === 'copied' ? 'relinked' : 'failed';
@@ -1311,12 +1319,12 @@ export class DesktopCodexAuthAdapter implements AuthAdapter {
       if (snapshot.kind === 'copied') {
         markNativeProviderAuthSharedSystemCredential('openai');
         this.lastKnownCodexCredentialScope = 'system-shared';
-        log.info('codex auth.json copied from Release login for read-only Dev use');
+        log.info('codex auth.json copied from shared login for read-only Dev use');
       } else {
-        credPathLog.warn('Release auth snapshot failed, auth.json left intact', {
+        credPathLog.warn('shared auth snapshot failed, auth.json left intact', {
           error: snapshot.error?.message,
         });
-        throw snapshot.error ?? new Error('Failed to copy Release auth snapshot');
+        throw snapshot.error ?? new Error('Failed to copy shared auth snapshot');
       }
       return;
     }
@@ -1935,7 +1943,7 @@ export class DesktopCodexAuthAdapter implements AuthAdapter {
           fs.mkdirSync(this.codexHome, { recursive: true, mode: 0o700 });
           // Retain the existing read-only Dev exception; writable runtimes must share
           // the native credential rather than rotate an independent refresh-token copy.
-          if (this.shouldSnapshotReleaseCodexAuth(systemAuth, localAuth)) {
+          if (this.shouldSnapshotSharedCodexAuth(systemAuth, localAuth)) {
             const result = await copyCodexAuthSnapshot(systemAuth, localAuth);
             if (result.kind !== 'copied') throw new Error('Local auth snapshot failed');
           } else {
