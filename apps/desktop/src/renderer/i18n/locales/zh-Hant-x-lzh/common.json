@@ -9973,8 +9973,10 @@
         "automations": "自運",
         "plugins": "法器",
         "bots": "同僚",
-        "search": "尋"
-      }
+        "search": "尋",
+        "todos": "待理"
+      },
+      "todosCount_other": "待理方行者 {{count}}"
     },
     "user": {
       "settingsLink": "規制，當前使用者：{{name}}",
@@ -11714,6 +11716,58 @@
       "unavailable": "目錄暫失",
       "failed": "案未能更新，請重載以核所存之果。",
       "noAvailable": "欲得更多案，可先於案錄中增之。"
+    },
+    "todoBoard": {
+      "title": "待理",
+      "filterTeammates": "以伴擇之",
+      "discovered": "伴所察",
+      "suggested": "擬 {{date}}",
+      "laterUntil": "{{date}} 再告",
+      "completedOn": "畢於 {{date}}",
+      "origin": {
+        "label": "類",
+        "all": "皆",
+        "assigned": "所囑",
+        "discovered": "所察"
+      },
+      "view": {
+        "label": "狀",
+        "open": "方行",
+        "later": "姑緩",
+        "done": "已畢"
+      },
+      "bucket": {
+        "overdue": "已逾",
+        "today": "今日",
+        "week": "本旬",
+        "later": "後此",
+        "none": "無期"
+      },
+      "nextKind": {
+        "advance": "推之",
+        "view": "觀之",
+        "decide": "待君定"
+      },
+      "tip": {
+        "source": "所自",
+        "next": "次第",
+        "deadline": "期",
+        "suggested": "擬期",
+        "later": "姑緩",
+        "done": "畢",
+        "overridden": "{{date}}，君所改（原載 {{source}}）",
+        "quote": "{{date}} · 原語「{{quote}}」"
+      },
+      "empty": {
+        "open": "今無待理",
+        "later": "無姑緩之事",
+        "done": "未有畢者",
+        "hint": "君所囑於伴之事，及伴於郵、飛書、GitHub 所察者，皆錄於此",
+        "chat": "與{{name}}言"
+      },
+      "offlineCached": "{{name}}所在之{{device}}失聯，所示乃前所見",
+      "offlineUnknown": "{{name}}所在之{{device}}失聯，暫不得見其待理",
+      "loadFailed": "未能讀{{name}}之待理"
     }
   },
   "common": {

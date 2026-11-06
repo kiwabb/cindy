@@ -78,8 +78,8 @@ beforeEach(() => {
   localStorage.removeItem('sidebar-navigation:apps:v1');
   navigationTesting.resetArrivals();
   setSidebarNavigationPrefs(OWNER, {
-    order: ['automations', 'plugins', 'search'],
-    visible: ['automations', 'plugins', 'search'],
+    order: ['automations', 'todos', 'plugins', 'search'],
+    visible: ['automations', 'todos', 'plugins', 'search'],
   });
 });
 
@@ -418,6 +418,16 @@ describe('Sidebar navigation rows and More', () => {
     expect(view.container.childElementCount).toBe(0);
   });
 
+  // 待办页不是某位伙伴的对话：入口打开 /bots/todos 并高亮，离开后不再高亮。
+  it('opens the teammates todo page from its own entry', () => {
+    render(<Harness initialPath="/cc-agent" />);
+    fireEvent.click(screen.getByRole('button', { name: 'sidebar.navigation.items.todos' }));
+    expect(screen.getByTestId('location').textContent).toBe('/bots/todos');
+    expect(screen.getByRole('button', { name: 'sidebar.navigation.items.todos' }).getAttribute('aria-current')).toBe('page');
+    fireEvent.click(screen.getByRole('button', { name: 'sidebar.tabs.plugins' }));
+    expect(screen.getByRole('button', { name: 'sidebar.navigation.items.todos' }).hasAttribute('aria-current')).toBe(false);
+  });
+
   it('keeps the previous task when visiting automations before plugins', () => {
     const sessionPath = '/cc-agent/session-1?remoteHostId=host-1#message-2';
     render(<Harness initialPath={sessionPath} />);
@@ -750,7 +760,7 @@ describe('Plugins joining the sidebar', () => {
       .toBe('false');
     fireEvent.click(screen.getByRole('button', { name: 'sidebar.navigation.customize.done' }));
     expect(getSidebarNavigationPrefs('owner-2').visible).toEqual(['automations']);
-    expect(getSidebarNavigationPrefs(OWNER).visible).toEqual(['automations', 'plugins', 'search']);
+    expect(getSidebarNavigationPrefs(OWNER).visible).toEqual(['automations', 'todos', 'plugins', 'search']);
   });
 });
 

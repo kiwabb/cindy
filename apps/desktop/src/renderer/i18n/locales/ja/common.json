@@ -9973,8 +9973,10 @@
         "automations": "自動化",
         "plugins": "プラグイン",
         "bots": "仲間",
-        "search": "検索"
-      }
+        "search": "検索",
+        "todos": "Todo"
+      },
+      "todosCount_other": "進行中の Todo {{count}} 件"
     },
     "user": {
       "settingsLink": "設定, 現在のユーザー: {{name}}",
@@ -11714,6 +11716,58 @@
       "unavailable": "ディレクトリを利用できません",
       "failed": "プロジェクトを更新できませんでした。再読み込みして保存状態を確認してください。",
       "noAvailable": "他のプロジェクトは、先にプロジェクト一覧に追加してください。"
+    },
+    "todoBoard": {
+      "title": "Todo",
+      "filterTeammates": "仲間で絞り込む",
+      "discovered": "仲間が見つけた",
+      "suggested": "提案 {{date}}",
+      "laterUntil": "{{date}} に再通知",
+      "completedOn": "{{date}} に完了",
+      "origin": {
+        "label": "種類",
+        "all": "すべて",
+        "assigned": "依頼",
+        "discovered": "発見"
+      },
+      "view": {
+        "label": "状態",
+        "open": "進行中",
+        "later": "あとで",
+        "done": "完了"
+      },
+      "bucket": {
+        "overdue": "期限切れ",
+        "today": "今日",
+        "week": "今週",
+        "later": "それ以降",
+        "none": "期限なし"
+      },
+      "nextKind": {
+        "advance": "進める",
+        "view": "確認する",
+        "decide": "あなたの判断が必要"
+      },
+      "tip": {
+        "source": "出どころ",
+        "next": "次の一手",
+        "deadline": "期限",
+        "suggested": "提案された期限",
+        "later": "あとで",
+        "done": "完了",
+        "overridden": "{{date}}（あなたが変更。元は {{source}}）",
+        "quote": "{{date}} · 元の文面「{{quote}}」"
+      },
+      "empty": {
+        "open": "いまは Todo がありません",
+        "later": "あとでにした Todo はありません",
+        "done": "完了した Todo はまだありません",
+        "hint": "仲間に頼んだことや、仲間がメール・Feishu・GitHub で見つけたことがここに記録されます",
+        "chat": "{{name}}と話す"
+      },
+      "offlineCached": "{{name}}がいる{{device}}はオフラインです。前回見た Todo を表示しています",
+      "offlineUnknown": "{{name}}がいる{{device}}はオフラインのため、Todo を表示できません",
+      "loadFailed": "{{name}}の Todo を読み込めませんでした"
     }
   },
   "common": {

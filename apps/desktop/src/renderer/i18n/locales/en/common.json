@@ -10016,8 +10016,11 @@
         "automations": "Automations",
         "plugins": "Plugins",
         "bots": "Teammates",
-        "search": "Search"
-      }
+        "search": "Search",
+        "todos": "Todos"
+      },
+      "todosCount_one": "{{count}} open todo",
+      "todosCount_other": "{{count}} open todos"
     },
     "user": {
       "settingsLink": "Settings, current user: {{name}}",
@@ -11760,6 +11763,58 @@
       "unavailable": "Directory unavailable",
       "failed": "Could not update projects. Reload to check the saved state.",
       "noAvailable": "Add more projects from the project list first."
+    },
+    "todoBoard": {
+      "title": "Todos",
+      "filterTeammates": "Filter by teammate",
+      "discovered": "Found by teammate",
+      "suggested": "Suggested {{date}}",
+      "laterUntil": "Back {{date}}",
+      "completedOn": "Done {{date}}",
+      "origin": {
+        "label": "Type",
+        "all": "All",
+        "assigned": "Assigned",
+        "discovered": "Found"
+      },
+      "view": {
+        "label": "Status",
+        "open": "Open",
+        "later": "Later",
+        "done": "Done"
+      },
+      "bucket": {
+        "overdue": "Overdue",
+        "today": "Today",
+        "week": "This week",
+        "later": "After this week",
+        "none": "No deadline"
+      },
+      "nextKind": {
+        "advance": "Move forward",
+        "view": "Take a look",
+        "decide": "Needs your decision"
+      },
+      "tip": {
+        "source": "Source",
+        "next": "Next",
+        "deadline": "Deadline",
+        "suggested": "Suggested deadline",
+        "later": "Later",
+        "done": "Done",
+        "overridden": "{{date}}, changed by you (source said {{source}})",
+        "quote": "{{date}} · source said “{{quote}}”"
+      },
+      "empty": {
+        "open": "No todos right now",
+        "later": "Nothing set aside for later",
+        "done": "No completed todos yet",
+        "hint": "What you ask your teammates to do, and what they find in mail, Feishu and GitHub, shows up here",
+        "chat": "Chat with {{name}}"
+      },
+      "offlineCached": "{{device}}, where {{name}} runs, is offline. Showing the todos seen last time.",
+      "offlineUnknown": "{{device}}, where {{name}} runs, is offline. Its todos can’t be shown right now.",
+      "loadFailed": "Couldn’t load {{name}}’s todos"
     }
   },
   "common": {

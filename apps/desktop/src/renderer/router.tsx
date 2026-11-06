@@ -35,6 +35,7 @@ import { BotMarketRoute } from '@/features/bots/BotMarketDialog';
 import { BotSessionView } from '@/features/bots/BotSessionView';
 import { BotDirectMessageView } from '@/features/bots/BotDirectMessageView';
 import { BotGroupChatView } from '@/features/bots/BotGroupChatView';
+import { TeammateTodosView } from '@/features/bots/TeammateTodosView';
 import { GhostMainViewFeatureLayout } from '@/features/plugin/GhostMainViewFeatureLayout';
 
 /**
@@ -128,6 +129,8 @@ export const router = createHashRouter([
                       // 被当成一个叫 "roster" 的伙伴。
                       { path: 'roster', element: <BotRosterView /> },
                       { path: 'market/:packageId?', element: <BotMarketRoute /> },
+                      // 各位伙伴的待办汇总页(只读);静态段同样排在 :botId 之前。
+                      { path: 'todos', element: <TeammateTodosView /> },
                       // 伙伴群聊是独立对象(不是某位伙伴的任务),静态段 'groups' 同样排在
                       // :botId 之前,/bots/groups/<id> 不会被当成一个叫 "groups" 的伙伴。
                       { path: 'groups/:groupId', element: <BotGroupChatView /> },

@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { Plug, Search, Timer, type LucideIcon } from 'lucide-react';
+import { ListTodo, Plug, Search, Timer, type LucideIcon } from 'lucide-react';
 
 import { readSidebarOwnerStorage, writeSidebarOwnerStorage } from '@/lib/sidebarOwnerStorage';
 
@@ -8,10 +8,12 @@ import { readSidebarOwnerStorage, writeSidebarOwnerStorage } from '@/lib/sidebar
  * Teammates left this list on 2026-10-13: they live in the sidebar's own section above
  * Pinned. Saved orders and visibility that still name `bots` are dropped on read.
  */
-export type SidebarNavigationItemId = 'automations' | 'plugins' | 'search';
+export type SidebarNavigationItemId = 'automations' | 'todos' | 'plugins' | 'search';
 
+/** 「待办」2026-11-06 加入：各位伙伴的待办汇总页。已保存过顺序的账号里它排在最后，可在自定义里挪。 */
 export const SIDEBAR_NAVIGATION_ITEMS: readonly SidebarNavigationItemId[] = [
   'automations',
+  'todos',
   'plugins',
   'search',
 ];
@@ -19,12 +21,14 @@ export const SIDEBAR_NAVIGATION_ITEMS: readonly SidebarNavigationItemId[] = [
 /** One icon per built-in entry, shared by the sidebar rows, the rail, More and Customize. */
 export const SIDEBAR_NAVIGATION_ITEM_ICONS: Record<SidebarNavigationItemId, LucideIcon> = {
   automations: Timer,
+  todos: ListTodo,
   plugins: Plug,
   search: Search,
 };
 
 export const DEFAULT_SIDEBAR_NAVIGATION_VISIBLE: readonly SidebarNavigationItemId[] = [
   'automations',
+  'todos',
   'plugins',
   'search',
 ];

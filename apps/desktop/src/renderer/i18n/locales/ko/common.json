@@ -9973,8 +9973,10 @@
         "automations": "자동화",
         "plugins": "플러그인",
         "bots": "동료",
-        "search": "검색"
-      }
+        "search": "검색",
+        "todos": "할 일"
+      },
+      "todosCount_other": "진행 중인 할 일 {{count}}개"
     },
     "user": {
       "settingsLink": "설정, 현재 사용자: {{name}}",
@@ -11714,6 +11716,58 @@
       "unavailable": "디렉터리를 사용할 수 없습니다",
       "failed": "프로젝트를 업데이트하지 못했습니다. 다시 불러와 저장 상태를 확인하세요.",
       "noAvailable": "다른 프로젝트는 먼저 프로젝트 목록에 추가하세요."
+    },
+    "todoBoard": {
+      "title": "할 일",
+      "filterTeammates": "동료별 필터",
+      "discovered": "동료가 찾음",
+      "suggested": "제안 {{date}}",
+      "laterUntil": "{{date}}에 다시 알림",
+      "completedOn": "{{date}} 완료",
+      "origin": {
+        "label": "유형",
+        "all": "전체",
+        "assigned": "맡김",
+        "discovered": "발견"
+      },
+      "view": {
+        "label": "상태",
+        "open": "진행 중",
+        "later": "나중에",
+        "done": "완료"
+      },
+      "bucket": {
+        "overdue": "기한 지남",
+        "today": "오늘",
+        "week": "이번 주",
+        "later": "그 이후",
+        "none": "기한 없음"
+      },
+      "nextKind": {
+        "advance": "진행",
+        "view": "확인",
+        "decide": "결정 필요"
+      },
+      "tip": {
+        "source": "출처",
+        "next": "다음 단계",
+        "deadline": "기한",
+        "suggested": "제안된 기한",
+        "later": "나중에",
+        "done": "완료",
+        "overridden": "{{date}}, 직접 변경함(출처: {{source}})",
+        "quote": "{{date}} · 출처 원문 “{{quote}}”"
+      },
+      "empty": {
+        "open": "지금은 할 일이 없습니다",
+        "later": "나중에로 미룬 할 일이 없습니다",
+        "done": "완료한 할 일이 아직 없습니다",
+        "hint": "동료에게 맡긴 일과 동료가 메일, Feishu, GitHub에서 찾은 일이 여기에 기록됩니다",
+        "chat": "{{name}}와 대화"
+      },
+      "offlineCached": "{{name}}가 있는 {{device}}가 오프라인입니다. 지난번에 본 할 일을 표시합니다",
+      "offlineUnknown": "{{name}}가 있는 {{device}}가 오프라인이라 할 일을 볼 수 없습니다",
+      "loadFailed": "{{name}}의 할 일을 불러오지 못했습니다"
     }
   },
   "common": {
