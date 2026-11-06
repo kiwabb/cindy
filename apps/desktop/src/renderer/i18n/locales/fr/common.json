@@ -10093,8 +10093,12 @@
         "automations": "Automatisations",
         "plugins": "Plugins",
         "bots": "Coéquipiers",
-        "search": "Rechercher"
-      }
+        "search": "Rechercher",
+        "todos": "À faire"
+      },
+      "todosCount_one": "{{count}} tâche en cours",
+      "todosCount_other": "{{count}} tâches en cours",
+      "todosCount_many": "{{count}} tâches en cours"
     },
     "user": {
       "settingsLink": "Paramètres, utilisateur actuel : {{name}}",
@@ -11855,6 +11859,58 @@
       "unavailable": "Répertoire indisponible",
       "failed": "Impossible de mettre à jour les projets. Rechargez pour vérifier l'état enregistré.",
       "noAvailable": "Ajoutez d'abord d'autres projets depuis la liste des projets."
+    },
+    "todoBoard": {
+      "title": "À faire",
+      "filterTeammates": "Filtrer par coéquipier",
+      "discovered": "Trouvé par le coéquipier",
+      "suggested": "Suggéré {{date}}",
+      "laterUntil": "De retour le {{date}}",
+      "completedOn": "Terminé le {{date}}",
+      "origin": {
+        "label": "Type",
+        "all": "Tout",
+        "assigned": "Confiées",
+        "discovered": "Trouvées"
+      },
+      "view": {
+        "label": "État",
+        "open": "En cours",
+        "later": "Plus tard",
+        "done": "Terminées"
+      },
+      "bucket": {
+        "overdue": "En retard",
+        "today": "Aujourd’hui",
+        "week": "Cette semaine",
+        "later": "Après cette semaine",
+        "none": "Sans échéance"
+      },
+      "nextKind": {
+        "advance": "Avancer",
+        "view": "Consulter",
+        "decide": "Votre décision est requise"
+      },
+      "tip": {
+        "source": "Source",
+        "next": "Étape suivante",
+        "deadline": "Échéance",
+        "suggested": "Échéance suggérée",
+        "later": "Plus tard",
+        "done": "Terminé",
+        "overridden": "{{date}}, modifiée par vous (la source indiquait {{source}})",
+        "quote": "{{date}} · la source indiquait « {{quote}} »"
+      },
+      "empty": {
+        "open": "Rien à faire pour le moment",
+        "later": "Rien de reporté à plus tard",
+        "done": "Aucune tâche terminée pour l’instant",
+        "hint": "Ce que vous confiez à vos coéquipiers et ce qu’ils trouvent dans les e-mails, Feishu et GitHub apparaît ici",
+        "chat": "Discuter avec {{name}}"
+      },
+      "offlineCached": "{{device}}, où se trouve {{name}}, est hors ligne. Affichage des tâches vues la dernière fois.",
+      "offlineUnknown": "{{device}}, où se trouve {{name}}, est hors ligne. Ses tâches ne peuvent pas être affichées pour le moment.",
+      "loadFailed": "Impossible de charger les tâches de {{name}}"
     }
   },
   "common": {

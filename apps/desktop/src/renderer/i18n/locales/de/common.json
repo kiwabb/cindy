@@ -10016,8 +10016,11 @@
         "automations": "Automatisierungen",
         "plugins": "Plugins",
         "bots": "Teammitglieder",
-        "search": "Suchen"
-      }
+        "search": "Suchen",
+        "todos": "To-dos"
+      },
+      "todosCount_one": "{{count}} offenes To-do",
+      "todosCount_other": "{{count}} offene To-dos"
     },
     "user": {
       "settingsLink": "Einstellungen, aktueller Nutzer: {{name}}",
@@ -11760,6 +11763,58 @@
       "unavailable": "Verzeichnis nicht verfügbar",
       "failed": "Projekte konnten nicht aktualisiert werden. Lade neu, um den gespeicherten Stand zu prüfen.",
       "noAvailable": "Füge zuerst weitere Projekte aus der Projektliste hinzu."
+    },
+    "todoBoard": {
+      "title": "To-dos",
+      "filterTeammates": "Nach Teammate filtern",
+      "discovered": "Vom Teammate gefunden",
+      "suggested": "Vorschlag {{date}}",
+      "laterUntil": "Wieder am {{date}}",
+      "completedOn": "Erledigt am {{date}}",
+      "origin": {
+        "label": "Art",
+        "all": "Alle",
+        "assigned": "Beauftragt",
+        "discovered": "Gefunden"
+      },
+      "view": {
+        "label": "Status",
+        "open": "Offen",
+        "later": "Später",
+        "done": "Erledigt"
+      },
+      "bucket": {
+        "overdue": "Überfällig",
+        "today": "Heute",
+        "week": "Diese Woche",
+        "later": "Nach dieser Woche",
+        "none": "Ohne Frist"
+      },
+      "nextKind": {
+        "advance": "Voranbringen",
+        "view": "Ansehen",
+        "decide": "Deine Entscheidung nötig"
+      },
+      "tip": {
+        "source": "Quelle",
+        "next": "Nächster Schritt",
+        "deadline": "Frist",
+        "suggested": "Vorgeschlagene Frist",
+        "later": "Später",
+        "done": "Erledigt",
+        "overridden": "{{date}}, von dir geändert (Quelle: {{source}})",
+        "quote": "{{date}} · Quelle: „{{quote}}“"
+      },
+      "empty": {
+        "open": "Gerade keine To-dos",
+        "later": "Nichts auf später verschoben",
+        "done": "Noch keine erledigten To-dos",
+        "hint": "Was du deinen Teammates aufträgst und was sie in Mail, Feishu und GitHub finden, erscheint hier",
+        "chat": "Mit {{name}} chatten"
+      },
+      "offlineCached": "{{device}}, auf dem {{name}} läuft, ist offline. Angezeigt werden die zuletzt gesehenen To-dos.",
+      "offlineUnknown": "{{device}}, auf dem {{name}} läuft, ist offline. Die To-dos können gerade nicht angezeigt werden.",
+      "loadFailed": "To-dos von {{name}} konnten nicht geladen werden"
     }
   },
   "common": {

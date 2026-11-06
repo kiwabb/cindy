@@ -44,6 +44,7 @@ import { useGhostMainViews, type GhostMainViewItem } from '@/cindy-brain/ghostMa
 import { useInstalledGhosts } from '@/cindy-brain/useInstalledGhosts';
 import { useActiveMainView } from '@/hooks/useActiveMainView';
 import { SidebarInlineSearch } from '@/features/cc-agent/sidebar/SidebarInlineSearch';
+import { TodoBoardLocalSources, useTodoBoardOpenCount } from '@/features/bots/useTeammateTodoBoard';
 import { SidebarIconButton, SIDEBAR_RAIL_ICON_BUTTON_CLASS } from './SidebarIconButton';
 import { Tip } from '@/components/ui/tooltip';
 import { useConversationSearchContext } from '@/features/cc-agent/sidebar/conversationSearchContext';
@@ -109,6 +110,8 @@ export interface SidebarNavigationAction {
   dotTone?: DotTone;
   /** Attention count shown at the entry's end (99+ overflow), with its spoken label. */
   count?: { value: number; label: string };
+  /** Readers the count depends on; mounted with the entry, so a hidden entry reads nothing. */
+  sources?: React.ReactNode;
 }
 
 function EntryCountBadge({ count, className }: { count?: SidebarNavigationAction['count']; className?: string }) {
@@ -128,6 +131,8 @@ function useSidebarNavigationActions(
   const hasRetirementUnread = useInstalledGhosts().some((ghost) => ghost.retirement?.unread);
   const hasGhostUnread = useAnyGhostUnread() || hasRetirementUnread;
   const reviewUnread = usePluginReviewUpdates().updates.filter(item => item.unread);
+  const onTodosMatch = useMatch('/bots/todos');
+  const todoCount = useTodoBoardOpenCount();
   return {
     automations: {
       label: t('ccAgent.layout.automations'),
@@ -135,6 +140,15 @@ function useSidebarNavigationActions(
       onSelect: () => navigate('/cc-agent/scheduled'),
       active: Boolean(onScheduleMatch),
       showDot: false,
+    },
+    todos: {
+      label: t('sidebar.navigation.items.todos'),
+      icon: SIDEBAR_NAVIGATION_ITEM_ICONS.todos,
+      onSelect: () => navigate('/bots/todos'),
+      active: Boolean(onTodosMatch),
+      showDot: false,
+      count: { value: todoCount, label: t('sidebar.navigation.todosCount', { count: todoCount }) },
+      sources: <TodoBoardLocalSources />,
     },
     plugins: {
       label: t('sidebar.tabs.plugins'),
@@ -380,7 +394,7 @@ export function SidebarRailNavigation({
             aria-description={action.count?.value ? action.count.label : undefined}
             showDot={action.showDot}
             dotTone={action.dotTone}
-            badge={<EntryCountBadge count={action.count} />}
+            badge={<>{action.sources}<EntryCountBadge count={action.count} /></>}
             onClick={action.onSelect}
           />
         );
@@ -479,6 +493,7 @@ export function SidebarTopNav({
         <span className="leading-none">{action.label}</span>
         {action.showDot && <AttentionDot size={6} tone={action.dotTone} className="ml-auto mr-0.5" />}
         <EntryCountBadge count={action.count} className="ml-auto" />
+        {action.sources}
       </button>
     );
   };

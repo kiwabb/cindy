@@ -45,9 +45,17 @@ export interface GlanceTodos {
   nextDeferredAt: string | null;
   /** 「每天帮我查一次」是否开着；那台电脑的宿主还不支持时为 null，开关不出现。 */
   dailyCheck: boolean | null;
+  /** 「稍后再说」还没到期的未完成事项；只有按 `later` 读取时才有（待办页用），近况不读。 */
+  later: TeammateTodo[];
 }
 
-const EMPTY: GlanceTodos = { open: [], openTotal: 0, done: [], doneTotal: 0, nextDeferredAt: null, dailyCheck: null };
+/** 近况读待办与每天检查开关；待办页另外要「稍后再说」，不要开关。 */
+export interface GlanceTodoReadOptions {
+  later?: boolean;
+  dailyCheck?: boolean;
+}
+
+const EMPTY: GlanceTodos = { open: [], openTotal: 0, done: [], doneTotal: 0, nextDeferredAt: null, dailyCheck: null, later: [] };
 
 interface TodoPage {
   items: TeammateTodo[];
@@ -83,9 +91,9 @@ async function readRemotePage(deviceId: string, botId: string, query: TodoListQu
 /** 一类待办按页读完（宿主单页上限 25）；页数在开头读到的总数内收敛，总数中途变化时以最新一页为准。 */
 async function readAll(
   readPage: (query: TodoListQuery) => Promise<TodoPage>,
-  view: 'open' | 'done',
+  view: 'open' | 'done' | 'hidden',
 ): Promise<TodoPage> {
-  const order = view === 'open' ? 'due' : 'created';
+  const order = view === 'done' ? 'created' : 'due';
   const first = await readPage({ view, order, offset: 0, limit: PAGE });
   const items = [...first.items];
   let total = first.total;
@@ -98,7 +106,8 @@ async function readAll(
   return { items: items.slice(0, MAX_ITEMS), total, nextDeferredAt: first.nextDeferredAt ?? null, dailyCheck: first.dailyCheck };
 }
 
-async function readTodos(host: GlanceTodoHost): Promise<GlanceTodos> {
+async function readTodos(host: GlanceTodoHost, options: GlanceTodoReadOptions = {}): Promise<GlanceTodos> {
+  const withDailyCheck = options.dailyCheck !== false;
   let readPage: (query: TodoListQuery) => Promise<TodoPage>;
   let dailyCheck: Promise<boolean | null> | null = null;
   if (host.deviceId) {
@@ -109,16 +118,30 @@ async function readTodos(host: GlanceTodoHost): Promise<GlanceTodos> {
     const now = new Date();
     readPage = async (query) => queryTodoItems(items, query, now);
     // 读不到开关（伙伴暂停等）时只是不显示开关，待办照常。
-    dailyCheck = (async () => window.electronAPI.localDb.bots.todos.dailyCheck(host.botId))().catch(() => null);
+    if (withDailyCheck)
+      dailyCheck = (async () => window.electronAPI.localDb.bots.todos.dailyCheck(host.botId))().catch(() => null);
   }
-  const [open, done, localDailyCheck] = await Promise.all([readAll(readPage, 'open'), readAll(readPage, 'done'), dailyCheck]);
+  // 「隐藏」里还有不再提示与已删除的；只留暂缓到以后的未完成事项。读不到（如那台电脑的版本
+  // 还不认这一类）只是少了「稍后再说」，进行中与已完成照常。
+  const later = options.later
+    ? readAll(readPage, 'hidden')
+        .then((page) => page.items.filter((todo) => todo.status === 'open' && todo.decision?.kind === 'later'))
+        .catch(() => [])
+    : Promise.resolve([]);
+  const [open, done, localDailyCheck, laterItems] = await Promise.all([
+    readAll(readPage, 'open'),
+    readAll(readPage, 'done'),
+    dailyCheck,
+    later,
+  ]);
   return {
     open: open.items,
     openTotal: open.total,
     done: [...done.items].reverse(),
     doneTotal: done.total,
     nextDeferredAt: open.nextDeferredAt ?? null,
-    dailyCheck: host.deviceId ? (open.dailyCheck ?? null) : (localDailyCheck ?? null),
+    dailyCheck: !withDailyCheck ? null : host.deviceId ? (open.dailyCheck ?? null) : (localDailyCheck ?? null),
+    later: laterItems,
   };
 }
 
@@ -161,7 +184,8 @@ export async function patchGlanceTodo(host: GlanceTodoHost, patch: TodoPatch): P
  * 读一位伙伴的待办。`enabled=false` 时不读也不订阅（例如名册里伙伴主任务还没就绪）。
  * 本机随宿主推送刷新；别的电脑上的随那台的远程资源变更推送刷新；回到前台时再读一次。
  */
-export function useGlanceTodos(host: GlanceTodoHost, enabled = true) {
+export function useGlanceTodos(host: GlanceTodoHost, enabled = true, options: GlanceTodoReadOptions = {}) {
+  const { later = false, dailyCheck: withDailyCheck = true } = options;
   const [state, setState] = useState<{ todos: GlanceTodos; loaded: boolean; failed: boolean }>({
     todos: EMPTY,
     loaded: false,
@@ -175,21 +199,22 @@ export function useGlanceTodos(host: GlanceTodoHost, enabled = true) {
     const mine = ++epoch.current;
     const owner = getDataOwnerGeneration();
     try {
-      const todos = await readTodos({ botId, deviceId });
+      const todos = await readTodos({ botId, deviceId }, { later, dailyCheck: withDailyCheck });
       if (mine !== epoch.current || !isDataOwnerGenerationCurrent(owner)) return;
       setState({ todos, loaded: true, failed: false });
     } catch {
       if (mine !== epoch.current || !isDataOwnerGenerationCurrent(owner)) return;
       setState((previous) => ({ ...previous, loaded: true, failed: true }));
     }
-  }, [botId, deviceId, enabled]);
+  }, [botId, deviceId, enabled, later, withDailyCheck]);
 
   const refreshDailyCheck = useCallback(async () => {
+    if (!withDailyCheck) return;
     const owner = getDataOwnerGeneration();
     const dailyCheck = await readDailyCheck({ botId, deviceId }).catch(() => undefined);
     if (dailyCheck === undefined || !isDataOwnerGenerationCurrent(owner)) return;
     setState((previous) => ({ ...previous, todos: { ...previous.todos, dailyCheck } }));
-  }, [botId, deviceId]);
+  }, [botId, deviceId, withDailyCheck]);
 
   useEffect(() => {
     setState({ todos: EMPTY, loaded: false, failed: false });

@@ -10093,8 +10093,12 @@
         "automations": "Automatizações",
         "plugins": "Plugins",
         "bots": "Colegas",
-        "search": "Pesquisar"
-      }
+        "search": "Pesquisar",
+        "todos": "Afazeres"
+      },
+      "todosCount_one": "{{count}} afazer em aberto",
+      "todosCount_other": "{{count}} afazeres em aberto",
+      "todosCount_many": "{{count}} afazeres em aberto"
     },
     "user": {
       "settingsLink": "Definições, utilizador atual: {{name}}",
@@ -11855,6 +11859,58 @@
       "unavailable": "Diretório indisponível",
       "failed": "Não foi possível atualizar os projetos. Recarregue para verificar o estado guardado.",
       "noAvailable": "Adicione primeiro mais projetos a partir da lista de projetos."
+    },
+    "todoBoard": {
+      "title": "Afazeres",
+      "filterTeammates": "Filtrar por colega",
+      "discovered": "Encontrado pelo colega",
+      "suggested": "Sugerido {{date}}",
+      "laterUntil": "Volta a {{date}}",
+      "completedOn": "Concluído a {{date}}",
+      "origin": {
+        "label": "Tipo",
+        "all": "Todos",
+        "assigned": "Atribuídos",
+        "discovered": "Encontrados"
+      },
+      "view": {
+        "label": "Estado",
+        "open": "Em aberto",
+        "later": "Mais tarde",
+        "done": "Concluídos"
+      },
+      "bucket": {
+        "overdue": "Em atraso",
+        "today": "Hoje",
+        "week": "Esta semana",
+        "later": "Mais adiante",
+        "none": "Sem prazo"
+      },
+      "nextKind": {
+        "advance": "Avançar",
+        "view": "Ver",
+        "decide": "Precisa da sua decisão"
+      },
+      "tip": {
+        "source": "Origem",
+        "next": "Próximo passo",
+        "deadline": "Prazo",
+        "suggested": "Prazo sugerido",
+        "later": "Mais tarde",
+        "done": "Concluído",
+        "overridden": "{{date}}, alterado por si (a origem indicava {{source}})",
+        "quote": "{{date}} · a origem indicava «{{quote}}»"
+      },
+      "empty": {
+        "open": "Sem afazeres de momento",
+        "later": "Nada adiado para mais tarde",
+        "done": "Ainda não há afazeres concluídos",
+        "hint": "O que pede aos colegas e o que eles encontram no e-mail, Feishu e GitHub aparece aqui",
+        "chat": "Conversar com {{name}}"
+      },
+      "offlineCached": "{{device}}, onde está {{name}}, está offline. A mostrar os afazeres vistos da última vez.",
+      "offlineUnknown": "{{device}}, onde está {{name}}, está offline. Não é possível mostrar os afazeres agora.",
+      "loadFailed": "Não foi possível carregar os afazeres de {{name}}"
     }
   },
   "common": {

@@ -78,9 +78,11 @@ export function useActiveMainView() {
         location.pathname === '/cc-agent/scheduled' ||
         location.pathname.startsWith('/cc-agent/scheduled/');
       if (!isAutomations) {
-        const isBotCreation =
-          location.pathname === '/bots/roster' || location.pathname === '/bots/roster/';
-        history.current.paths[matchedKey] = isBotCreation
+        // 创建伙伴与待办汇总都不是某位伙伴的对话，回到伙伴时不落在这两页。
+        const notBotChat =
+          location.pathname === '/bots/roster' || location.pathname === '/bots/roster/' ||
+          location.pathname === '/bots/todos' || location.pathname === '/bots/todos/';
+        history.current.paths[matchedKey] = notBotChat
           ? '/bots'
           : location.pathname + location.search + location.hash;
       }

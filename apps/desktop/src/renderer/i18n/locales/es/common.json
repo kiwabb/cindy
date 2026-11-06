@@ -10093,8 +10093,12 @@
         "automations": "Automatizaciones",
         "plugins": "Complementos",
         "bots": "Compañeros",
-        "search": "Buscar"
-      }
+        "search": "Buscar",
+        "todos": "Pendientes"
+      },
+      "todosCount_one": "{{count}} pendiente abierto",
+      "todosCount_other": "{{count}} pendientes abiertos",
+      "todosCount_many": "{{count}} pendientes abiertos"
     },
     "user": {
       "settingsLink": "Configuración, usuario actual: {{name}}",
@@ -11855,6 +11859,58 @@
       "unavailable": "Directorio no disponible",
       "failed": "No se pudieron actualizar los proyectos. Vuelve a cargar para comprobar el estado guardado.",
       "noAvailable": "Primero agrega más proyectos desde la lista de proyectos."
+    },
+    "todoBoard": {
+      "title": "Pendientes",
+      "filterTeammates": "Filtrar por compañero",
+      "discovered": "Encontrado por el compañero",
+      "suggested": "Sugerido {{date}}",
+      "laterUntil": "Vuelve el {{date}}",
+      "completedOn": "Hecho el {{date}}",
+      "origin": {
+        "label": "Tipo",
+        "all": "Todos",
+        "assigned": "Encargados",
+        "discovered": "Encontrados"
+      },
+      "view": {
+        "label": "Estado",
+        "open": "Abiertos",
+        "later": "Más tarde",
+        "done": "Hechos"
+      },
+      "bucket": {
+        "overdue": "Vencidos",
+        "today": "Hoy",
+        "week": "Esta semana",
+        "later": "Más adelante",
+        "none": "Sin fecha límite"
+      },
+      "nextKind": {
+        "advance": "Avanzar",
+        "view": "Revisar",
+        "decide": "Necesita tu decisión"
+      },
+      "tip": {
+        "source": "Origen",
+        "next": "Siguiente paso",
+        "deadline": "Fecha límite",
+        "suggested": "Fecha sugerida",
+        "later": "Más tarde",
+        "done": "Hecho",
+        "overridden": "{{date}}, cambiada por ti (el origen decía {{source}})",
+        "quote": "{{date}} · el origen decía «{{quote}}»"
+      },
+      "empty": {
+        "open": "No hay pendientes ahora",
+        "later": "Nada aplazado para más tarde",
+        "done": "Aún no hay pendientes hechos",
+        "hint": "Lo que encargas a tus compañeros y lo que encuentran en el correo, Feishu y GitHub aparece aquí",
+        "chat": "Chatear con {{name}}"
+      },
+      "offlineCached": "{{device}}, donde está {{name}}, no tiene conexión. Se muestran los pendientes vistos la última vez.",
+      "offlineUnknown": "{{device}}, donde está {{name}}, no tiene conexión. Sus pendientes no se pueden mostrar ahora.",
+      "loadFailed": "No se pudieron cargar los pendientes de {{name}}"
     }
   },
   "common": {

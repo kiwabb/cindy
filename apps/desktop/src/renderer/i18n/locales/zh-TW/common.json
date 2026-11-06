@@ -9973,8 +9973,10 @@
         "automations": "自動化",
         "plugins": "插件",
         "bots": "夥伴",
-        "search": "搜尋"
-      }
+        "search": "搜尋",
+        "todos": "待辦"
+      },
+      "todosCount_other": "{{count}} 項進行中的待辦"
     },
     "user": {
       "settingsLink": "設定，當前使用者：{{name}}",
@@ -11714,6 +11716,58 @@
       "unavailable": "目錄暫不可用",
       "failed": "專案未能更新，請重新載入核對儲存結果。",
       "noAvailable": "更多專案可先在專案列表中新增。"
+    },
+    "todoBoard": {
+      "title": "待辦",
+      "filterTeammates": "依夥伴篩選",
+      "discovered": "夥伴發現",
+      "suggested": "建議 {{date}}",
+      "laterUntil": "{{date}} 再提醒",
+      "completedOn": "完成於 {{date}}",
+      "origin": {
+        "label": "類型",
+        "all": "全部",
+        "assigned": "交辦",
+        "discovered": "發現"
+      },
+      "view": {
+        "label": "狀態",
+        "open": "進行中",
+        "later": "稍後再說",
+        "done": "已完成"
+      },
+      "bucket": {
+        "overdue": "逾期",
+        "today": "今天",
+        "week": "本週",
+        "later": "更晚",
+        "none": "無截止"
+      },
+      "nextKind": {
+        "advance": "推進",
+        "view": "查看",
+        "decide": "需要你決定"
+      },
+      "tip": {
+        "source": "來源",
+        "next": "下一步",
+        "deadline": "截止",
+        "suggested": "建議截止",
+        "later": "稍後再說",
+        "done": "完成",
+        "overridden": "{{date}}，你改過（來源寫的是 {{source}}）",
+        "quote": "{{date}} · 來源原話「{{quote}}」"
+      },
+      "empty": {
+        "open": "現在沒有待辦",
+        "later": "沒有稍後再說的待辦",
+        "done": "還沒有完成的待辦",
+        "hint": "交代給夥伴的事，以及它從郵件、飛書、GitHub 裡發現的事，都會記在這裡",
+        "chat": "和{{name}}聊聊"
+      },
+      "offlineCached": "{{name}}所在的 {{device}} 離線，顯示的是上次看到的待辦",
+      "offlineUnknown": "{{name}}所在的 {{device}} 離線，暫時看不到它的待辦",
+      "loadFailed": "沒能讀到{{name}}的待辦"
     }
   },
   "common": {
