@@ -1,0 +1,128 @@
+name: Package desktop for Mac
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the tested app to GitHub Releases
+        type: boolean
+        default: true
+  push:
+    branches:
+      - codex/github-packaging
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-package-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    runs-on: macos-15
+    timeout-minutes: 90
+    env:
+      # Installed apps fetch engines on demand. Packaging stages its own pinned ripgrep.
+      XDT_SKIP_AGENT_BIN_INSTALL: '1'
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          lfs: true
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+        with:
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Check native Apple Silicon runner
+        run: node -e 'if (process.platform !== "darwin" || process.arch !== "arm64") process.exit(1)'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Package and smoke-test the app
+        # 0.0.0 is the existing community-build sentinel. It disables official app updates.
+        # The existing packager applies ad-hoc signing and retains its packaged smoke test.
+        run: pnpm release:package --platform darwin --arch arm64 --region global --no-sign
+
+      - name: Create and verify installation DMG
+        working-directory: apps/desktop/release/artifacts/global/unversioned/darwin-arm64
+        run: |
+          dmg_root="$RUNNER_TEMP/cindy-dmg"
+          mkdir -p "$dmg_root"
+          ditto -x -k cindy-unversioned-arm64.zip "$dmg_root"
+          test -d "$dmg_root/Cindy.app"
+          ln -s /Applications "$dmg_root/Applications"
+          hdiutil create -volname Cindy -srcfolder "$dmg_root" -format UDZO cindy-unversioned-arm64.dmg
+          hdiutil verify cindy-unversioned-arm64.dmg
+
+      - name: Check distributable and write checksums
+        working-directory: apps/desktop/release/artifacts/global/unversioned/darwin-arm64
+        run: |
+          test -s cindy-unversioned-arm64.zip
+          test -s cindy-unversioned-arm64.dmg
+          test -s build-info.json
+          shasum -a 256 cindy-unversioned-arm64.dmg cindy-unversioned-arm64.zip build-info.json > SHA256SUMS
+          shasum -a 256 -c SHA256SUMS
+
+      - name: Upload downloadable app
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: cindy-macos-arm64
+          path: apps/desktop/release/artifacts/global/unversioned/darwin-arm64/
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+  release:
+    needs: package
+    if: github.event_name == 'push' || inputs.publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download tested app
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: cindy-macos-arm64
+          path: dist
+
+      - name: Publish installation download
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SOURCE_COMMIT: ${{ github.sha }}
+        working-directory: dist
+        run: |
+          sha256sum --check SHA256SUMS
+          tag="desktop-macos-arm64-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          cat > /tmp/cindy-release-notes.md <<'NOTES'
+          Apple Silicon Mac community build from this fork.
+
+          Download and open `cindy-unversioned-arm64.dmg`, then drag `Cindy.app` into Applications. Then launch Cindy from Applications, Launchpad, or Spotlight.
+
+          This app uses ad-hoc signing and has not been notarized by Apple. macOS can block its first launch. After attempting to open this trusted download, open System Settings → Privacy & Security → Open Anyway if offered.
+
+          This package uses the upstream community version `0.0.0`. It does not install official Cindy app updates. Download a newer build here when you want to update it.
+
+          The packaged startup/database smoke test ran in CI. Signing and real account/model/device workflows require separate acceptance.
+          NOTES
+          printf '\nSource commit `%s`\n' "$SOURCE_COMMIT" >> /tmp/cindy-release-notes.md
+          gh release create "$tag" \
+            --target "$SOURCE_COMMIT" \
+            --title "Cindy for Apple Silicon Mac (${SOURCE_COMMIT:0:7})" \
+            --notes-file /tmp/cindy-release-notes.md \
+            --latest \
+            cindy-unversioned-arm64.dmg cindy-unversioned-arm64.zip build-info.json SHA256SUMS
+          printf '## Installation download\n\n[Download Cindy](https://github.com/%s/releases/tag/%s)\n' "$GH_REPO" "$tag" >> "$GITHUB_STEP_SUMMARY"
