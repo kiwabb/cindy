@@ -53,6 +53,9 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Package and smoke-test the app
+        env:
+          # Authenticate public release metadata requests on shared GitHub runner IPs.
+          GITHUB_TOKEN: ${{ github.token }}
         # 0.0.0 is the existing community-build sentinel. It disables official app updates.
         # The existing packager applies ad-hoc signing and retains its packaged smoke test.
         run: pnpm release:package --platform darwin --arch arm64 --region global --no-sign
