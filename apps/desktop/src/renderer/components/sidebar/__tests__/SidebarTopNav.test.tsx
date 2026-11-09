@@ -18,8 +18,11 @@ const mainViewsMock = vi.hoisted(() => ({
   routeCapable: [] as MainViewMock[],
   sidebarVisible: [] as MainViewMock[],
 }));
-const authMock = vi.hoisted(() => ({ owner: 'owner-1' as string | null }));
-vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ dataOwnerId: authMock.owner }) }));
+const authMock = vi.hoisted(() => ({ owner: 'owner-1' as string | null, generation: 1 }));
+vi.mock('@/contexts/AuthContext', () => ({
+  useAuth: () => ({ dataOwnerId: authMock.owner, dataOwnerGeneration: authMock.generation }),
+  useOptionalDataOwnerGeneration: () => authMock.generation,
+}));
 // A non-empty installed roster marks the plugin list as loaded (Main sends none mid-switch).
 const installedMock = vi.hoisted(() => ({ ghosts: [{ manifest: { id: 'bundled' } }] as unknown[] }));
 vi.mock('@/cindy-brain/useInstalledGhosts', () => ({ useInstalledGhosts: () => installedMock.ghosts }));
@@ -72,6 +75,7 @@ beforeEach(() => {
   mainViewsMock.routeCapable = [];
   mainViewsMock.sidebarVisible = [];
   authMock.owner = 'owner-1';
+  authMock.generation = 1;
   installedMock.ghosts = [{ manifest: { id: 'bundled' } }];
   unreadMock.ordinary = false;
   reviewMock.updates = [];
@@ -677,11 +681,13 @@ describe('Plugins joining the sidebar', () => {
 
   it('waits for the account before deciding which plugins are new', () => {
     authMock.owner = null;
+    authMock.generation = 0;
     mainViewsMock.routeCapable = [SITES];
     mainViewsMock.sidebarVisible = [SITES];
     const view = renderNav();
     expect(localStorage.getItem('sidebar-navigation:apps:v1')).toBeNull();
     authMock.owner = 'owner-1';
+    authMock.generation = 1;
     view.rerender(
       <MainViewHistoryProvider>
         <MemoryRouter initialEntries={['/cc-agent']}>
@@ -717,6 +723,7 @@ describe('Plugins joining the sidebar', () => {
     const view = renderNav();
     expect(screen.getByRole('button', { name: 'sidebar.tabs.plugins' })).toBeTruthy();
     authMock.owner = 'owner-2';
+    authMock.generation = 2;
     view.rerender(
       <MainViewHistoryProvider>
         <MemoryRouter initialEntries={['/cc-agent']}>
@@ -749,6 +756,7 @@ describe('Plugins joining the sidebar', () => {
     // switches before Done.
     fireEvent.click(screen.getByRole('checkbox', { name: 'sidebar.navigation.items.plugins' }));
     authMock.owner = 'owner-2';
+    authMock.generation = 2;
     view.rerender(
       <MainViewHistoryProvider>
         <MemoryRouter initialEntries={['/cc-agent']}>

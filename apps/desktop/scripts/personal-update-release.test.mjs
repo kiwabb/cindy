@@ -1,5 +1,5 @@
 /* global Buffer */
-import test from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -18,7 +18,7 @@ const environment = { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: policy.reposito
   GITHUB_SHA: sourceCommit, GITHUB_RUN_ID: '123', GITHUB_RUN_ATTEMPT: '1' };
 function fixture(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cindy-personal-release-test-'));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  t.onTestFinished(() => fs.rmSync(dir, { recursive: true, force: true }));
   const desktopRoot = path.join(dir, 'repo', 'apps', 'desktop');
   const artifactDir = path.join(dir, 'artifacts');
   fs.mkdirSync(artifactDir); fs.mkdirSync(desktopRoot, { recursive: true });

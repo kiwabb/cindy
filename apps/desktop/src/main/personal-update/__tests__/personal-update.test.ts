@@ -28,7 +28,7 @@ describe('personal update trust boundary', () => {
     expect(() => validatePersonalManifest({ ...manifest, storageIdentity: '' }, policy)).toThrow();
   });
 
-  it('acknowledges only the exact canonical revision, nonce and opened-storage transaction', () => {
+  it.skipIf(process.platform !== 'darwin')('durably acknowledges only the exact canonical revision, nonce and opened-storage transaction', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cindy-personal-health-test-'));
     try {
       const nonce = randomUUID(), health = path.join(root, `health-${nonce}.json`);
@@ -78,24 +78,55 @@ describe('personal update archive preflight', () => {
 });
 
 
+function transactionFixture(root: string) {
+  const nonce = randomUUID();
+  const journal = {
+    schemaVersion: 1 as const,
+    nonce,
+    phase: 'prepared',
+    identity,
+    previousIdentity: { ...identity, revision: 41 },
+    previousPid: 123,
+    canonicalApp: '/Applications/Cindy.app',
+    backup: `/Applications/.Cindy-personal-backup-${nonce}.app`,
+    health: path.join(root, `health-${nonce}.json`),
+    zip: path.join(root, 'personal-42.zip'),
+    sha256: 'c'.repeat(64),
+    helper: path.join(root, `attempt-${nonce}`, 'swap-apps'),
+    helperSha256: 'd'.repeat(64),
+    teamId: 'ABCDEFGHIJ',
+    ownerIdentity: 'e'.repeat(64),
+  };
+  return journal;
+}
+
 describe('personal update transaction script', () => {
-  it('builds executable shell syntax and rejects a substituted canonical or backup path', () => {
+  it('rejects a substituted canonical or backup path', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cindy-personal-script-test-'));
     try {
-      const nonce = randomUUID();
-      const journal = { schemaVersion: 1 as const, nonce, phase: 'prepared', identity,
-        previousIdentity: { ...identity, revision: 41 }, previousPid: 123,
-        canonicalApp: '/Applications/Cindy.app', backup: `/Applications/.Cindy-personal-backup-${nonce}.app`,
-        health: path.join(root, `health-${nonce}.json`), zip: path.join(root, 'personal-42.zip'),
-        sha256: 'c'.repeat(64), helper: path.join(root, `attempt-${nonce}`, 'swap-apps'),
-        helperSha256: 'd'.repeat(64), teamId: 'ABCDEFGHIJ', ownerIdentity: 'e'.repeat(64) };
-      const script = buildPersonalMacTransaction(journal, root);
-      const parsed = spawnSync('/bin/bash', ['-n'], { input: script, encoding: 'utf8' });
-      expect(parsed.status, parsed.stderr).toBe(0);
+      const journal = transactionFixture(root);
       expect(() => buildPersonalMacTransaction({ ...journal, canonicalApp: '/tmp/Cindy.app' }, root)).toThrow();
       expect(() => buildPersonalMacTransaction({ ...journal, backup: '/Applications/Other.app' }, root)).toThrow();
       expect(() => buildPersonalMacTransaction({ ...journal, helper: '/tmp/untrusted-helper' }, root)).toThrow();
       expect(() => buildPersonalMacTransaction({ ...journal, phase: 'future-unknown-phase' }, root)).toThrow();
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it.skipIf(process.platform !== 'darwin')('validates the macOS transaction syntax with system Bash', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cindy-personal-script-syntax-test-'));
+    try {
+      const script = buildPersonalMacTransaction(transactionFixture(root), root);
+      const parsed = spawnSync('/bin/bash', ['-n'], { input: script, encoding: 'utf8' });
+      expect(parsed.status, parsed.stderr).toBe(0);
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it.skipIf(process.platform !== 'darwin')('executes the macOS health predicate against stale and valid receipts', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cindy-personal-health-predicate-test-'));
+    try {
+      const journal = transactionFixture(root);
+      const { nonce } = journal;
+      const script = buildPersonalMacTransaction(journal, root);
       // Execute the emitted health predicate with filesystem/process fixtures only.
       // The signature boundary is stubbed here; no installed application is inspected.
       const begin = script.indexOf('valid_health() {');
@@ -114,7 +145,6 @@ describe('personal update transaction script', () => {
       expect(check({ ...receipt, processBirth: '1:3' }).stdout).toBe('waiting');
       expect(check({ ...receipt, ownerIdentity: 'f'.repeat(64) }).stdout).toBe('waiting');
       expect(check(receipt).stdout).toBe('ready');
-
     } finally { fs.rmSync(root, { recursive: true, force: true }); }
   });
 });

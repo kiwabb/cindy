@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 import { Buffer } from 'node:buffer';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import { parsePackageArgs } from './ci/package-lib.mjs';
 import { appleDevelopmentRequirement, verifyAppleDevelopmentSignature, localCodesignArguments, localDesignatedRequirement, readLocalSigningIdentity, readLocalSigningIdentifier, smokeLocalSignedApp } from './ci/local-mac-signing.mjs';
 import { collectMacSigningTargets } from './ci/lib.mjs';
@@ -109,9 +109,7 @@ test('codesign receives inline requirements rather than requirement file paths',
 
 // Native helper regression fixtures exercise metadata and traversal only, without
 // importing an identity, signing code, launching an app or touching TCC.
-test('local bundle IDs come from current metadata and nested signing order stays inside-out', {
-  skip: process.platform !== 'darwin',
-}, () => {
+test.skipIf(process.platform !== 'darwin')('local bundle IDs come from current metadata and nested signing order stays inside-out', () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cindy-signing-layout-'));
   try {
     const appPath = path.join(directory, 'Cindy.app');

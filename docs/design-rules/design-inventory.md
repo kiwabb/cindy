@@ -18,7 +18,7 @@
 | `desktop.auth.add-account` | desktop | 添加账号 | hash `/add-account`（ProtectedRoute → AddAccountLoginPage） |
 | `desktop.auth.legacy-migration` | desktop | 首登数据迁移弹窗 | App 顶层挂载 LegacyMigrationDialog（仅主窗；main 检测到旧版 userData 经 `legacy-migration:state` 驱动） |
 | `desktop.auth.login` | desktop | 登录页 | hash `/login`（GuestRoute → LoginPage） |
-| `desktop.bots` | desktop | 伙伴（列表 / 对话 / 设置 / 历史 / 伙伴私聊 / 群聊） | hash `/bots`、`/bots/list`、`/bots/:botId`、`/bots/roster` 及伙伴当前/历史任务、伙伴私聊、伙伴群聊路由（BotsFeatureLayout） |
+| `desktop.bots` | desktop | 伙伴（列表 / 个人与伙伴待办 / 对话 / 设置 / 历史 / 伙伴私聊 / 群聊） | hash `/bots`、`/bots/list`、`/bots/:botId`、`/bots/roster`、`/bots/todos`（个人与伙伴待办）及伙伴当前/历史任务、伙伴私聊、伙伴群聊路由（BotsFeatureLayout） |
 | `desktop.chat.files` | desktop | 工作目录文件浏览 | hash `/cc-agent/files/:sessionId`（WorkdirBrowseRoute） |
 | `desktop.chat.new-draft` | desktop | 新建任务草稿页 | hash `/cc-agent/new`（NewMakerDraftRoute） |
 | `desktop.chat.orca-workflow` | desktop | Orca 协同工作台 | hash `/cc-agent/orca/:sessionId`（OrcaWorkflowRoute） |
@@ -95,6 +95,7 @@
 | `/bots/remote/:deviceId/:botId/history/:sessionId` | BotHistorySessionView | `desktop.bots` |
 | `/bots/remote/:deviceId/:botId/session/:sessionId` | RemoteBotSessionView | `desktop.bots` |
 | `/bots/roster` | BotRosterView | `desktop.bots` |
+| `/bots/todos` | TeammateTodosView | `desktop.bots` |
 | `/cc-agent/:sessionId` | CCAgentSessionView | `desktop.chat.session` |
 | `/cc-agent/boot` | SecondaryWindowBootGate | `desktop.chat.session` |
 | `/cc-agent/files/:sessionId` | WorkdirBrowseRoute | `desktop.chat.files` |
