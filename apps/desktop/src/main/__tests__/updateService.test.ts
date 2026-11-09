@@ -29,6 +29,15 @@ const appGetPath = vi.fn((name: string) => {
   if (name === 'exe') return TEST_EXE;
   return TEST_ROOT;
 });
+const personalContext = vi.fn<() => unknown>(() => null);
+const personalPrepared = vi.fn<() => unknown>(() => null);
+const personalManifest = vi.fn<() => Promise<unknown>>(async () => null);
+const personalApply = vi.fn(async () => undefined);
+vi.mock('../personal-update/runtime.js', () => ({
+  personalUpdateContext: personalContext, readPreparedPersonalUpdate: personalPrepared,
+  checkPersonalManifest: personalManifest, prepareInUtilityProcess: vi.fn(),
+  applyPreparedPersonalUpdate: personalApply,
+}));
 const fetchManifest = vi.fn();
 const getBaseUrl = vi.fn(() => CDN_EXTERNAL_BASE_URL);
 const isDev = vi.fn(() => false);
@@ -201,6 +210,20 @@ async function freshUpdateService(platform: NodeJS.Platform, arch: string = orig
   return import('../updateService');
 }
 
+function personalUpdateFixture() {
+  const root = path.join(TEST_USER_DATA, 'personal-app-updates');
+  fs.mkdirSync(root, { recursive: true });
+  const zip = path.join(root, 'personal-42.zip');
+  fs.writeFileSync(zip, 'prepared-fixture');
+  const identity = { revision: 42, sourceCommit: 'a'.repeat(40), storageIdentity: 'same-storage' };
+  const context = { root, identity: { ...identity, revision: 41, sourceCommit: 'b'.repeat(40) } };
+  const prepared = { path: zip, sha256: 'c'.repeat(64), teamId: 'ABCDEFGHIJ', identity };
+  personalContext.mockReturnValue(context);
+  personalPrepared.mockReturnValue(prepared);
+  personalManifest.mockResolvedValue(identity);
+  return { context, prepared, zip, identity };
+}
+
 function resetUpdateServiceFixture() {
   if (TEST_ROOT) {
     fs.rmSync(TEST_ROOT, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
@@ -220,6 +243,10 @@ afterAll(() => {
   fs.rmSync(TEST_ROOT, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
 });
 beforeEach(() => {
+  personalContext.mockReturnValue(null);
+  personalPrepared.mockReturnValue(null);
+  personalManifest.mockResolvedValue(null);
+  personalApply.mockClear();
   // Own every startup/background timer so afterEach can cancel it before the
   // app.getPath mock starts pointing at the next test's isolated fixture.
   vi.useFakeTimers();
@@ -1526,6 +1553,130 @@ describe('app update forward-only policy', () => {
 
     expect(service.getUpdateStatus()).toBe('idle');
     expect(fs.existsSync(path.join(TEST_USER_DATA, 'updates', 'patch-info.json'))).toBe(false);
+  });
+
+  it('applies a qualified personal revision through the normal relaunch IPC despite public 0.0.0', async () => {
+    readAutoUpdateSettings.mockReturnValue({ autoRelaunchOnIdle: false });
+    appGetVersion.mockReturnValue('0.0.0');
+    const { zip } = personalUpdateFixture();
+    const service = await freshUpdateService('darwin');
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+    service.initUpdateService();
+    try {
+      await expect(service.checkForUpdate()).resolves.toBe('ready');
+      ipcListeners.get('update-relaunch')?.({}, 'dark');
+      await vi.waitFor(() => expect(personalApply).toHaveBeenCalledWith(zip));
+      expect(exitSpy).toHaveBeenCalledWith(0);
+      expect(fs.existsSync(zip)).toBe(true);
+    } finally { exitSpy.mockRestore(); service.stopUpdateService(); }
+  });
+
+  it.each(['PERSONAL_UPDATE_STORAGE_INCOMPATIBLE', 'Invalid personal update policy',
+    'Invalid personal update identity', 'PERSONAL_UPDATE_FEED_UNAVAILABLE'])
+  ('defers a cached personal update after a rejected check (%s)', async error => {
+    readAutoUpdateSettings.mockReturnValue({ autoRelaunchOnIdle: false });
+    const { zip } = personalUpdateFixture();
+    const service = await freshUpdateService('darwin');
+    service.initUpdateService();
+    try {
+      await expect(service.checkForUpdate()).resolves.toBe('ready');
+      personalManifest.mockRejectedValueOnce(new Error(error));
+      await expect(service.checkForUpdate()).resolves.toBe('manifest_failed');
+      expect(service.getUpdateStatus()).toBe('idle');
+      expect(fs.existsSync(zip)).toBe(true);
+      ipcListeners.get('update-relaunch')?.({}, 'dark');
+      await vi.waitFor(() => expect(logError).toHaveBeenCalledWith('No ready update file to apply'));
+      expect(personalApply).not.toHaveBeenCalled();
+    } finally { service.stopUpdateService(); }
+  });
+
+  it('settles the confirming Agent turn before checking personal update activity and recording restart', async () => {
+    readAutoUpdateSettings.mockReturnValue({ autoRelaunchOnIdle: false });
+    appGetVersion.mockReturnValue('0.0.0');
+    const { zip } = personalUpdateFixture();
+    const service = await freshUpdateService('darwin');
+    let callerBusy = true;
+    const order: string[] = [];
+    service.setUpdateAutoRelaunchBusyProbe(() => { order.push('busy-check'); return callerBusy; });
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+    try {
+      await expect(service.checkForUpdate()).resolves.toBe('ready');
+      const result = await service.applyConfirmedAppUpdateForAgent({
+        expectedVersion: 'personal-r42',
+        beforeRelaunch: async () => { order.push('caller-settled'); callerBusy = false; return true; },
+        beforeSpawn: () => { order.push('restart-record'); return true; },
+      });
+      expect(result).toMatchObject({ status: 'relaunching', targetVersion: 'personal-r42' });
+      expect(order).toEqual(['caller-settled', 'busy-check', 'busy-check', 'restart-record']);
+      expect(personalApply).toHaveBeenCalledWith(zip);
+    } finally { exitSpy.mockRestore(); service.stopUpdateService(); }
+  });
+
+  it('leaves other personal tasks running before the confirmed Agent entry reclaims runners', async () => {
+    readAutoUpdateSettings.mockReturnValue({ autoRelaunchOnIdle: false });
+    appGetVersion.mockReturnValue('0.0.0');
+    personalUpdateFixture();
+    const service = await freshUpdateService('darwin');
+    service.setUpdateAutoRelaunchBusyProbe(() => true);
+    const runners = await import('@cindy/maker-core/pi-subagent-runs');
+    const reclaim = vi.spyOn(runners, 'stopAllPiSubagentRunsForExit');
+    const beforeSpawn = vi.fn(() => true);
+    try {
+      await expect(service.checkForUpdate()).resolves.toBe('ready');
+      const result = await service.applyConfirmedAppUpdateForAgent({
+        expectedVersion: 'personal-r42', beforeRelaunch: async () => true, beforeSpawn,
+      });
+      expect(result.status).toBe('failed');
+      expect(service.getUpdateStatus()).toBe('ready');
+      expect(reclaim).not.toHaveBeenCalled();
+      expect(beforeSpawn).not.toHaveBeenCalled();
+      expect(personalApply).not.toHaveBeenCalled();
+    } finally { reclaim.mockRestore(); service.stopUpdateService(); }
+  });
+
+  it('does not promote a cached personal target without a matching current manifest', async () => {
+    readAutoUpdateSettings.mockReturnValue({ autoRelaunchOnIdle: false });
+    const { zip, identity } = personalUpdateFixture();
+    const service = await freshUpdateService('darwin');
+    for (const manifest of [null, { ...identity, sourceCommit: 'f'.repeat(40) },
+      { ...identity, storageIdentity: 'different-storage' }, { ...identity, revision: 40 }]) {
+      personalManifest.mockResolvedValueOnce(manifest);
+      await expect(service.checkForUpdate()).resolves.toBe('idle');
+      expect(service.getUpdateStatus()).toBe('idle');
+      expect(fs.existsSync(zip)).toBe(true);
+    }
+    personalManifest.mockResolvedValueOnce(identity);
+    await expect(service.checkForUpdate()).resolves.toBe('ready');
+  });
+
+  it.each(['busy', 'setting', 'active', 'target', 'channel', 'disabled'] as const)
+  ('rechecks personal %s after asynchronous runner reclaim before automatic apply', async change => {
+    const { prepared } = personalUpdateFixture();
+    const service = await freshUpdateService('darwin');
+    const runners = await import('@cindy/maker-core/pi-subagent-runs');
+    let finishReclaim: ((result: boolean) => void) | undefined;
+    const reclaim = vi.spyOn(runners, 'stopAllPiSubagentRunsForExit')
+      .mockImplementationOnce(() => new Promise(resolve => { finishReclaim = resolve; }));
+    let busy = false;
+    service.setUpdateAutoRelaunchBusyProbe(() => busy);
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+    service.initUpdateService();
+    try {
+      await expect(service.checkForUpdate()).resolves.toBe('ready');
+      await vi.waitFor(() => expect(reclaim).toHaveBeenCalled());
+      if (change === 'busy') busy = true;
+      if (change === 'setting') readAutoUpdateSettings.mockReturnValue({ autoRelaunchOnIdle: false });
+      if (change === 'active') powerMonitorGetSystemIdleState.mockReturnValue('active');
+      if (change === 'target') personalPrepared.mockReturnValue({ ...prepared, identity: { ...prepared.identity, revision: 43 } });
+      if (change === 'channel') readUpdateChannelSettings.mockReturnValue({ enableBeta: true, orgDefaultEnableBeta: false });
+      if (change === 'disabled') personalContext.mockReturnValue(null);
+      finishReclaim?.(true);
+      await vi.waitFor(() => expect(logInfo).toHaveBeenCalledWith(
+        'Personal update deferred at final apply boundary (%s)', expect.any(String),
+      ));
+      expect(personalApply).not.toHaveBeenCalled();
+      expect(exitSpy).not.toHaveBeenCalled();
+    } finally { reclaim.mockRestore(); exitSpy.mockRestore(); service.stopUpdateService(); }
   });
 
   it('rechecks the version immediately before launching the native updater', async () => {

@@ -2577,7 +2577,7 @@ interface ElectronAPI {
    * Triggers FeishuBot WS connection (gated; otherwise the bot would come
    * online before the app can actually serve requests). Idempotent.
    */
-  appReadyForBot: () => Promise<{ ok: true }>;
+  appReadyForBot: (options?: { rendererCommitted: true; dataOwnerId: string; ownerGeneration: number }) => Promise<{ ok: true }>;
 
   syncDesktopCcPrefs: (prefs: {
     model: string;
@@ -5073,6 +5073,10 @@ interface ElectronAPI {
       ) => Promise<{ dismissed: number; processed: string[]; failed: string[] }>;
       ackInterrupted: (id: string) => Promise<void>;
       // Stage 2 C2: fork 已迁到 electronAPI.maker.fork (走 maker:fork IPC)。
+    };
+    personalTodos: {
+      list: () => Promise<import('../shared/personalTodo').PersonalTodo[]>;
+      update: (input: import('../shared/personalTodo').PersonalTodoUpdate) => Promise<import('../shared/personalTodo').PersonalTodo>;
     };
     bots: {
       getModelChainSettings: () => Promise<{

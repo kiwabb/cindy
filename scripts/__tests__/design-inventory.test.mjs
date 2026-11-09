@@ -125,6 +125,7 @@ test('extractRouterFacts: 真实 router.tsx 的三类去向逐条钉死', () => 
     '/bots/remote/:deviceId/:botId/history/:sessionId BotHistorySessionView',
     '/bots/remote/:deviceId/:botId/session/:sessionId RemoteBotSessionView',
     '/bots/roster BotRosterView',
+    '/bots/todos TeammateTodosView',
     '/cc-agent/:sessionId CCAgentSessionView',
     '/cc-agent/boot SecondaryWindowBootGate',
     '/cc-agent/files/:sessionId WorkdirBrowseRoute',

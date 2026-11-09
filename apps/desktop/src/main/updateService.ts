@@ -25,6 +25,8 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 import { isCindyPersonalRuntime } from './cindy-make/versionRuntimeIdentity.js';
+import { personalUpdateContext, checkPersonalManifest, prepareInUtilityProcess,
+  readPreparedPersonalUpdate, applyPreparedPersonalUpdate } from './personal-update/runtime.js';
 import os from 'node:os';
 
 import {
@@ -217,7 +219,7 @@ let busyProbe: () => boolean | Promise<boolean> = () => false;
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 function getUpdatesDir(): string {
-  const dir = path.join(app.getPath('userData'), 'updates');
+  const dir = personalUpdateContext()?.root ?? path.join(app.getPath('userData'), 'updates');
   fs.mkdirSync(dir, { recursive: true });
   return dir;
 }
@@ -353,12 +355,12 @@ async function hasBusyTasks(): Promise<boolean> {
   }
 }
 
-async function getAutoRelaunchBlockReasonForCurrentState(): Promise<AutoRelaunchBlockReason | null> {
+async function getAutoRelaunchBlockReasonForCurrentState(ownsRelaunch = false): Promise<AutoRelaunchBlockReason | null> {
   if (!readAutoUpdateSettings().autoRelaunchOnIdle) return 'disabled';
   if (isDev()) return 'dev';
   if (currentStatus !== 'ready') return 'not-ready';
   if (lastErrorCode === WINDOWS_UPDATER_RUNTIME_MISSING_ERROR_CODE) return 'not-ready';
-  if (isRelaunching || autoRelaunchInProgress) return 'relaunching';
+  if (!ownsRelaunch && (isRelaunching || autoRelaunchInProgress)) return 'relaunching';
   const hasBusyTasksNow = await hasBusyTasks();
 
   // The busy probe can await SQLite. Re-snapshot every mutable gate after it
@@ -367,7 +369,7 @@ async function getAutoRelaunchBlockReasonForCurrentState(): Promise<AutoRelaunch
   const enabled = readAutoUpdateSettings().autoRelaunchOnIdle;
   const dev = isDev();
   const status = currentStatus;
-  const relaunching = isRelaunching || autoRelaunchInProgress;
+  const relaunching = !ownsRelaunch && (isRelaunching || autoRelaunchInProgress);
   const nowMs = Date.now();
   if (hasBusyTasksNow) lastBusyAtMs = nowMs;
 
@@ -487,7 +489,7 @@ async function requestAutoRelaunch(
     lastAutoRelaunchBlockReason = null;
     autoRelaunchInProgress = true;
     log.info('auto relaunch conditions met (%s), applying update v%s', reason, readyVersion ?? '<unknown>');
-    void executeRelaunch(theme);
+    void executeRelaunch(theme, { automatic: true });
     return { accepted: true };
   } finally {
     autoRelaunchDecisionDepth = Math.max(0, autoRelaunchDecisionDepth - 1);
@@ -675,6 +677,7 @@ export function clearReloginFlag(): void {
  *                  in the union for backward compatibility with prior callers.)
  */
 function checkExistingPatch(): { action: 'relaunch' | 'check' | 'none'; version?: string } {
+  if (personalUpdateContext()) return { action: 'check' };
   if (isCindyPersonalRuntime()) return { action: 'none' };
   const updatesDir = getUpdatesDir();
   const infoPath = path.join(updatesDir, PATCH_INFO_FILE);
@@ -1123,7 +1126,63 @@ export function isVersionlessAppVersion(version: string): boolean {
   return version === '0.0.0' || version.startsWith('0.0.0-');
 }
 
+async function doCheckPersonalUpdate(): Promise<CheckForUpdateResult> {
+  const context = personalUpdateContext();
+  if (!context) return 'idle';
+  syncObservedUpdateChannel();
+  const channelEpochAtStart = updateChannelEpoch;
+  try {
+    setStatus('checking');
+    const manifest = await checkPersonalManifest();
+    if (!manifest) {
+      readyFilePath = undefined;
+      readyVersion = undefined;
+      readyChannelEpoch = undefined;
+      setStatus('idle');
+      return 'idle';
+    }
+    let prepared = readPreparedPersonalUpdate();
+    if (!prepared || manifest.revision > prepared.identity.revision) {
+      const incoming = path.join(context.root, `incoming-${manifest.revision}.zip`);
+      fs.mkdirSync(context.root, { recursive: true, mode: 0o700 });
+      setStatus('downloading', { version: `personal-r${manifest.revision}`, progress: 0 });
+      await download({ url: manifest.asset.url, targetPath: incoming, sha256: manifest.asset.sha256,
+        expectedSize: manifest.asset.size,
+        onProgress: event => broadcastUpdateProgress({ progress: event.total ? Math.min(99, event.loaded / event.total * 100) : 0,
+          received: event.loaded, total: event.total ?? manifest.asset.size }),
+      });
+      prepared = await prepareInUtilityProcess(incoming, manifest);
+      fs.rmSync(incoming, { force: true });
+    }
+    if (!personalUpdateContext() || syncObservedUpdateChannel() || channelEpochAtStart !== updateChannelEpoch
+      || !prepared || prepared.identity.revision !== manifest.revision
+      || prepared.identity.sourceCommit !== manifest.sourceCommit
+      || prepared.identity.storageIdentity !== manifest.storageIdentity) {
+      readyFilePath = undefined;
+      readyVersion = undefined;
+      readyChannelEpoch = undefined;
+      setStatus('idle');
+      return 'idle';
+    }
+    readyFilePath = prepared.path;
+    readyVersion = `personal-r${prepared.identity.revision}`;
+    readyChannelEpoch = updateChannelEpoch;
+    setStatus('ready', { version: readyVersion });
+    return 'ready';
+  } catch (error) {
+    log.warn('Personal update preparation stopped', { code: error instanceof Error ? error.message : 'PERSONAL_UPDATE_FAILED' });
+    // Keep verified bytes on disk, but never turn an unavailable or rejected
+    // manifest into authority to install a previously prepared target.
+    readyFilePath = undefined;
+    readyVersion = undefined;
+    readyChannelEpoch = undefined;
+    setStatus('idle');
+    return 'manifest_failed';
+  }
+}
+
 async function doCheckForUpdate(manifestOverride?: Manifest | null): Promise<CheckForUpdateResult> {
+  if (personalUpdateContext()) return doCheckPersonalUpdate();
   if (isCindyPersonalRuntime()) return 'idle';
   log.info('checkForUpdate() called, currentStatus=%s', currentStatus);
   // 先跟共享设置对一次有效渠道:共库另一实例改过开关时,本进程内存代际还停在旧值。
@@ -1610,7 +1669,12 @@ function forceQuit(): void {
   process.exit(0);
 }
 
-function executeUpdateMacOS(zipPath: string): void {
+async function executeUpdateMacOS(zipPath: string, personal = false): Promise<void> {
+  if (personal || personalUpdateContext()) {
+    await applyPreparedPersonalUpdate(zipPath);
+    forceQuit();
+    return;
+  }
   const appPath = path.dirname(path.dirname(path.dirname(app.getAppPath())));
   const appName = path.basename(appPath, '.app');
   const tmpDir = os.tmpdir();
@@ -1908,6 +1972,7 @@ function executeUpdateLinux(debPath: string, installation: LinuxUserInstallation
 }
 
 interface RelaunchOptions {
+  automatic?: boolean;
   /**
    * Last check after Subagent reclaim, immediately before the platform updater
    * spawns. Returning false keeps the patch staged and does not restart.
@@ -1987,7 +2052,15 @@ async function executeRelaunchUnguarded(
   }
 
   const currentVersion = app.getVersion();
-  const versionRelation = compareAppUpdateVersions(readyVersion, currentVersion);
+  const personalContext = personalUpdateContext();
+  const personalPrepared = personalContext ? readPreparedPersonalUpdate() : null;
+  const personalEpoch = updateChannelEpoch;
+  const versionRelation = personalContext
+    ? (personalPrepared?.path === readyFilePath
+      && personalPrepared.identity.revision > personalContext.identity.revision
+      && personalPrepared.identity.storageIdentity === personalContext.identity.storageIdentity
+      && readyVersion === `personal-r${personalPrepared.identity.revision}` ? 'newer' : 'unknown')
+    : compareAppUpdateVersions(readyVersion, currentVersion);
   if (versionRelation !== 'newer') {
     log.error(
       'executeRelaunch() refused non-upgrade patch: current=%s patch=%s relation=%s',
@@ -1998,6 +2071,15 @@ async function executeRelaunchUnguarded(
     isRelaunching = false;
     autoRelaunchInProgress = false;
     discardStagedPatchFiles();
+    return;
+  }
+
+  // An explicit personal update also waits for other tasks. Check before
+  // reclaiming runners so refusing an update never stops an active task.
+  if (personalContext && await hasBusyTasks()) {
+    log.info('Personal update deferred before runner reclaim (busy)');
+    isRelaunching = false;
+    autoRelaunchInProgress = false;
     return;
   }
 
@@ -2055,6 +2137,31 @@ async function executeRelaunchUnguarded(
     return;
   }
 
+  if (personalContext) {
+    const blockReason = options?.automatic
+      ? await getAutoRelaunchBlockReasonForCurrentState(true)
+      : (await hasBusyTasks() ? 'busy' : null);
+    const currentContext = personalUpdateContext();
+    const currentPrepared = readPreparedPersonalUpdate();
+    if (blockReason || !personalPrepared || !currentContext || !currentPrepared || syncObservedUpdateChannel()
+      || personalEpoch !== updateChannelEpoch || shouldAbortStagedPatchApply()
+      || readyChannelEpoch !== personalEpoch || currentStatus !== 'ready'
+      || readyFilePath !== personalPrepared.path || readyVersion !== `personal-r${personalPrepared.identity.revision}`
+      || currentPrepared.path !== personalPrepared.path || currentPrepared.sha256 !== personalPrepared.sha256
+      || currentPrepared.identity.revision !== personalPrepared.identity.revision
+      || currentPrepared.identity.sourceCommit !== personalPrepared.identity.sourceCommit
+      || currentPrepared.identity.storageIdentity !== personalPrepared.identity.storageIdentity
+      || currentPrepared.teamId !== personalPrepared.teamId || currentContext.root !== personalContext.root
+      || currentContext.identity.revision !== personalContext.identity.revision
+      || currentContext.identity.sourceCommit !== personalContext.identity.sourceCommit
+      || currentContext.identity.storageIdentity !== personalContext.identity.storageIdentity) {
+      log.info('Personal update deferred at final apply boundary (%s)', blockReason ?? 'target-changed');
+      isRelaunching = false;
+      autoRelaunchInProgress = false;
+      return;
+    }
+  }
+
   // The reclaim above can wait several seconds; a caller-bound condition (an
   // Agent install's confirming account) is re-checked after it, at the last
   // point where not restarting is still possible.
@@ -2087,7 +2194,7 @@ async function executeRelaunchUnguarded(
       // this only after the last in-executor check that can still keep the
       // staged patch for retry (Windows Runtime, Linux ownership recheck).
       incrementApplyAttempts();
-      executeUpdateMacOS(readyFilePath);
+      await executeUpdateMacOS(readyFilePath, Boolean(personalContext));
       break;
     case 'linux':
       executeUpdateLinux(readyFilePath, linuxInstallation);
@@ -2130,7 +2237,7 @@ function agentUpdateApplyBlockReason(): string | null {
 
 /** Build and installation blockers shared by every Agent-facing update entry. */
 function agentUpdateUnsupportedReason(): string | null {
-  if (!app.isPackaged || isDev() || isCindyPersonalRuntime() || isVersionlessAppVersion(app.getVersion())) {
+  if (!app.isPackaged || isDev() || isCindyPersonalRuntime() || (isVersionlessAppVersion(app.getVersion()) && !personalUpdateContext())) {
     return '此构建不支持应用内更新。';
   }
   return agentUpdateApplyBlockReason();
@@ -2559,6 +2666,12 @@ export function initUpdateService(): void {
     startupUpdateCheckInProgress = true;
     try {
       if (isDev() || isCindyPersonalRuntime()) {
+        return { hasUpdate: false, action: 'none' as const };
+      }
+
+      if (personalUpdateContext()) {
+        // Restore the user's tasks first. Personal updates use the existing idle/busy apply gate.
+        void checkForUpdate();
         return { hasUpdate: false, action: 'none' as const };
       }
 

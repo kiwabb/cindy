@@ -9,6 +9,7 @@ export default {
   notCovered:
     'The sidebar entry and its count, live pushes and foreground refresh, a teammate going offline after its todos were read, cloud companions, opening the teammate conversation',
   stubs: {
+    'src/renderer/contexts/AuthContext': { partial: `export const useOptionalDataOwnerGeneration=()=>0;` },
     'src/renderer/features/bots/botStore': {
       partial: `export const useBotProfiles=()=>[{id:'cindy-default',name:'Cindy',avatar:'cindy://avatar/preset/cindy',avatarColor:'violet',status:'active'}];`,
     },
@@ -20,6 +21,7 @@ export default {
     },
   },
   cases: {
+    'personal-row': { about: 'UNIT FIXTURE: one personal row, checkbox/opener siblings and keyboard focus. No model, account, writes, or simulated save results.' },
     default: { about: 'Three teammates, one offline: every deadline section, a decision to make, suggested date, done fold' },
     empty: { about: 'No todos anywhere: one sentence and a way into a teammate chat' },
   },
@@ -27,6 +29,23 @@ export default {
     await page.getByTestId('todo-board').waitFor();
   },
   async check(page, ui) {
+    if (ui.case === 'personal-row') {
+      const row = page.getByTestId('todo-board-row');
+      await row.waitFor();
+      assert.equal(await row.locator('button button').count(), 0);
+      const checkbox = row.getByRole('checkbox');
+      assert.equal(await checkbox.getAttribute('aria-checked'), 'false');
+      await checkbox.focus();
+      await ui.capture('personal-row-keyboard-focus-unit-fixture');
+      await row.getByRole('button', { name: '[fixture] Personal row — layout only' }).click();
+      await ui.capture('personal-existing-details-unit-fixture');
+      return;
+    }
+    await ui.capture('personal-empty');
+    await page.getByRole('button', { name: await ui.t('personalTodos.add') }).click();
+    await ui.capture('personal-editor-empty');
+    await page.getByRole('button', { name: await ui.t('personalTodos.close') }).click();
+    await page.getByRole('radio', { name: await ui.t('personalTodos.assistant'), exact: true }).click();
     if (ui.case === 'empty') {
       await page.getByTestId('todo-board-empty').waitFor();
       return;

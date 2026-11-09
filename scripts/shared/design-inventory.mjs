@@ -539,14 +539,15 @@ export function catalogSurfaces() {
     {
       id: 'desktop.bots',
       platform: 'desktop',
-      title: '伙伴（列表 / 对话 / 设置 / 历史 / 伙伴私聊 / 群聊）',
+      title: '伙伴（列表 / 个人与伙伴待办 / 对话 / 设置 / 历史 / 伙伴私聊 / 群聊）',
       productionEntry:
-        'hash `/bots`、`/bots/list`、`/bots/:botId`、`/bots/roster` 及伙伴当前/历史任务、伙伴私聊、伙伴群聊路由（BotsFeatureLayout）',
+        'hash `/bots`、`/bots/list`、`/bots/:botId`、`/bots/roster`、`/bots/todos`（个人与伙伴待办）及伙伴当前/历史任务、伙伴私聊、伙伴群聊路由（BotsFeatureLayout）',
       reachableComponents: [
         'BotsHomeView',
         'BotsListView',
         'BotMarketDialog',
         'BotRosterView',
+        'TeammateTodosView',
         'BotSessionView',
         'RemoteBotSessionView',
         'BotHistorySessionView',
@@ -572,6 +573,7 @@ export function catalogSurfaces() {
         '/bots/:botId/history/:sessionId',
         '/bots/:botId/session/:sessionId',
         '/bots/roster',
+        '/bots/todos',
         '/bots/groups/:groupId',
         '/bots/remote/:deviceId/:botId',
         '/bots/remote/:deviceId/:botId/history/:sessionId',
@@ -586,6 +588,7 @@ export function catalogSurfaces() {
         '/bots/:botId/history/:sessionId': 'BotHistorySessionView',
         '/bots/:botId/session/:sessionId': 'BotSessionView',
         '/bots/roster': 'BotRosterView',
+        '/bots/todos': 'TeammateTodosView',
         '/bots/groups/:groupId': 'BotGroupChatView',
         '/bots/remote/:deviceId/:botId': 'RemoteBotSessionView',
         '/bots/remote/:deviceId/:botId/history/:sessionId': 'BotHistorySessionView',

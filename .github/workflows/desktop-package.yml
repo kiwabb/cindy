@@ -9,17 +9,19 @@ on:
         default: true
   push:
     branches:
-      - codex/github-packaging
+      - main
 
 permissions:
   contents: read
 
 concurrency:
-  group: desktop-package-${{ github.ref }}
+  # Serialize the complete build/publication transaction for this sole Mac channel.
+  group: personal-macos-arm64
   cancel-in-progress: false
 
 jobs:
   package:
+    if: github.repository == 'kiwabb/cindy' && github.ref == 'refs/heads/main'
     runs-on: macos-15
     timeout-minutes: 90
     env:
@@ -49,6 +51,14 @@ jobs:
       - name: Check native Apple Silicon runner
         run: node -e 'if (process.platform !== "darwin" || process.arch !== "arm64") process.exit(1)'
 
+      - name: Assign update revision
+        id: identity
+        run: |
+          node --input-type=module <<'JS' >> "$GITHUB_ENV"
+          import { personalRevisionForRun } from './apps/desktop/scripts/ci/personal-update-metadata.mjs';
+          console.log(`CINDY_PERSONAL_UPDATE_REVISION=${personalRevisionForRun(process.env.GITHUB_RUN_ID, process.env.GITHUB_RUN_ATTEMPT)}`);
+          JS
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -56,7 +66,7 @@ jobs:
         env:
           # Authenticate public release metadata requests on shared GitHub runner IPs.
           GITHUB_TOKEN: ${{ github.token }}
-        # 0.0.0 is the existing community-build sentinel. It disables official app updates.
+        # Keep the official 0.0.0 sentinel. The signed personal identity carries its own revision.
         # The existing packager applies ad-hoc signing and retains its packaged smoke test.
         run: pnpm release:package --platform darwin --arch arm64 --region global --no-sign
 
@@ -70,6 +80,7 @@ jobs:
           ln -s /Applications "$dmg_root/Applications"
           hdiutil create -volname Cindy -srcfolder "$dmg_root" -format UDZO cindy-unversioned-arm64.dmg
           hdiutil verify cindy-unversioned-arm64.dmg
+          node "$GITHUB_WORKSPACE/apps/desktop/scripts/prepare-personal-update.mjs" "$PWD" "$dmg_root/Cindy.app"
 
       - name: Check distributable and write checksums
         working-directory: apps/desktop/release/artifacts/global/unversioned/darwin-arm64
@@ -77,7 +88,7 @@ jobs:
           test -s cindy-unversioned-arm64.zip
           test -s cindy-unversioned-arm64.dmg
           test -s build-info.json
-          shasum -a 256 cindy-unversioned-arm64.dmg cindy-unversioned-arm64.zip build-info.json > SHA256SUMS
+          test -s personal-update.json
           shasum -a 256 -c SHA256SUMS
 
       - name: Upload downloadable app
@@ -103,31 +114,24 @@ jobs:
           name: cindy-macos-arm64
           path: dist
 
-      - name: Publish installation download
+      - name: Checkout verified publication scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          path: source
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      - name: Publish immutable assets then advance the Mac channel
         env:
           GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          SOURCE_COMMIT: ${{ github.sha }}
-        working-directory: dist
         run: |
+          cd dist
           sha256sum --check SHA256SUMS
-          tag="desktop-macos-arm64-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          cat > /tmp/cindy-release-notes.md <<'NOTES'
-          Apple Silicon Mac community build from this fork.
-
-          Download and open `cindy-unversioned-arm64.dmg`, then drag `Cindy.app` into Applications. Then launch Cindy from Applications, Launchpad, or Spotlight.
-
-          This app uses ad-hoc signing and has not been notarized by Apple. macOS can block its first launch. After attempting to open this trusted download, open System Settings → Privacy & Security → Open Anyway if offered.
-
-          This package uses the upstream community version `0.0.0`. It does not install official Cindy app updates. Download a newer build here when you want to update it.
-
-          The packaged startup/database smoke test ran in CI. Signing and real account/model/device workflows require separate acceptance.
-          NOTES
-          printf '\nSource commit `%s`\n' "$SOURCE_COMMIT" >> /tmp/cindy-release-notes.md
-          gh release create "$tag" \
-            --target "$SOURCE_COMMIT" \
-            --title "Cindy for Apple Silicon Mac (${SOURCE_COMMIT:0:7})" \
-            --notes-file /tmp/cindy-release-notes.md \
-            --latest \
-            cindy-unversioned-arm64.dmg cindy-unversioned-arm64.zip build-info.json SHA256SUMS
-          printf '## Installation download\n\n[Download Cindy](https://github.com/%s/releases/tag/%s)\n' "$GH_REPO" "$tag" >> "$GITHUB_STEP_SUMMARY"
+          cd ..
+          node source/apps/desktop/scripts/publish-personal-update.mjs dist
+          printf '## Personal Mac update\n\nSource `%s`\n' "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"

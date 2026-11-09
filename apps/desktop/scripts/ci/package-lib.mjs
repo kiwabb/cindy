@@ -83,6 +83,7 @@ export function parsePackageArgs(argv, defaults = {}) {
     skipSmoke: false,
     allowUnsigned: false,
     noSign: false,
+    localSign: false,
   };
   let archFlag = null;
   let regionSpecified = false;
@@ -112,9 +113,17 @@ export function parsePackageArgs(argv, defaults = {}) {
       // 环境,不具备该环境的机器打版本无关包时用它;与 --allow-unsigned
       // (放行"缺配置")语义互补。
       case '--no-sign': out.noSign = true; out.allowUnsigned = true; break;
+      case '--local-sign': out.localSign = true; break;
       default:
-        throw new Error(`未知参数: ${a}(支持 --platform/--arch/--region/--version/--skip-smoke/--allow-unsigned/--no-sign)`);
+        throw new Error(`未知参数: ${a}(支持 --platform/--arch/--region/--version/--skip-smoke/--allow-unsigned/--no-sign/--local-sign)`);
     }
+  }
+
+  if (out.localSign && (out.noSign || out.platform !== 'darwin')) {
+    throw new Error('--local-sign requires darwin and cannot be combined with --no-sign');
+  }
+  if (out.localSign && out.versionSpec !== null) {
+    throw new Error('--local-sign supports versionless 0.0.0 builds only; omit --version');
   }
 
   if (!SUPPORTED_PLATFORMS.includes(out.platform)) {
@@ -230,12 +239,14 @@ export function artifactBaseName({ version, versionless }) {
  *   files: Array<{ role: string, name: string, sha256: string, size: number }>,
  *   signing: Record<string, unknown>,
  *   mcpAppsManual?: { sha256: string, size: number } | null,
+ *   personalUpdate?: Record<string, unknown> | null,
  * }} ctx
  */
 export function buildBuildInfo(ctx) {
   return {
     // v2 移除无运行语义的 package channel；发布通道只属于 publish 阶段。
     schemaVersion: 2,
+    ...(ctx.personalUpdate ? { personalUpdate: ctx.personalUpdate } : {}),
     product: 'cindy-desktop',
     // 版本无关包 version 记 null,占位符不冒充真实版本。
     version: ctx.versionless ? null : ctx.version,

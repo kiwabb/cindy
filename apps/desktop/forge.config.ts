@@ -12,6 +12,7 @@ import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import type { ForgeArch, ForgeConfig, ForgePlatform } from '@electron-forge/shared-types';
 import { stageLinuxBuildInfo } from './forge-linux';
+import { buildPersonalUpdateIdentity } from './scripts/ci/personal-update-metadata.mjs';
 import {
   BRAND_IDENTITY,
   allDeepLinkSchemes,
@@ -71,9 +72,10 @@ function formatLocalBuildTime(date = new Date()): string {
 function stageCindySourceMetadata(): void {
   const sourceCommit = resolveSourceCommit();
   const builtAt = formatLocalBuildTime();
+  const personalUpdate = buildPersonalUpdateIdentity({ desktopRoot: __dirname, sourceCommit });
   fs.writeFileSync(
     CINDY_SOURCE_METADATA_PATH,
-    `${JSON.stringify({ sourceCommit, builtAt }, null, 2)}\n`,
+    `${JSON.stringify({ sourceCommit, builtAt, ...(personalUpdate ? { personalUpdate } : {}) }, null, 2)}\n`,
     'utf8',
   );
   console.log(
@@ -1492,6 +1494,18 @@ function buildMacXboxGamepadHelper(platform: ForgePlatform, arch: ForgeArch): vo
   fs.chmodSync(dest, 0o755);
 }
 
+function buildPersonalUpdateSwapHelper(platform: ForgePlatform, arch: ForgeArch): void {
+  if (platform !== 'darwin') return;
+  if (arch !== 'arm64' && arch !== 'x64') throw new Error('Unsupported personal updater architecture');
+  const destination = path.join(__dirname, 'resources', 'tools', 'personal-update', 'swap-apps');
+  fs.mkdirSync(path.dirname(destination), { recursive: true });
+  const result = spawnSync('/usr/bin/xcrun', ['clang', '-arch', arch === 'x64' ? 'x86_64' : 'arm64',
+    '-O2', '-Wall', '-Werror', '-mmacosx-version-min=12.0',
+    path.join(__dirname, 'native', 'personal-update', 'swap-apps.c'), '-o', destination], { stdio: 'inherit' });
+  if (result.status !== 0) throw new Error('Personal update atomic exchange helper build failed');
+  fs.chmodSync(destination, 0o755);
+}
+
 function buildMacVoiceInputTextInsertionHelper(platform: ForgePlatform, arch: ForgeArch): void {
   if (process.platform !== 'darwin' || !isMacForgePlatform(platform)) return;
   const src = path.join(__dirname, 'native', 'voice-input', 'macos-text-insertion-helper.swift');
@@ -2065,6 +2079,7 @@ const config: ForgeConfig = {
       buildWindowsVoiceInputFunctionKeyListener(targetPlatform);
       buildMacVoiceInputTextInsertionHelper(platform, arch);
       buildMacXboxGamepadHelper(platform, arch);
+      buildPersonalUpdateSwapHelper(platform, arch);
       buildWindowsGamepadHelper(platform, arch);
       buildWindowsAtomicRenameHelper(platform, arch);
       buildWindowsTaskbarAddon(platform, arch);
@@ -2133,6 +2148,11 @@ const config: ForgeConfig = {
           config: 'vite.db-worker.config.ts',
           // 借用 preload target 的 CJS 单文件输出；这里运行时是 Node worker_threads，
           // 不是 Electron preload。
+          target: 'preload',
+        },
+        {
+          entry: 'src/main/personal-update/prepareProcess.ts',
+          config: 'vite.node-worker.config.ts',
           target: 'preload',
         },
         {

@@ -117,7 +117,7 @@ describe('PI Subagent reclaim before an update relaunch', () => {
     const gate = relaunch.indexOf('if (!await reclaimSubagentRunnersForRelaunch())');
     const attempts = relaunch.indexOf('incrementApplyAttempts();');
     const windows = relaunch.indexOf('executeUpdateWindows(readyFilePath, theme);');
-    const mac = relaunch.indexOf('executeUpdateMacOS(readyFilePath);');
+    const mac = relaunch.indexOf('await executeUpdateMacOS(readyFilePath, Boolean(personalContext));');
     expect(gate).toBeGreaterThan(-1);
     expect(attempts).toBeGreaterThan(gate);
     expect(windows).toBeGreaterThan(gate);
@@ -155,6 +155,6 @@ describe('PI Subagent reclaim before an update relaunch', () => {
     // the gate's rejection handling.
     expect([...source.matchAll(/(?<!void )executeRelaunch\((?:resolved|theme)(?:,[^)]*)?\)/g)]).toHaveLength(0);
     expect(source).toContain('void executeRelaunch(resolved);');
-    expect(source).toContain('void executeRelaunch(theme);');
+    expect(source).toContain('void executeRelaunch(theme, { automatic: true });');
   });
 });
