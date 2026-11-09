@@ -1,0 +1,125 @@
+name: Package desktop for Windows
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the tested installer to GitHub Releases
+        type: boolean
+        default: true
+  push:
+    branches:
+      - codex/windows-packaging
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-package-windows-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    runs-on: windows-2025
+    timeout-minutes: 90
+    env:
+      # The packager stages pinned runtime assets; installed apps fetch engines on demand.
+      XDT_SKIP_AGENT_BIN_INSTALL: '1'
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          lfs: true
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+        with:
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Check native Windows x64 runner
+        run: |
+          node -e "if (process.platform !== 'win32' || process.arch !== 'x64') process.exit(1)"
+          cargo --version
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Package and smoke-test the app
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        # Keep the community 0.0.0 version: no official app updates or signing secrets.
+        # Retain the packager's real packaged startup/database smoke test.
+        run: pnpm release:package --platform win32 --arch x64 --region global --no-sign
+
+      - name: Check installer and write checksums
+        working-directory: apps/desktop/release/artifacts/global/unversioned/win32-x64
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $files = @('cindy-unversioned-Setup.exe', 'build-info.json')
+          $lines = foreach ($file in $files) {
+            if (!(Test-Path -LiteralPath $file) -or (Get-Item -LiteralPath $file).Length -eq 0) {
+              throw "Missing or empty distributable: $file"
+            }
+            $hash = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $file"
+          }
+          $lines | Set-Content -LiteralPath SHA256SUMS -Encoding utf8NoBOM
+
+      - name: Upload tested Windows installer
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: cindy-windows-x64
+          path: apps/desktop/release/artifacts/global/unversioned/win32-x64/
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+  release:
+    needs: package
+    if: github.event_name == 'push' || inputs.publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download tested Windows installer
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: cindy-windows-x64
+          path: dist
+
+      - name: Publish Windows installation download
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SOURCE_COMMIT: ${{ github.sha }}
+        working-directory: dist
+        run: |
+          sha256sum --check SHA256SUMS
+          tag="desktop-windows-x64-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          cat > /tmp/cindy-windows-release-notes.md <<'NOTES'
+          Windows x64 community build from kiwabb/cindy.
+
+          Download and run `cindy-unversioned-Setup.exe`. The installer is unsigned; verify its SHA-256 against `SHA256SUMS` before running it.
+
+          This package uses the community version `0.0.0` and does not install official Cindy app updates. Download newer community builds from this repository.
+
+          The packaged startup/database smoke test ran in CI. Real account, model, and device workflows require separate acceptance.
+          NOTES
+          printf '\nSource commit `%s`\n' "$SOURCE_COMMIT" >> /tmp/cindy-windows-release-notes.md
+          gh release create "$tag" \
+            --target "$SOURCE_COMMIT" \
+            --title "Cindy for Windows x64 (${SOURCE_COMMIT:0:7})" \
+            --notes-file /tmp/cindy-windows-release-notes.md \
+            --latest \
+            cindy-unversioned-Setup.exe build-info.json SHA256SUMS
+          printf '## Windows installation download\n\n[Download Cindy for Windows](https://github.com/%s/releases/tag/%s)\n' "$GH_REPO" "$tag" >> "$GITHUB_STEP_SUMMARY"
