@@ -19,4 +19,14 @@ The upstream community-build version is `0.0.0`, which disables official app upd
 
 Packaged builds use their normal application profile. The existing development sandbox is separate, so its login and conversations do not automatically appear in the installed app. Keep the development sandbox when installing, and use the application's supported login and migration features as needed.
 
+## Personal signing on one Mac
+
+For a stable local identity across personal builds, run `pnpm release:package --platform darwin --arch arm64 --local-sign` on the owning Mac. This also signs versionless `0.0.0` builds and produces an app ZIP. It uses public metadata at `~/Library/Application Support/CindyLocalSigning/identity.json` with `schemaVersion: 1`, `certificateSha1` (the dedicated code-signing certificate's 40-character SHA-1 fingerprint) and `keychainPath` (the absolute path of the user's login keychain). Create the dedicated certificate through macOS Keychain Access before building. Its private key stays in that keychain under macOS access control.
+
+Each nested code object receives a designated requirement bound to its identifier and that exact certificate. Signing uses no timestamp server or notarization. Retain the same certificate and private key for future builds. `--local-sign` conflicts with `--no-sign` and rejects `--version`, keeping these personal builds on the community `0.0.0` update policy. Without the local flag, existing signing selection applies. The local metadata, certificates, private keys and keychain passwords belong outside the repository. The exported `signLocalMacApp` in `apps/desktop/scripts/ci/local-mac-signing.mjs` also signs an existing personal app copy with the same policy.
+
+The local build first checks the pinned public certificate using macOS's `codeSign` trust policy. A failed check requires the owner to explicitly confirm code-signing trust for that dedicated certificate in Keychain Access. The build itself only checks trust. Local packaging runs the existing packaged smoke test after final signing and before creating the ZIP, subject to `--skip-smoke` and the existing unsupported-host-architecture skip.
+
+Verify signature integrity and identical designated requirements on two distinct builds, then check real Accessibility authorization after replacing the first build with the second. Unit checks cover argument, requirement and smoke-runner selection. Permission continuity requires this native upgrade check.
+
 CI validates packaged startup and database access. A successful build does not establish real account login, model calls, native permissions, or device connectivity on the user's Mac.

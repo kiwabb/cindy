@@ -33,6 +33,7 @@
 //   --no-sign                       主动跳过签名(即使签名配置在手;隐含 --allow-unsigned)。
 //                                   外部签名命令依赖发布方自己的环境,不具备
 //                                   该环境的机器打版本无关包时用它
+//   --local-sign                    使用本机专用身份签名版本无关包，与 --no-sign / --version 互斥。
 //
 // 产物: release/artifacts/<region>/<version|unversioned>/<platform-arch>/
 //   cindy-<version|unversioned>-Setup.exe / -<arch>.dmg /
@@ -75,6 +76,7 @@ import {
   notarizeMacApp,
   createMacDMG,
 } from './ci/lib.mjs';
+import { readLocalSigningIdentity, signLocalMacApp, smokeLocalSignedApp, verifyLocalSigningTrust } from './ci/local-mac-signing.mjs';
 import {
   parsePackageArgs,
   resolvePackageVersion,
@@ -389,6 +391,9 @@ async function finishDarwin({
   allowUnsigned,
   noSign,
   macSigningIdentity,
+  localSigningIdentity,
+  region,
+  skipSmoke,
   webAuthnProvisioningProfile,
 }) {
   const packagedDir = path.join(DESKTOP_ROOT, 'out', `${appName}-darwin-${arch}`);
@@ -403,7 +408,7 @@ async function finishDarwin({
   const mainEntitlementsPath = path.join(RELEASE_DIR, 'build-main.entitlements');
 
   const applePassword = noSign ? undefined : process.env.APPLE_APP_PASSWORD;
-  const wantsRealSigning = !versionless && !noSign;
+  const wantsRealSigning = !versionless && !noSign && !localSigningIdentity;
   let signingMode = 'adhoc';
 
   if (wantsRealSigning && !applePassword && !allowUnsigned) {
@@ -413,7 +418,18 @@ async function finishDarwin({
   }
 
   const files = [];
-  if (wantsRealSigning && applePassword) {
+  if (localSigningIdentity) {
+    writeMacEntitlements(helperEntitlementsPath);
+    writeMacEntitlements(mainEntitlementsPath, { appleEvents: true });
+    signLocalMacApp(appPath, helperEntitlementsPath, mainEntitlementsPath, localSigningIdentity);
+    smokeLocalSignedApp({ arch, region, skipSmoke, hostCanRunArm64: isPhysicalArm64Mac() });
+    signingMode = 'local-only';
+    verifyMacBinaryArch(appName, arch);
+    const appZipPath = path.join(artifactDir, `${baseName}-${arch}.zip`);
+    if (fs.existsSync(appZipPath)) fs.unlinkSync(appZipPath);
+    exec(`/usr/bin/ditto -c -k --keepParent "${appPath}" "${appZipPath}"`);
+    files.push(fileEntry('installer', appZipPath));
+  } else if (wantsRealSigning && applePassword) {
     const identity = macSigningIdentity ?? { ...resolveAppleIdentity(), applePassword };
     const bundleId = readMacBundleIdentifier(appPath);
     const keychainAccessGroup = webAuthnProvisioningProfile
@@ -464,7 +480,8 @@ async function finishDarwin({
     files.push(fileEntry('installer', appZipPath));
   }
 
-  return { files, signing: { mode: signingMode } };
+  return { files, signing: { mode: signingMode,
+    ...(localSigningIdentity ? { certificateSha1: localSigningIdentity.certificateSha1 } : {}) } };
 }
 
 async function finishLinux({ artifactDir, baseName, arch }) {
@@ -495,14 +512,16 @@ async function main() {
     console.error(`ERROR: ${err.message}`);
     process.exit(1);
   }
-  const { platform, archs, region, versionSpec, skipSmoke, allowUnsigned, noSign } = args;
+  const { platform, archs, region, versionSpec, skipSmoke, allowUnsigned, noSign, localSign } = args;
+  const localSigningIdentity = localSign ? readLocalSigningIdentity() : undefined;
+  if (localSigningIdentity) verifyLocalSigningTrust(localSigningIdentity);
   // ensureBinary 的 CDN fallback 按此 region 选择清单基址；必须早于二进制准备。
   process.env.CINDY_AUTH_REGION = region;
   // mac 签名身份按区域从 release-regions.json 注入(文件缺失时静默跳过,
   // 届时签名要求身份齐备,由 resolveAppleIdentity fail closed)。只在 darwin
   // 且未显式跳签时加载:appPasswordEnv 声明即承诺(指向空 env 会抛错),
   // 不该拦住 win/linux 或 --no-sign 的打包。
-  if (platform === 'darwin' && !noSign) applyMacSigningConfigToEnv(region);
+  if (platform === 'darwin' && !noSign && !localSign) applyMacSigningConfigToEnv(region);
 
   if (platform !== process.platform) {
     console.error(`ERROR: 不支持交叉打包(当前 ${process.platform},目标 ${platform});请在目标平台机器上执行。`);
@@ -514,7 +533,7 @@ async function main() {
     fetchCdnBaselineVersion(platform === 'darwin' ? 'darwin-arm64' : `${platform}-${archs[0]}`, region),
   );
   const applePassword =
-    platform === 'darwin' && !versionless && !noSign ? process.env.APPLE_APP_PASSWORD : undefined;
+    platform === 'darwin' && !versionless && !noSign && !localSign ? process.env.APPLE_APP_PASSWORD : undefined;
   const macSigningIdentity = applePassword
     ? { ...resolveAppleIdentity(), applePassword }
     : undefined;
@@ -637,7 +656,7 @@ async function main() {
       // 处理了「arm64 宿主打 x64 包」的镜像场景)。lipo 验完二进制架构即跳过启动。
       verifyMacBinaryArch(appName, arch);
       console.log('==> Skipping smoke: arm64 artifact not runnable on Intel host (binary arch verified)');
-    } else {
+    } else if (!localSigningIdentity) {
       runSmokeTest(platform, arch, region);
     }
 
@@ -658,6 +677,9 @@ async function main() {
         allowUnsigned,
         noSign,
         macSigningIdentity,
+        localSigningIdentity,
+        region,
+        skipSmoke,
         webAuthnProvisioningProfile,
       }));
 

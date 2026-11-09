@@ -83,6 +83,7 @@ export function parsePackageArgs(argv, defaults = {}) {
     skipSmoke: false,
     allowUnsigned: false,
     noSign: false,
+    localSign: false,
   };
   let archFlag = null;
   let regionSpecified = false;
@@ -112,9 +113,17 @@ export function parsePackageArgs(argv, defaults = {}) {
       // 环境,不具备该环境的机器打版本无关包时用它;与 --allow-unsigned
       // (放行"缺配置")语义互补。
       case '--no-sign': out.noSign = true; out.allowUnsigned = true; break;
+      case '--local-sign': out.localSign = true; break;
       default:
-        throw new Error(`未知参数: ${a}(支持 --platform/--arch/--region/--version/--skip-smoke/--allow-unsigned/--no-sign)`);
+        throw new Error(`未知参数: ${a}(支持 --platform/--arch/--region/--version/--skip-smoke/--allow-unsigned/--no-sign/--local-sign)`);
     }
+  }
+
+  if (out.localSign && (out.noSign || out.platform !== 'darwin')) {
+    throw new Error('--local-sign requires darwin and cannot be combined with --no-sign');
+  }
+  if (out.localSign && out.versionSpec !== null) {
+    throw new Error('--local-sign supports versionless 0.0.0 builds only; omit --version');
   }
 
   if (!SUPPORTED_PLATFORMS.includes(out.platform)) {

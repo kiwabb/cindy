@@ -762,6 +762,38 @@ export function verifyMacContactsPermissions(appPath, { keychainAccessGroup, sig
   );
 }
 
+/** Collect nested signing targets inside-out for a staged personal app. */
+export function collectMacSigningTargets(appPath) {
+  const targets = [];
+  const scan = (directory, helperApps) => {
+    if (!fs.existsSync(directory)) return;
+    const bundles = [];
+    const walk = current => {
+      for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+        const filePath = path.join(current, entry.name);
+        if (entry.isSymbolicLink()) continue;
+        if (entry.isDirectory()) {
+          walk(filePath);
+          if (entry.name.endsWith('.app') || entry.name.endsWith('.framework')) {
+            bundles.push({ path: filePath, helper: helperApps && entry.name.endsWith('.app') });
+          }
+        } else if (entry.isFile()) {
+          const result = spawnSync('/usr/bin/file', ['-b', filePath], { encoding: 'utf8' });
+          if (result.status !== 0) throw new Error(`Cannot inspect signing target: ${filePath}`);
+          if (result.stdout.includes('Mach-O')) targets.push({ path: filePath, helper: false });
+        }
+      }
+    };
+    walk(directory);
+    targets.push(...bundles);
+  };
+  scan(path.join(appPath, 'Contents', 'Resources', 'app.asar.unpacked'), false);
+  scan(path.join(appPath, 'Contents', 'Resources', 'tools'), false);
+  scan(path.join(appPath, 'Contents', 'Frameworks'), true);
+  targets.push({ path: appPath, main: true });
+  return targets;
+}
+
 export function adhocSignMacApp(appPath, helperEntitlementsPath, mainEntitlementsPath, arch) {
   console.log('==> Ad-hoc signing macOS app for local packaged testing...');
   const signBase = '/usr/bin/codesign --force --options runtime --sign -';
