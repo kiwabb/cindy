@@ -62,7 +62,10 @@ function remote(caseName: string): TeammateTodo[] {
 mountPage({
   route: '/bots/todos',
   host: (ctx) => ({
-    localDb: { bots: { todos: {
+    localDb: { personalTodos: { list: async () => ctx.case === 'personal-row' ? [{
+      id: 'unit-personal-row', revision: 1, title: '[fixture] Personal row — layout only', notes: 'Unit fixture, no account data or writes.',
+      deadline: null, status: 'open', deferredUntil: null, createdAt: '2026-11-01T00:00:00Z', updatedAt: '2026-11-01T00:00:00Z', ownership: 'self', source: 'manual',
+    }] : [], update: forbid('personalTodos.update') }, bots: { todos: {
       list: async () => ({ items: local(ctx.case), version: 1 }),
       update: forbid('todos.update'),
       dailyCheck: forbid('todos.dailyCheck'),

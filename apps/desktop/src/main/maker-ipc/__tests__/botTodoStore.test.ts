@@ -1,10 +1,12 @@
+import { createPersonalTodoStore } from '../personalTodoStore';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createBotTodoStore } from '../botTodoStore';
 const roots: string[] = [];
 afterEach(async () => {
+  vi.useRealTimers();
   for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true });
 });
 async function fixture() {
@@ -415,4 +417,61 @@ describe('todos moving with the companion', () => {
     await store.patch({ id: items[0]!.id, expectedRevision: items[0]!.revision, progress: '继续' });
     expect((await store.read()).items).toHaveLength(1);
   });
+});
+
+// Personal ownership contract: bot tests do not exercise the manual adapter.
+// Minimal input: title only. Unit tier; isolated OS temp files, never real user todos.
+// Protects persistence, revisions and independent due/defer dates through the production adapter.
+describe('personal todo account store', () => {
+  it('persists title-only creation, independent deferral, completion/reopen and deletion', async () => {
+    const { file } = await fixture();
+    const first = createPersonalTodoStore(file);
+    const created = await first.update({ creationRequestId: crypto.randomUUID(), title: 'Personal unit input' });
+    expect(created).toMatchObject({ ownership: 'self', source: 'manual', notes: '', deadline: null });
+    expect(created).not.toHaveProperty('origin');
+    const reopenedStore = createPersonalTodoStore(file);
+    expect(await reopenedStore.list()).toEqual([created]);
+    const deadline = { kind: 'date' as const, date: '2030-01-01', timeZone: 'UTC' };
+    const deferred = await reopenedStore.update({ id: created.id, expectedRevision: created.revision, notes: 'Unit notes', deadline, operation: 'later', until: '2030-02-01T00:00:00Z' });
+    expect(deferred).toMatchObject({ deadline, deferredUntil: '2030-02-01T00:00:00Z' });
+    const done = await first.update({ id: deferred.id, expectedRevision: deferred.revision, operation: 'complete' });
+    expect(done).toMatchObject({ status: 'done', deferredUntil: null, deadline });
+    const open = await first.update({ id: done.id, expectedRevision: done.revision, operation: 'reopen' });
+    expect(open.status).toBe('open');
+    await first.update({ id: open.id, expectedRevision: open.revision, operation: 'delete' });
+    expect(await reopenedStore.list()).toEqual([]);
+  });
+  it('rejects stale revisions, invalid manual input and an owner change without altering persisted data', async () => {
+    const { file } = await fixture();
+    const store = createPersonalTodoStore(file);
+    const item = await store.update({ creationRequestId: crypto.randomUUID(), title: 'Versioned unit input' });
+    await store.update({ id: item.id, expectedRevision: item.revision, notes: 'New version' });
+    await expect(store.update({ id: item.id, expectedRevision: item.revision, title: 'Stale' })).rejects.toMatchObject({ code: 'CONFLICT' });
+    await expect(store.update({ creationRequestId: crypto.randomUUID(), title: '' })).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+    await expect(store.update({ creationRequestId: crypto.randomUUID(), title: 'x', origin: 'assigned' } as never)).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+    const switched = createPersonalTodoStore(file, () => { throw new Error('Owner changed'); });
+    await expect(switched.update({ creationRequestId: crypto.randomUUID(), title: 'Wrong owner' })).rejects.toThrow('Owner changed');
+    expect((await store.list()).map(t => t.title)).toEqual(['Versioned unit input']);
+  });
+});
+
+// Unit: a real atomic store commit followed by a lost transport receipt must be replay-safe.
+it('recovers a committed personal creation after a lost reply without creating another item', async () => {
+  const { file } = await fixture();
+  const input = { creationRequestId: 'lost-reply-unit', title: 'Committed unit todo', notes: '', deadline: { kind: 'date' as const, date: '2030-01-01', timeZone: 'UTC' } };
+  const client = createPersonalTodoStore(file);
+  let committed: Awaited<ReturnType<typeof client.update>> | undefined;
+  await expect((async () => { committed = await client.update(input); throw new Error('Reply lost after commit'); })()).rejects.toThrow('Reply lost');
+  const retry = await createPersonalTodoStore(file).update({ ...input, deadline: { timeZone: 'UTC', date: '2030-01-01', kind: 'date' } });
+  expect(retry).toEqual(committed);
+  expect(await client.list()).toEqual([retry]);
+  await expect(client.update({ ...input, title: 'Edited uncertain draft' })).rejects.toMatchObject({ code: 'CONFLICT' });
+  const done = await client.update({ id: retry.id, expectedRevision: retry.revision, operation: 'complete' });
+  // Keep the real clock for the cross-process lock's OS process-identity checks.
+  await vi.waitFor(() => expect(Date.now()).toBeGreaterThan(Date.parse(done.updatedAt)));
+  const edited = await client.update({ id: done.id, expectedRevision: done.revision, notes: 'Edited after completion' });
+  expect(edited.createdAt).toBe(retry.createdAt);
+  expect(done.completedAt).toBe(done.updatedAt);
+  expect(edited.completedAt).toBe(done.completedAt);
+  expect(Date.parse(edited.updatedAt)).toBeGreaterThan(Date.parse(done.updatedAt));
 });

@@ -1,3 +1,4 @@
+import { registerPersonalTodoIpc } from '../../maker-ipc/personalTodoIpc.js';
 import { emitSessionCreated } from './sessionCreatedBroadcast.js';
 import type { RoutineModel } from '@cindy/maker-scheduler';
 import { todoAccess } from '../../maker-ipc/botTodoAccess.js';
@@ -2866,6 +2867,7 @@ export function registerBotIpc(): void {
       return access.set(id, rawLinked);
     });
   }
+  registerPersonalTodoIpc();
   for (const operation of ['list', 'update', 'act'] as const) {
     ipcMain.handle(`local-db:bots:todos:${operation}`, async (event, rawBotId: unknown, input: unknown) => {
       assertTrustedAppRendererEvent(event);

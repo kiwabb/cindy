@@ -1,3 +1,5 @@
+import { usePersonalTodoSnapshot } from './usePersonalTodoSnapshot';
+import { personalTodoIsOpen } from './personalTodoCache';
 /**
  * 待办页与侧栏「待办」入口共用的伙伴名单和读取。每位伙伴仍走近况那条读取路径
  * （`useGlanceTodos`：本机读宿主，别的电脑经 device-link 远程资源），这里不新增通道。
@@ -98,7 +100,8 @@ export function TodoBoardSources({ teammates }: { teammates: readonly TodoBoardT
 export function useTodoBoardOpenCount(): number {
   const teammates = useTodoBoardTeammates();
   const entries = useTodoBoardEntries();
-  return todoBoardOpenCount(teammates, entries);
+  const personal = usePersonalTodoSnapshot();
+  return todoBoardOpenCount(teammates, entries) + personal.items.filter(item => personalTodoIsOpen(item)).length;
 }
 
 export function TodoBoardLocalSources() {

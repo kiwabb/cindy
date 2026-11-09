@@ -59,6 +59,7 @@ export function todoBoardBucket(todo: TeammateTodo, now = new Date()): TodoBoard
 }
 
 export interface TodoBoardItem {
+  personal?: import('../../../shared/personalTodo').PersonalTodo;
   todo: TeammateTodo;
   teammate: TodoBoardTeammate;
 }

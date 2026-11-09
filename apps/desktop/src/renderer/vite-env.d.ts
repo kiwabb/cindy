@@ -5074,6 +5074,10 @@ interface ElectronAPI {
       ackInterrupted: (id: string) => Promise<void>;
       // Stage 2 C2: fork 已迁到 electronAPI.maker.fork (走 maker:fork IPC)。
     };
+    personalTodos: {
+      list: () => Promise<import('../shared/personalTodo').PersonalTodo[]>;
+      update: (input: import('../shared/personalTodo').PersonalTodoUpdate) => Promise<import('../shared/personalTodo').PersonalTodo>;
+    };
     bots: {
       getModelChainSettings: () => Promise<{
         modelChain: import('../shared/botModelChain').BotModelRoute[];

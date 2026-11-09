@@ -6104,6 +6104,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.invoke('local-db:sessions:ack-interrupted', id),
       // Stage 2 C2: fork 已迁到 electronAPI.maker.fork (走 maker:fork IPC)。
     },
+    personalTodos: {
+      list: () => ipcRenderer.invoke('local-db:personal-todos:list'),
+      update: (input: import('../shared/personalTodo').PersonalTodoUpdate) => ipcRenderer.invoke('local-db:personal-todos:update', input),
+    },
     bots: {
       generateAvatar: (token: string): Promise<{ avatarImageBase64: string }> =>
         ipcRenderer.invoke('local-db:bots:generate-avatar', token),
