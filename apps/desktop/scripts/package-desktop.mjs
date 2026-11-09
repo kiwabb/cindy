@@ -76,6 +76,8 @@ import {
   notarizeMacApp,
   createMacDMG,
 } from './ci/lib.mjs';
+import { buildPersonalUpdateIdentity, assertPersonalUpdateBuildSource, readPersonalUpdatePolicy } from './ci/personal-update-metadata.mjs';
+import { assertPackagedPersonalIdentity } from './ci/personal-update-artifacts.mjs';
 import { readLocalSigningIdentity, signLocalMacApp, smokeLocalSignedApp, verifyLocalSigningTrust } from './ci/local-mac-signing.mjs';
 import {
   parsePackageArgs,
@@ -122,7 +124,7 @@ function collectBuildMeta() {
   return { schemaVersionMax, migrationFiles, commitSha, electronVersion };
 }
 
-function verifyPackagedSourceMetadata({ appName, platform, arch, expectedCommit }) {
+function verifyPackagedSourceMetadata({ appName, platform, arch, expectedCommit, personalUpdate }) {
   const packagedDir = path.join(DESKTOP_ROOT, 'out', `${appName}-${platform}-${arch}`);
   const metadataPath =
     platform === 'darwin'
@@ -152,6 +154,7 @@ function verifyPackagedSourceMetadata({ appName, platform, arch, expectedCommit 
       `packaged Cindy source metadata commit mismatch: expected ${expectedCommit}, got ${metadata.sourceCommit}`,
     );
   }
+  if (personalUpdate) assertPackagedPersonalIdentity(metadata, personalUpdate, readPersonalUpdatePolicy(DESKTOP_ROOT));
   console.log(`    verified packaged source metadata: ${metadata.sourceCommit}`);
 }
 
@@ -513,6 +516,8 @@ async function main() {
     process.exit(1);
   }
   const { platform, archs, region, versionSpec, skipSmoke, allowUnsigned, noSign, localSign } = args;
+  const personalUpdate = buildPersonalUpdateIdentity({ desktopRoot: DESKTOP_ROOT, sourceCommit: collectBuildMeta().commitSha });
+  if (personalUpdate) assertPersonalUpdateBuildSource({ desktopRoot: DESKTOP_ROOT, sourceCommit: personalUpdate.sourceCommit, ...args });
   const localSigningIdentity = localSign ? readLocalSigningIdentity() : undefined;
   if (localSigningIdentity) verifyLocalSigningTrust(localSigningIdentity);
   // ensureBinary 的 CDN fallback 按此 region 选择清单基址；必须早于二进制准备。
@@ -636,6 +641,7 @@ async function main() {
       platform,
       arch,
       expectedCommit: meta.commitSha,
+      personalUpdate,
     });
 
     // drizzle 资源校验(平台差异只在 packaged 内路径)。
@@ -696,6 +702,7 @@ async function main() {
         files,
         signing,
         mcpAppsManual,
+        personalUpdate,
       });
       buildInfoPath = path.join(artifactDir, 'build-info.json');
       fs.writeFileSync(buildInfoPath, JSON.stringify(buildInfo, null, 2) + '\n');

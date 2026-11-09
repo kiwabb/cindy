@@ -239,12 +239,14 @@ export function artifactBaseName({ version, versionless }) {
  *   files: Array<{ role: string, name: string, sha256: string, size: number }>,
  *   signing: Record<string, unknown>,
  *   mcpAppsManual?: { sha256: string, size: number } | null,
+ *   personalUpdate?: Record<string, unknown> | null,
  * }} ctx
  */
 export function buildBuildInfo(ctx) {
   return {
     // v2 移除无运行语义的 package channel；发布通道只属于 publish 阶段。
     schemaVersion: 2,
+    ...(ctx.personalUpdate ? { personalUpdate: ctx.personalUpdate } : {}),
     product: 'cindy-desktop',
     // 版本无关包 version 记 null,占位符不冒充真实版本。
     version: ctx.versionless ? null : ctx.version,

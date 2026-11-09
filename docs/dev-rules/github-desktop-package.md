@@ -1,23 +1,37 @@
-# Downloadable Mac builds from GitHub
+# Personal Mac builds and updates from GitHub
 
-The `Package desktop for Mac` workflow builds the Global client for Apple Silicon Macs. It uses the existing `release:package` command and its packaged startup/database smoke test. CI wraps that command's ad-hoc-signed app ZIP in a verified DMG with an Applications shortcut. The original ZIP stays available alongside it, and `build-info.json` describes that original packager output.
+The approved publisher is `kiwabb/cindy`, with `main` as its sole release source. The Mac workflow builds the Global Apple Silicon client through the existing `release:package` command and official packaged startup/database smoke test. It creates a verified DMG for manual installation and a ZIP for the personal update channel.
 
 ## Build and download
 
-1. Open the fork's **Actions → Package desktop for Mac → Run workflow**.
-2. Choose the source branch. Leave **Publish the tested app to GitHub Releases** enabled for a permanent download.
-3. Wait for both jobs to finish. Open **Releases** and download `cindy-unversioned-arm64.dmg`. A copy is also available under the run's `cindy-macos-arm64` artifact for 14 days.
-4. Open the DMG and drag `Cindy.app` onto Applications. Launch it from Applications, Launchpad, or Spotlight.
+A push to `main` builds automatically. A manual **Actions → Package desktop for Mac → Run workflow** must also select `main`. Disable **Publish the tested app to GitHub Releases** for an artifact-only build. Other repositories and branches cannot publish this channel.
 
-The bootstrap branch `codex/github-packaging` also builds and publishes when pushed. Each release has a unique run/attempt tag, the exact source commit, `build-info.json`, and `SHA256SUMS`.
+Each update uses `github.run_id * 100 + github.run_attempt` as its positive safe-integer revision. Attempts 100 and above, arithmetic overflow, a dirty source tree, mismatched source identity and skipped smoke all fail the personal build. The display version remains `0.0.0`. The independent personal revision orders updates.
 
-## Signing and updates
+Download `cindy-unversioned-arm64.dmg` from a revision release for a first manual installation. Open the DMG and drag `Cindy.app` to Applications. An existing personally signed installation uses the personal updater to preserve its Apple identity. The run also retains its artifacts for 14 days. Installed profiles remain separate from source-development sandboxes.
 
-This workflow needs no private release or signing secrets. The existing packager applies ad-hoc signing. The app has no Apple Developer ID notarization, so macOS can block the first launch. After attempting to open this trusted download, use **System Settings → Privacy & Security → Open Anyway** if offered. The workflow does not provide an Apple-trusted public distribution signature.
+## Personal update publication
 
-The upstream community-build version is `0.0.0`, which disables official app updates. Install future builds from this fork's Releases page. The installed app still downloads its required model-engine runtimes on demand.
+`apps/desktop/personal-update-channel.json` fixes the repository, channel and feed URL. The shared validator in `src/main/personal-update/contract.mjs` is used by both producer and client.
 
-Packaged builds use their normal application profile. The existing development sandbox is separate, so its login and conversations do not automatically appear in the installed app. Keep the development sandbox when installing, and use the application's supported login and migration features as needed.
+1. Package a clean committed checkout, verify its embedded `cindy-source.json` identity, run the official smoke test and hash the ZIP.
+2. Extract that ZIP for DMG creation and verify its actual source metadata again. Generate `personal-update.json` and `SHA256SUMS` from those bytes.
+3. Create `personal-macos-arm64-r<revision>` as a draft, upload all assets and verify every remote asset's SHA256 and size. Publish the immutable release and verify the actual Git tag resolves to its source commit. Keep it outside GitHub's general latest release. Retries may complete a draft but cannot overwrite existing immutable bytes.
+4. Recheck the current channel revision, persist and verify the revision floor in the separate `personal-macos-arm64` release notes, then replace its single manifest asset. Verify the published manifest after upload. All Mac workflow runs share a serialization group. A higher existing floor or manifest revision stops an older run. A missing asset can be repaired at the same revision using the verified immutable release.
+
+The feed is `https://github.com/kiwabb/cindy/releases/download/personal-macos-arm64/personal-update.json`. The general GitHub latest release can belong to Windows and is not an update input. An immutable release left behind by a failed channel publication is safe to retry. GitHub asset replacement can briefly return 404, so clients retain the installed app and retry later.
+
+The manifest records `schemaVersion`, `repository`, `channel`, `revision`, `sourceCommit`, `platform`, `arch`, `region`, `bundleIdentifier`, `storageIdentity` and `asset` (`url`, `sha256`, `size`). The signed app's `cindy-source.json.personalUpdate` carries the same identity without the self-referential ZIP asset. `build-info.json.personalUpdate` mirrors that identity. A source commit alone cannot describe uncommitted feature files, which is why personal-channel builds require clean committed source.
+
+## Storage compatibility and signing
+
+`storageIdentity` hashes migration runtime resources, the schema source, personal-todo JSON persistence and the policy's explicit `storageCompatibilityVersion`. Personal-todo coverage includes `personalTodoStore.ts`, its underlying `botTodoStore.ts` and the shared `teammateTodo.ts` representation. Development-only numbered Drizzle snapshots are excluded because packaging removes them. Changes to these inputs conservatively block automatic replacement. Raise `storageCompatibilityVersion` for incompatible changes to other persisted formats, including preferences and credential envelopes. The client requires identical installed/candidate storage identities before automatic replacement.
+
+CI produces an ad-hoc-signed payload. The owning Mac prepares it with its existing Apple Development signing identity before installation. Private keys and local identity configuration stay on that Mac. Automatic installation waits for idle work and preserves the previous app for failed-start recovery. Storage incompatibility stops automatic installation. App rollback does not establish that a database migration can be reversed.
+
+The upstream official feed remains disabled for the `0.0.0` community version. This separately approved personal channel provides its own source, revision, storage and signature checks. Public ad-hoc downloads are not notarized. macOS can block their first manual launch. After attempting to open a trusted download, use **System Settings → Privacy & Security → Open Anyway** if offered.
+
+The producer unit tests cover revision bounds, storage identity changes, ZIP/source mismatches, publisher restrictions, publication order, retry, remote corruption, racing channel revisions and authentication failures. A real CI build and installed two-release update still require runtime acceptance.
 
 ## Personal signing on one Mac
 
@@ -45,6 +59,6 @@ A stable self-signed designated requirement does not guarantee uninterrupted Key
 
 In the local two-build trial, both builds passed strict signature checks with the same leaf-bound requirement and different CDHashes. The second build stalled in Keychain credential access during isolated smoke and normal startup at the same Applications path. Restoring the first build recovered the account UI and microphone and automatic-input authorization. Native upgrade acceptance must include successful existing-login credential decryption, entry into the main UI, and retention of prior permissions. Preserve failed smoke results and resolve their cause before accepting an upgrade. Do not bypass this acceptance with `--skip-smoke` or broader Keychain ACLs.
 
-The subsequent Apple Development trial used two copies of the existing functional app with different bundle build numbers and CDHashes. Both passed the official isolated startup and database smoke test. After initial Keychain, microphone and Accessibility consent for the Apple identity, replacing the first build with the second at the same Applications path entered the existing account UI and retained microphone and automatic-input authorization without another consent prompt. These local signing checks leave the separate fork update-feed integration pending.
+The subsequent Apple Development trial used two copies of the existing functional app with different bundle build numbers and CDHashes. Both passed the official isolated startup and database smoke test. After initial Keychain, microphone and Accessibility consent for the Apple identity, replacing the first build with the second at the same Applications path entered the existing account UI and retained microphone and automatic-input authorization without another consent prompt. These local signing checks cover the signing identity. Acceptance of the personal feed additionally requires two actual published revisions through the installed updater.
 
 CI validates packaged startup and database access. A successful build does not establish real account login, model calls, native permissions, or device connectivity on the user's Mac.
