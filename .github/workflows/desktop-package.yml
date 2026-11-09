@@ -22,7 +22,7 @@ concurrency:
 jobs:
   package:
     if: github.repository == 'kiwabb/cindy' && github.ref == 'refs/heads/main'
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 90
     env:
       # Installed apps fetch engines on demand. Packaging stages its own pinned ripgrep.
