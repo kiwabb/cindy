@@ -3599,6 +3599,62 @@ describe('computer mcp integration', () => {
     expect(spawnMock.mock.calls.some((call) => call[1]?.[0] === 'permissions')).toBe(false);
   });
 
+  // Regression: the installed 0.5.3 daemon reports real grants, but page entry
+  // previously discarded them. Exercise the production status entry (unit tier).
+  it.each([false, true])('refreshes verified 0.5.3 page-entry grants without lifecycle actions (fresh=%s)', async freshPermissionProbe => {
+    setPlatform('darwin');
+    existsSyncMock.mockImplementation(candidate => String(candidate) === '/Applications/CuaDriver.app');
+    const options = { forcePermissionProbe: true, freshPermissionProbe, bypassPermissionProbeCache: true, passivePermissionProbeOnly: true };
+    for (const granted of [true, false, true]) {
+      mockDriverSpawn({ stdout: 'cua-driver 0.5.3\n' });
+      mockDriverSpawn({ stdout: 'Cua Driver daemon is running\n  pid: 4242\n' });
+      mockDriverSpawn({ stdout: JSON.stringify({ accessibility: granted, screen_recording: granted,
+        screen_recording_capturable: granted, source: { attribution: 'driver-daemon', pid: 4242 } }) });
+      await expect(getComputerDriverStatus(options)).resolves.toMatchObject({
+        permissionState: { status: granted ? 'granted' : 'missing', accessibility: granted ? 'granted' : 'missing' },
+      });
+    }
+    expect(spawnMock.mock.calls.map(call => call[1])).toEqual(Array.from({ length: 3 }, () => [
+      ['--version'], ['status'], ['permissions', 'status', '--json'],
+    ]).flat());
+  });
+
+  it('leaves a stopped 0.5.3 daemon stopped during passive page entry', async () => {
+    setPlatform('darwin');
+    mockDriverSpawn({ stdout: 'cua-driver 0.5.3\n' });
+    mockDriverSpawn({ stderr: 'Cua Driver daemon is not running\n', exitCode: 1 });
+    await expect(getComputerDriverStatus({ forcePermissionProbe: true, bypassPermissionProbeCache: true,
+      passivePermissionProbeOnly: true })).resolves.toMatchObject({ daemonRunning: false });
+    expect(spawnMock.mock.calls.some(call => call[0] === 'open' || call[1]?.[0] === 'stop')).toBe(false);
+    expect(spawnMock.mock.calls.map(call => call[1])).toEqual([['--version'], ['status']]);
+  });
+
+  it.each(['0.5.2', '0.5.4', '0.5.3-beta.1', '0.12.1', 'unknown'])('does not probe unverified passive version %s', async version => {
+    setPlatform('darwin');
+    mockDriverSpawn({ stdout: `cua-driver ${version}\n` });
+    mockDriverSpawn({ stdout: 'Cua Driver daemon is running\n  pid: 4242\n' });
+    await expect(getComputerDriverStatus({ forcePermissionProbe: true, bypassPermissionProbeCache: true,
+      passivePermissionProbeOnly: true })).resolves.toMatchObject({ permissionState: { status: 'unknown' } });
+    expect(spawnMock.mock.calls.map(call => call[1])).toEqual([['--version'], ['status']]);
+  });
+
+  it.each([
+    {},
+    { accessibility: true, source: { attribution: 'driver-daemon' } },
+    { accessibility: false, screen_recording: true, screen_recording_capturable: true, source: { attribution: 'driver-daemon' } },
+    { accessibility: true, screen_recording: true, screen_recording_capturable: false, source: { attribution: 'driver-daemon' } },
+    { accessibility: true, screen_recording: true, screen_recording_capturable: true, source: { attribution: 'launcher' } },
+    { accessibility: true, screen_recording: true, source: { attribution: 'launcher' } },
+  ])('keeps missing or misattributed 0.5.3 permissions denied: %j', async permissions => {
+    setPlatform('darwin');
+    mockDriverSpawn({ stdout: 'cua-driver 0.5.3\n' });
+    mockDriverSpawn({ stdout: 'Cua Driver daemon is running\n  pid: 4242\n' });
+    mockDriverSpawn({ stdout: JSON.stringify(permissions) });
+    await expect(getComputerDriverStatus({ forcePermissionProbe: true, bypassPermissionProbeCache: true,
+      passivePermissionProbeOnly: true })).resolves.toMatchObject({ permissionState: { status: 'missing' } });
+    expect(spawnMock.mock.calls.map(call => call[1])).toEqual([['--version'], ['status'], ['permissions', 'status', '--json']]);
+  });
+
   it('refreshes page-entry permissions through the read-only 0.12.2 status command', async () => {
     if (process.platform !== 'darwin') return;
 
@@ -3826,13 +3882,16 @@ describe('computer mcp integration', () => {
     });
   });
 
-  it('autostarts the daemon for a forced permission probe when it is down, then probes it', async () => {
+  it.each([
+    { version: '0.7.0', passivePermissionProbeOnly: false },
+    { version: '0.12.2', passivePermissionProbeOnly: true },
+  ])('autostarts the supported daemon for a forced probe: %j', async ({ version, passivePermissionProbeOnly }) => {
     if (process.platform !== 'darwin') return;
 
     // macOS 修改屏幕录制授权会杀掉 daemon 且 macOS 侧没有 autostart;设置面板的
     // 显式探测应把它拉起来(必须带 --no-permissions-gate,避免 serve 首启 gate
     // 自己弹授权框 + 打开系统设置)再对新 daemon 做探测。
-    mockDriverSpawn({ stdout: 'cua-driver 0.7.0\n' });
+    mockDriverSpawn({ stdout: `cua-driver ${version}\n` });
     mockDriverSpawn({ stderr: 'daemon not running\n', exitCode: 1 });
     mockDriverSpawn({ stdout: '' }); // open -n -g -a CuaDriver … → exit 0
     mockDriverSpawn({ stdout: 'Cua Driver daemon is running\n  pid: 7777\n' }); // 自愈后的轮询
@@ -3841,7 +3900,7 @@ describe('computer mcp integration', () => {
         '{"accessibility":true,"screen_recording":true,"screen_recording_capturable":true,"source":{"attribution":"driver-daemon"}}\n',
     });
 
-    await expect(getComputerDriverStatus({ forcePermissionProbe: true })).resolves.toMatchObject({
+    await expect(getComputerDriverStatus({ forcePermissionProbe: true, passivePermissionProbeOnly })).resolves.toMatchObject({
       installed: true,
       daemonRunning: true,
       permissionState: { status: 'granted' },

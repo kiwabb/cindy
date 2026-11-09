@@ -89,6 +89,9 @@ const CUA_DRIVER_SESSION_PROCESS_NONCE = randomUUID().replace(/-/g, '').slice(0,
 // 0.12.2 changed `permissions status` into a strictly read-only daemon query.
 // Older builds may touch ScreenCaptureKit while checking capturability.
 const PASSIVE_PERMISSION_STATUS_MIN_VERSION = '0.12.2';
+// 0.5.3 also documents and implements a daemon-attributed, read-only status query.
+// Keep this exception exact: intermediate older releases are not verified passive.
+const PASSIVE_PERMISSION_STATUS_COMPAT_VERSION = '0.5.3';
 const SCREENSHOT_OUTPUT_TOOL_NAMES = new Set<ComputerMcpToolName>(['get_window_state']);
 const DRIVER_SESSION_ARG_TOOL_NAMES = new Set<ComputerMcpToolName>([
   'list_windows',
@@ -2627,11 +2630,18 @@ export async function getComputerDriverStatus(
   try {
     const version = await readDriverVersion();
     const installedVersion = extractDriverSemver(version);
+    const passiveCompatVersion = installedVersion === PASSIVE_PERMISSION_STATUS_COMPAT_VERSION
+      && version?.trim().replace(/^cua-driver\s+/, '') === PASSIVE_PERMISSION_STATUS_COMPAT_VERSION;
+    // The compatibility evidence covers querying an already-running daemon only.
+    const passiveCompatProbe = options.passivePermissionProbeOnly === true && passiveCompatVersion;
     const passivePermissionProbeSupported =
       options.passivePermissionProbeOnly !== true
       || (
         installedVersion !== null
-        && compareSemver(installedVersion, PASSIVE_PERMISSION_STATUS_MIN_VERSION) >= 0
+        && (
+          passiveCompatVersion
+          || compareSemver(installedVersion, PASSIVE_PERMISSION_STATUS_MIN_VERSION) >= 0
+        )
       );
     let daemon: DaemonStatus = await readDaemonStatus().catch((err) => ({
       running: false,
@@ -2650,6 +2660,7 @@ export async function getComputerDriverStatus(
       process.platform === 'darwin' &&
       !computerDriverPermissionProbePaused &&
       options.freshPermissionProbe === true &&
+      !passiveCompatProbe &&
       passivePermissionProbeSupported &&
       daemon.running &&
       cuaMcpSessions.size === 0 &&
@@ -2676,6 +2687,7 @@ export async function getComputerDriverStatus(
       process.platform === 'darwin' &&
       !computerDriverPermissionProbePaused &&
       !daemon.running &&
+      !passiveCompatProbe &&
       passivePermissionProbeSupported &&
       (options.forcePermissionProbe === true || options.freshPermissionProbe === true)
     ) {
@@ -2699,6 +2711,7 @@ export async function getComputerDriverStatus(
       !computerDriverPermissionProbePaused &&
       options.skipPermissionProbe !== true &&
       passivePermissionProbeSupported &&
+      (!passiveCompatProbe || daemon.running) &&
       (daemon.running || options.forcePermissionProbe === true || options.freshPermissionProbe === true);
     let permissions: unknown = null;
     let permissionProbe: 'run' | 'cached' | 'skipped' = 'skipped';
