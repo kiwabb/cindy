@@ -2577,7 +2577,7 @@ interface ElectronAPI {
    * Triggers FeishuBot WS connection (gated; otherwise the bot would come
    * online before the app can actually serve requests). Idempotent.
    */
-  appReadyForBot: () => Promise<{ ok: true }>;
+  appReadyForBot: (options?: { rendererCommitted: true; dataOwnerId: string; ownerGeneration: number }) => Promise<{ ok: true }>;
 
   syncDesktopCcPrefs: (prefs: {
     model: string;

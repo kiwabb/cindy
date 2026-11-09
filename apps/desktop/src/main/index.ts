@@ -310,6 +310,10 @@ async function dispatch(): Promise<void> {
     const { startFreshProfileInLocalMode } = await import('./appSessionState.js');
     startFreshProfileInLocalMode();
   }
+  if (app.isPackaged && process.platform === 'darwin') {
+    const { resumePersonalUpdateStartup } = await import('./personal-update/runtime.js');
+    await resumePersonalUpdateStartup();
+  }
   const mod = await import('./bootstrap-electron.js');
   await mod.bootstrapElectron();
 }

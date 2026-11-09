@@ -21,6 +21,8 @@ Download `cindy-unversioned-arm64.dmg` from a revision release for a first manua
 
 The feed is `https://github.com/kiwabb/cindy/releases/download/personal-macos-arm64/personal-update.json`. The general GitHub latest release can belong to Windows and is not an update input. An immutable release left behind by a failed channel publication is safe to retry. GitHub asset replacement can briefly return 404, so clients retain the installed app and retry later.
 
+A failed personal update check defers installation and retains verified cached bytes until a successful check confirms the same revision, source and storage identity.
+
 The manifest records `schemaVersion`, `repository`, `channel`, `revision`, `sourceCommit`, `platform`, `arch`, `region`, `bundleIdentifier`, `storageIdentity` and `asset` (`url`, `sha256`, `size`). The signed app's `cindy-source.json.personalUpdate` carries the same identity without the self-referential ZIP asset. `build-info.json.personalUpdate` mirrors that identity. A source commit alone cannot describe uncommitted feature files, which is why personal-channel builds require clean committed source.
 
 ## Storage compatibility and signing

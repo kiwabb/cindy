@@ -1,3 +1,4 @@
+import { usePersonalUpdateRendererReady } from '@/hooks/usePersonalUpdateRendererReady';
 import { getDataOwnerGeneration, isDataOwnerGenerationCurrent } from '@/contexts/dataOwnerGeneration';
 import { usePluginUiVisibilityOwner } from '@/cindy-brain/usePluginUiVisibility';
 import { initPluginTabViewHost } from '@/features/right-sidebar/pluginTabViews';
@@ -473,7 +474,8 @@ export function MainLayout() {
   // (下面的 `!isSettingsRoute && <ChromeActions>`)，快捷键不能跟着一起消失——
   // hook 的语义包含「从设置等栈外页后退回最近任务」。浏览栈按数据所有者
   // (账号 + 恢复代次)隔离：切号时不能把上一个账号的任务带过来。
-  const { dataOwnerId, dataOwnerRecoveryEpoch } = useAuth();
+  const { dataOwnerId, dataOwnerRecoveryEpoch, dataOwnerGeneration } = useAuth();
+  usePersonalUpdateRendererReady(dataOwnerId, dataOwnerGeneration);
   useEffect(() => { initPluginTabViewHost(); }, [dataOwnerId, dataOwnerRecoveryEpoch]);
   const browseHistory = useSessionBrowseHistory({
     ownerKey: `${dataOwnerId ?? 'signed-out'}:${dataOwnerRecoveryEpoch}`,

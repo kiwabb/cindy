@@ -2900,7 +2900,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // ensureReady 成功之后 fire-and-forget 调一次。main 收到后才启动 FeishuBot
   // 的 WS 长连接 —— 在此之前 bot 不上线,避免"bot 已上线但 db/auth 未就绪,
   // 用户回消息撞 localDb not ready" 的 race。幂等,多次调用无副作用。
-  appReadyForBot: (): Promise<{ ok: true }> => ipcRenderer.invoke('app:ready-for-bot'),
+  appReadyForBot: (options?: { rendererCommitted: true; dataOwnerId: string; ownerGeneration: number }): Promise<{ ok: true }> => ipcRenderer.invoke('app:ready-for-bot', options),
 
   // ── IM Binding (feishu /ctr 接管 → desktop session 路由) ──
   // 整体接管态由 main/im/binding.ts 维护; renderer 用这套 API 实时知道

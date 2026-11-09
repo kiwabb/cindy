@@ -1,4 +1,6 @@
+import { handlePersonalRendererReadiness } from './personal-update/readiness.js';
 import { registerRuntimeSettingsSection } from './app-settings/runtime.js';
+import { notePersonalStorageOpened, notePersonalRendererCommitted } from './personal-update/runtime.js';
 import { z as settingsSchema } from 'zod';
 import { deliverRoutineResult, listRoutineDeliveryTargets } from './routines/delivery.js';
 import { flushPluginUsageLifecycle } from './plugin-usage/current.js';
@@ -9714,6 +9716,7 @@ app.on('ready', async () => {
         return;
       }
       if (getActiveAppSession().dataOwnerId === userId) {
+        notePersonalStorageOpened(userId, getActiveAppSession().mode, getActiveAppSession().generation);
         void getGhostManager().retryInterruptedMutationsAfterDbReady().catch((error) => {
           dbClientLog.warn('ghost mutation recovery after DB readiness failed', {
             userId,
@@ -10128,8 +10131,12 @@ app.on('ready', async () => {
   // localDb.ensureReady 成功之后调一次。Hook 与 FeishuBot 的权威启动已由
   // localDb onReady 排到 provider readiness 之后；这里同样等待屏障，再为旧时序
   // 与瞬时失败保留幂等重试。
-  ipcMain.handle('app:ready-for-bot', async (event) => {
+  ipcMain.handle('app:ready-for-bot', async (event, options?: unknown) => {
     assertTrustedAppRendererEvent(event);
+    const main = mainWindowRef && !mainWindowRef.isDestroyed() ? mainWindowRef : null;
+    if (handlePersonalRendererReadiness(options,
+      main !== null && event.sender === main.webContents && event.senderFrame === event.sender.mainFrame,
+      getActiveAppSession(), notePersonalRendererCommitted)) return { ok: true };
     await waitForCurrentAccountProviderModelsReady();
     startHookControlAccount();
     startImConnection();
