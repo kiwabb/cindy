@@ -6,7 +6,7 @@ import process from 'node:process';
 import { Buffer } from 'node:buffer';
 import { test } from 'node:test';
 import { parsePackageArgs } from './ci/package-lib.mjs';
-import { localCodesignArguments, localDesignatedRequirement, readLocalSigningIdentity, readLocalSigningIdentifier, smokeLocalSignedApp } from './ci/local-mac-signing.mjs';
+import { appleDevelopmentRequirement, verifyAppleDevelopmentSignature, localCodesignArguments, localDesignatedRequirement, readLocalSigningIdentity, readLocalSigningIdentifier, smokeLocalSignedApp } from './ci/local-mac-signing.mjs';
 import { collectMacSigningTargets } from './ci/lib.mjs';
 
 // Unit regression coverage for the opt-in signing boundary. Real certificate,
@@ -46,6 +46,15 @@ test('local metadata accepts only a public certificate fingerprint and existing 
     fs.writeFileSync(metadataPath, JSON.stringify(value));
     assert.deepEqual(readLocalSigningIdentity(metadataPath), {
       keychainPath, certificateSha1: 'AB'.repeat(20) });
+    const apple = { ...value, signingKind: 'apple-development', teamId: 'TESTTEAM01' };
+    fs.writeFileSync(metadataPath, JSON.stringify(apple));
+    assert.deepEqual(readLocalSigningIdentity(metadataPath), { keychainPath, signingKind: 'apple-development', teamId: 'TESTTEAM01', certificateSha1: 'AB'.repeat(20) });
+    for (const invalid of [{ ...apple, teamId: '' }, { ...apple, teamId: 'spoof' },
+      { ...apple, teamId: 1234567890 }, { ...apple, teamId: ['TESTTEAM01'] },
+      { ...apple, signingKind: 'unknown' }]) {
+      fs.writeFileSync(metadataPath, JSON.stringify(invalid));
+      assert.throws(() => readLocalSigningIdentity(metadataPath));
+    }
     fs.writeFileSync(metadataPath, JSON.stringify({ ...value, certificateSha1: '-' }));
     assert.throws(() => readLocalSigningIdentity(metadataPath));
     fs.writeFileSync(metadataPath, JSON.stringify({ ...value, keychainPath: 'relative' }));
@@ -53,6 +62,34 @@ test('local metadata accepts only a public certificate fingerprint and existing 
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test('Apple development requirements survive certificate renewal within the verified team', () => {
+  const identity = { signingKind: 'apple-development', teamId: 'TESTTEAM01', certificateSha1: 'AB'.repeat(20), keychainPath: '/keychain' };
+  const first = localCodesignArguments('com.xd.cindy', identity);
+  const renewed = localCodesignArguments('com.xd.cindy', { ...identity, certificateSha1: 'CD'.repeat(20) });
+  assert.equal(first.sign[first.sign.indexOf('--sign') + 1], identity.certificateSha1);
+  assert.deepEqual(first.verify, renewed.verify);
+  assert.ok(first.verify[3].includes('anchor apple generic'));
+  assert.ok(first.verify[3].includes('certificate 1[field.1.2.840.113635.100.6.2.1] exists'));
+  assert.ok(first.verify[3].includes('certificate leaf[field.1.2.840.113635.100.6.1.12] exists'));
+  assert.ok(!first.verify[3].includes(identity.certificateSha1));
+  assert.notEqual(appleDevelopmentRequirement('com.xd.cindy', 'TESTTEAM02'), first.verify[3].slice(1));
+  assert.throws(() => appleDevelopmentRequirement('com.xd.cindy', 'bad"team'));
+  assert.throws(() => appleDevelopmentRequirement('com.xd.cindy', 1234567890));
+  assert.throws(() => appleDevelopmentRequirement('com.xd.cindy', ['TESTTEAM01']));
+  assert.throws(() => localCodesignArguments('com.xd.cindy', { ...identity, signingKind: 'unknown' }));
+});
+
+test('Apple signature verification requires a valid Apple requirement before accepting the observed team', () => {
+  const calls = [];
+  const verify = (_command, args) => { calls.push(args); return args[0] === '-d' ? 'TeamIdentifier=TESTTEAM01\n' : ''; };
+  verifyAppleDevelopmentSignature('/app', 'com.xd.cindy', 'TESTTEAM01', verify);
+  assert.equal(calls[0][0], '--verify');
+  assert.equal(calls[0][3], '=' + appleDevelopmentRequirement('com.xd.cindy', 'TESTTEAM01'));
+  assert.equal(calls[1][0], '-d');
+  assert.throws(() => verifyAppleDevelopmentSignature('/app', 'com.xd.cindy', 'TESTTEAM01', () => { throw new Error('Apple requirement failed'); }));
+  assert.throws(() => verifyAppleDevelopmentSignature('/app', 'com.xd.cindy', 'TESTTEAM01', (_command, args) => args[0] === '-d' ? 'TeamIdentifier=OTHERTEAM1' : ''));
 });
 
 test('designated requirement binds both stable identifier and exact certificate', () => {

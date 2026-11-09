@@ -20,7 +20,13 @@ export function readLocalSigningIdentity(metadataPath = path.join(
     throw new Error('Invalid local signing identity metadata');
   }
   if (!fs.statSync(value.keychainPath).isFile()) throw new Error('Local signing keychain is missing');
-  return { certificateSha1: value.certificateSha1.toUpperCase(), keychainPath: value.keychainPath };
+  const identity = { certificateSha1: value.certificateSha1.toUpperCase(), keychainPath: value.keychainPath };
+  if (value.signingKind === undefined || value.signingKind === 'self-signed') return identity;
+  if (value.signingKind !== 'apple-development' || typeof value.teamId !== 'string'
+    || !/^[A-Z\d]{10}$/.test(value.teamId)) {
+    throw new Error('Invalid local signing kind or Apple development team');
+  }
+  return { ...identity, signingKind: value.signingKind, teamId: value.teamId };
 }
 
 function run(command, args) {
@@ -45,6 +51,9 @@ export function verifyLocalSigningTrust(identity) {
     try {
       run('/usr/bin/security', ['verify-cert', '-L', '-p', 'codeSign', '-c', certificatePath, '-k', identity.keychainPath]);
     } catch (error) {
+      if (identity.signingKind === 'apple-development') {
+        throw new Error('Apple development certificate code-signing trust failed. Check the valid Apple-issued certificate and its WWDR intermediate chain in Keychain Access.', { cause: error });
+      }
       throw new Error(`Local signing certificate ${identity.certificateSha1} is not trusted for code signing. Ask the owner to confirm code-signing trust for this dedicated certificate in Keychain Access before building. Trust was not changed.`, { cause: error });
     }
   } finally {
@@ -59,13 +68,41 @@ export function localDesignatedRequirement(identifier, certificateSha1) {
   return `identifier "${identifier}" and certificate leaf = H"${certificateSha1.toUpperCase()}"`;
 }
 
+export function appleDevelopmentRequirement(identifier, teamId) {
+  if (!/^[A-Za-z\d._-]+$/.test(identifier) || typeof teamId !== 'string' || !/^[A-Z\d]{10}$/.test(teamId)) {
+    throw new Error('Invalid Apple development requirement identity');
+  }
+  return `identifier "${identifier}" and anchor apple generic`
+    + ' and certificate 1[field.1.2.840.113635.100.6.2.1] exists'
+    + ' and certificate leaf[field.1.2.840.113635.100.6.1.12] exists'
+    + ` and certificate leaf[subject.OU] = "${teamId}"`;
+}
+
 export function localCodesignArguments(identifier, identity) {
-  const requirement = localDesignatedRequirement(identifier, identity.certificateSha1);
+  if (!/^[a-f\d]{40}$/i.test(identity.certificateSha1 ?? '')) {
+    throw new Error('Invalid local signing certificate fingerprint');
+  }
+  if (identity.signingKind !== undefined && !['self-signed', 'apple-development'].includes(identity.signingKind)) {
+    throw new Error('Unknown local signing kind');
+  }
+  const requirement = identity.signingKind === 'apple-development'
+    ? appleDevelopmentRequirement(identifier, identity.teamId)
+    : localDesignatedRequirement(identifier, identity.certificateSha1);
   return {
     sign: ['--force', '--timestamp=none', '--options', 'runtime', '--sign', identity.certificateSha1,
       '--keychain', identity.keychainPath, '--identifier', identifier, '--requirements', `=designated => ${requirement}`],
     verify: ['--verify', '--strict', '-R', `=${requirement}`],
   };
+}
+
+export function verifyAppleDevelopmentSignature(targetPath, identifier, teamId, runCommand = run) {
+  const requirement = appleDevelopmentRequirement(identifier, teamId);
+  // Validate Apple's chain and certificate types before trusting the displayed OU/TeamIdentifier.
+  runCommand('/usr/bin/codesign', ['--verify', '--strict', '-R', `=${requirement}`, targetPath]);
+  const observed = runCommand('/usr/bin/codesign', ['-d', '--verbose=2', targetPath]);
+  if (/(?:^|\n)TeamIdentifier=([^\r\n]+)/.exec(observed)?.[1] !== teamId) {
+    throw new Error(`Apple development TeamIdentifier mismatch: ${targetPath}`);
+  }
 }
 
 export function readLocalSigningIdentifier(targetPath, appPath) {
@@ -102,9 +139,12 @@ export function signLocalMacApp(appPath, helperEntitlementsPath, mainEntitlement
     const entitlements = target.main ? mainEntitlementsPath : target.helper ? helperEntitlementsPath : null;
     if (entitlements) args.push('--entitlements', entitlements);
     run('/usr/bin/codesign', [...args, target.path]);
-    run('/usr/bin/codesign', [...verify, target.path]);
+    if (identity.signingKind === 'apple-development') {
+      verifyAppleDevelopmentSignature(target.path, identifier, identity.teamId);
+    } else run('/usr/bin/codesign', [...verify, target.path]);
   }
   run('/usr/bin/codesign', ['--verify', '--deep', '--strict', appPath]);
   verifyMacContactsPermissions(appPath);
-  return { mode: 'local-only', certificateSha1: identity.certificateSha1 };
+  return { mode: 'local-only', certificateSha1: identity.certificateSha1,
+    ...(identity.signingKind === 'apple-development' ? { signingKind: identity.signingKind, teamId: identity.teamId } : {}) };
 }
