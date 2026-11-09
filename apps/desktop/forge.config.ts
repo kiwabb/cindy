@@ -1844,6 +1844,13 @@ if (isWin) {
 
 const config: ForgeConfig = {
   packagerConfig: {
+    // Bind the archive version and SHA256 table to the same installed npm package.
+    // @electron/get still verifies the full archive, without refetching SHASUMS
+    // when an already verified Electron ZIP is available in its cache.
+    electronVersion: (_require('electron/package.json') as { version: string }).version,
+    download: {
+      checksums: _require('electron/checksums.json') as Record<string, string>,
+    },
     // sharp 的底层 libvips 共享库 (libvips-cpp.dylib / libvips-42.dll /
     // libvips-cpp.so) 在不同平台上的位置不同:
     //   - macOS / Linux: 住在独立的 @img/sharp-libvips-{platform}-{arch}/ 包,
