@@ -13,6 +13,9 @@
 #include <dirent.h>
 #include <sys/proc.h>
 #include <sys/sysctl.h>
+#include <mach/mach.h>
+#include <mach/exception_types.h>
+#include <mach/thread_status.h>
 
 /* Atomic same-volume exchange keeps the canonical application present even
  * across power loss. No deletion, process control, or credential access. */
@@ -108,6 +111,24 @@ static int bundle_status(const char *bundle, pid_t old_pid, const char *expected
   printf("],\"blocked\":%s,\"unknown\":%s}\n", blocking ? "true" : "false", unknown ? "true" : "false");
   free(pids);
   return unknown ? 2 : blocking ? 75 : 0;
+}
+
+/* The detached monitor must not keep its parent's Crashpad server alive while
+ * waiting for that server to leave the bundle. Mach exception rights survive
+ * exec independently of the CLOEXEC descriptors managed by libuv. */
+static int release_inherited_crashpad_ports(void) {
+  exception_mask_t mask = EXC_MASK_CRASH | EXC_MASK_RESOURCE | EXC_MASK_GUARD;
+  kern_return_t task_result = task_set_exception_ports(mach_task_self(), mask,
+      MACH_PORT_NULL, EXCEPTION_DEFAULT, THREAD_STATE_NONE);
+  mach_port_t thread = mach_thread_self();
+  kern_return_t thread_result = thread_set_exception_ports(thread, mask,
+      MACH_PORT_NULL, EXCEPTION_DEFAULT, THREAD_STATE_NONE);
+  mach_port_deallocate(mach_task_self(), thread);
+  if (task_result != KERN_SUCCESS || thread_result != KERN_SUCCESS) {
+    fprintf(stderr, "Cannot release inherited crash exception ports (%d, %d)\n", task_result, thread_result);
+    return 0;
+  }
+  return 1;
 }
 
 int main(int argc, char **argv) {
@@ -206,6 +227,7 @@ int main(int argc, char **argv) {
     }
   }
   if ((argc >= 4 && strcmp(argv[1], "--lock") == 0) || (argc == 3 && strcmp(argv[1], "--hold-lock") == 0)) {
+    if (strcmp(argv[1], "--lock") == 0 && !release_inherited_crashpad_ports()) return 2;
     int fd = open(argv[2], O_RDWR | O_CREAT | O_NOFOLLOW, 0600);
     struct flock lock = { .l_type = F_WRLCK, .l_whence = SEEK_SET };
     if (fd < 0 || fcntl(fd, F_SETLK, &lock) < 0) return 75;
