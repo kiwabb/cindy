@@ -1,13 +1,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { validatePersonalIdentity, validatePersonalPolicy, type PersonalIdentity } from './contract.mjs';
 import policyValue from '../../../personal-update-channel.json';
 import { fileSha256 } from './prepareProcess.js';
 import { appleDevelopmentRequirement, readLocalSigningIdentifier, verifyAppleDevelopmentSignature } from './signing-core.mjs';
 
 export interface PersonalJournal {
+  previousProcessBirth?: string;
   schemaVersion: 1; nonce: string; phase: string; identity: PersonalIdentity;
   canonicalApp: string; backup: string; health: string; previousPid: number; zip: string; sha256: string; previousIdentity: PersonalIdentity; helper: string; helperSha256: string; teamId: string; ownerIdentity: string;
 }
@@ -55,6 +56,7 @@ export function buildPersonalMacTransaction(journal: PersonalJournal, root: stri
     || journal.health !== path.join(root, `health-${journal.nonce}.json`)
     || !/^[a-f0-9]{64}$/.test(journal.ownerIdentity)
     || !['prepared', 'waiting-for-exit', 'swapping', 'awaiting-health', 'committed', 'failed'].includes(journal.phase)
+    || (journal.previousProcessBirth !== undefined && !/^\d+:\d+$/.test(journal.previousProcessBirth))
     || journal.zip !== path.join(root, `personal-${journal.identity.revision}.zip`)) throw new Error('Invalid personal transaction');
   const q = quote, record = path.join(root, 'transaction.json');
   const lock = path.join(root, `attempt-${journal.nonce}`, 'monitor');
@@ -67,11 +69,16 @@ export function buildPersonalMacTransaction(journal: PersonalJournal, root: stri
     `JOURNAL=${q(record)}`, `LOCK=${q(lock)}`, `HELPER=${q(journal.helper)}`,
     `APP=${q(journal.canonicalApp)}`, `BACKUP=${q(journal.backup)}`, `HEALTH=${q(journal.health)}`,
     `REQUIREMENT=${q(requirement)}`,
-    `BUNDLE_PATTERN=${q('^/Applications/Cindy[.]app/')}`,
-    'bundle_alive() { /usr/bin/pgrep -f "$BUNDLE_PATTERN" >/dev/null; }',
+    `EXIT_STATUS=${q(path.join(root, `attempt-${journal.nonce}`, 'exit-status.json'))}`,
+    "FAILURE_REASON=transaction_command_failed",
+    'bundle_alive() {',
+    `  if "$HELPER" --bundle-status "$APP" ${journal.previousPid} ${q(journal.previousProcessBirth ?? '-')} > "$EXIT_STATUS.tmp"; then`,
+    '    /bin/mv "$EXIT_STATUS.tmp" "$EXIT_STATUS"', '    return 1',
+    '  else', '    BUNDLE_STATUS=$?', '    /bin/mv "$EXIT_STATUS.tmp" "$EXIT_STATUS"',
+    '    return 0', '  fi', '}',
     'wait_old_bundle() {',
     '  for i in $(seq 1 "${1:-120}"); do',
-    `    if ! /bin/kill -0 ${journal.previousPid} 2>/dev/null && ! bundle_alive; then return 0; fi`,
+    '    if ! bundle_alive; then return 0; fi',
     '    sleep 1', '  done', '  return 1', '}',
     'phase() { /usr/bin/plutil -replace phase -string "$1" -o "$JOURNAL.tmp" "$JOURNAL" && /bin/mv "$JOURNAL.tmp" "$JOURNAL" && "$HELPER" --sync "$JOURNAL"; }',
     'matches() {',
@@ -107,8 +114,12 @@ export function buildPersonalMacTransaction(journal: PersonalJournal, root: stri
     '    if [ -n "$PIDS" ]; then /bin/kill $PIDS 2>/dev/null || true; sleep 2; /bin/kill -9 $PIDS 2>/dev/null || true; fi',
     '    swap || true',
     '  fi',
+    '  FAILED_FROM=$(/usr/bin/plutil -extract phase raw "$JOURNAL")',
+    '  /usr/bin/plutil -replace failedFromPhase -string "$FAILED_FROM" "$JOURNAL" || true',
+    '  /usr/bin/plutil -replace failureReason -string "$FAILURE_REASON" "$JOURNAL" || true',
     '  phase failed || true',
     `  /bin/cp "$JOURNAL" ${q(failed)}`,
+    `  "$HELPER" --sync ${q(failed)} || true`,
     '  /bin/rm -rf "$LOCK"',
     '  /usr/bin/open "$APP" || true',
     '}',
@@ -122,12 +133,16 @@ export function buildPersonalMacTransaction(journal: PersonalJournal, root: stri
     `matches "$BACKUP" ${journal.identity.revision} ${q(journal.identity.sourceCommit)}`,
     `matches "$APP" ${journal.previousIdentity.revision} ${q(journal.previousIdentity.sourceCommit)}`,
     'phase waiting-for-exit',
-    'wait_old_bundle',
-    'bundle_alive && exit 1',
+    'if ! wait_old_bundle; then',
+    '  FAILURE_REASON=old_bundle_exit_timeout',
+    '  if [ "${BUNDLE_STATUS:-2}" != 75 ]; then FAILURE_REASON=bundle_status_unavailable; fi',
+    '  "$HELPER" --sync "$EXIT_STATUS" || true', '  exit 1', 'fi',
+    'if bundle_alive; then FAILURE_REASON=bundle_reappeared_before_swap; exit 1; fi',
     'phase swapping', 'swap',
     'else',
     `if matches "$APP" ${journal.previousIdentity.revision} ${q(journal.previousIdentity.sourceCommit)}; then`,
     '  phase failed', `  /bin/cp "$JOURNAL" ${q(failed)}`,
+    `  "$HELPER" --sync ${q(failed)} || true`,
     '  trap - EXIT HUP INT TERM', '  /bin/rm -rf "$LOCK"', '  exit 0', 'fi',
     `matches "$APP" ${journal.identity.revision} ${q(journal.identity.sourceCommit)}`,
     `matches "$BACKUP" ${journal.previousIdentity.revision} ${q(journal.previousIdentity.sourceCommit)}`,
@@ -178,7 +193,10 @@ export async function launchPersonalTransaction(root: string, identity: Personal
   verifyAppleDevelopmentSignature(helper, helperIdentifier, teamId);
   const helperSha256 = fileSha256(helper);
   if (helperSha256 !== fileSha256(helperSource)) throw new Error('Personal updater helper copy mismatch');
-  const journal: PersonalJournal = { schemaVersion: 1, nonce, phase: 'prepared', identity,
+  const birth = spawnSync(helper, ['--pid-birth', String(pid)], { encoding: 'utf8', timeout: 2_000 });
+  const previousProcessBirth = birth.stdout?.trim();
+  if (birth.status !== 0 || !/^\d+:\d+$/.test(previousProcessBirth)) throw new Error('Previous process identity unavailable');
+  const journal: PersonalJournal = { schemaVersion: 1, nonce, phase: 'prepared', identity, previousProcessBirth,
     canonicalApp: '/Applications/Cindy.app', backup: `/Applications/.Cindy-personal-backup-${nonce}.app`,
     health: path.join(root, `health-${nonce}.json`), previousPid: pid, zip, sha256, previousIdentity, helper, helperSha256, teamId, ownerIdentity };
     writeAtomicJson(path.join(attempt, 'journal.json'), journal);

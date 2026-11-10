@@ -1672,7 +1672,8 @@ function forceQuit(): void {
 async function executeUpdateMacOS(zipPath: string, personal = false): Promise<void> {
   if (personal || personalUpdateContext()) {
     await applyPreparedPersonalUpdate(zipPath);
-    forceQuit();
+    noteExpectedExit('update-relaunch');
+    app.quit();
     return;
   }
   const appPath = path.dirname(path.dirname(path.dirname(app.getAppPath())));
@@ -2193,7 +2194,7 @@ async function executeRelaunchUnguarded(
       // failed updater can be bounded across restarts. Windows and Linux do
       // this only after the last in-executor check that can still keep the
       // staged patch for retry (Windows Runtime, Linux ownership recheck).
-      incrementApplyAttempts();
+      if (!personalContext) incrementApplyAttempts();
       await executeUpdateMacOS(readyFilePath, Boolean(personalContext));
       break;
     case 'linux':

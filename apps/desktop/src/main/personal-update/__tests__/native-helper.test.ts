@@ -69,6 +69,62 @@ describe.skipIf(process.platform !== 'darwin')('personal updater native kernel b
     }).toBe(false);
   });
 
+  it('blocks actual bundle executables, ignores a reused outside PID, and treats a zombie as exited', async () => {
+    const bundle = path.join(fs.realpathSync(root), 'process-fixture');
+    const executable = path.join(bundle, 'Contents/Frameworks/Renderer');
+    fs.mkdirSync(path.dirname(executable), { recursive: true });
+    fs.copyFileSync('/bin/sleep', executable); fs.chmodSync(executable, 0o700);
+    const renderer = spawn(executable, ['15']); children.push(renderer);
+    const status = (pid: number, birth: string) => spawnSync(helper,
+      ['--bundle-status', bundle, String(pid), birth], { encoding: 'utf8' });
+    await expect.poll(() => status(2147483647, '-').status).toBe(75);
+    const blocked = JSON.parse(status(2147483647, '-').stdout);
+    expect(blocked.processes).toContainEqual(expect.objectContaining({ pid: renderer.pid, executable: 'Contents/Frameworks/Renderer', zombie: false }));
+    const exited = new Promise(resolve => renderer.once('exit', resolve));
+    renderer.kill('SIGKILL'); await exited;
+    const reused = status(process.pid, '1:2');
+    expect(reused.status).toBe(0);
+    expect(JSON.parse(reused.stdout).processes).toContainEqual(expect.objectContaining({ pid: process.pid, oldIdentityMatches: false }));
+    const parentSource = path.join(root, 'zombie-parent.c'), parentExe = path.join(root, 'zombie-parent');
+    fs.writeFileSync(parentSource, String.raw`
+#include <unistd.h>
+#include <stdio.h>
+#include <sys/wait.h>
+#include <signal.h>
+
+static volatile sig_atomic_t done = 0;
+static void stop(int signal_number) { (void)signal_number; done = 1; }
+
+int main(int argc, char **argv) {
+  if (argc != 2) return 1;
+  signal(SIGTERM, stop);
+  pid_t child = fork();
+  if (child == 0) {
+    execl(argv[1], argv[1], "0", NULL);
+    _exit(1);
+  }
+  printf("%d\n", child);
+  fflush(stdout);
+  while (!done) sleep(1);
+  waitpid(child, NULL, 0);
+  return 0;
+}
+`);
+    expect(spawnSync('/usr/bin/xcrun', ['clang', parentSource, '-o', parentExe]).status).toBe(0);
+    const parent = spawn(parentExe, [executable]); children.push(parent);
+    const zombiePid = await new Promise<number>(resolve => parent.stdout.once('data', data => resolve(Number(String(data).trim()))));
+    try {
+      await expect.poll(() => {
+        const result = status(zombiePid, '-');
+        return JSON.parse(result.stdout).processes.some((value: { pid: number; zombie: boolean }) => value.pid === zombiePid && value.zombie);
+      }).toBe(true);
+      expect(status(zombiePid, '-').status).toBe(0);
+      expect(spawnSync('/bin/kill', ['-0', String(zombiePid)]).status).toBe(0);
+    } finally {
+      const stopped = new Promise(resolve => parent.once('exit', resolve)); parent.kill('SIGTERM'); await stopped;
+    }
+  });
+
   it('bounds its own command group timeout', () => {
     const result = spawnSync(helper, ['--run', String(process.pid), '1', '/bin/sleep', '15'], { timeout: 4_000 });
     expect(result.status).toBe(124);
