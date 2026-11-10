@@ -1,13 +1,9 @@
 name: client-ci
 
 on:
-  pull_request:
-  # merge queue 把 PR 与最新 main(及排在前面的 PR)合成临时分支,在上面重跑必需检查
-  # (verify / Windows unit tests),全绿才合入。没有这个触发,队列会一直等到超时再把 PR 移出。
-  merge_group:
-  push:
-    branches:
-      - main
+  # 只手动触发（Actions → client-ci → Run workflow，可选分支）。PR 与 main 推送
+  # 不再自动跑：一轮约 20 多分钟，维护者选择按需运行。要恢复自动门禁，加回
+  # pull_request / push: branches: [main]（启用 merge queue 时还需 merge_group）。
   workflow_dispatch:
 
 permissions:

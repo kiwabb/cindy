@@ -27,6 +27,7 @@ import { spawn } from 'node:child_process';
 import { isCindyPersonalRuntime } from './cindy-make/versionRuntimeIdentity.js';
 import { personalUpdateContext, checkPersonalManifest, prepareInUtilityProcess,
   readPreparedPersonalUpdate, applyPreparedPersonalUpdate } from './personal-update/runtime.js';
+import { writeAtomicJson } from './personal-update/transaction.js';
 import os from 'node:os';
 
 import {
@@ -355,10 +356,16 @@ async function hasBusyTasks(): Promise<boolean> {
   }
 }
 
+/** An unattended apply must never raise a UAC prompt: Windows personal installs outside a user-writable directory wait for a manual update. */
+function isPersonalWindowsInstallReadOnly(): boolean {
+  return process.platform === 'win32' && personalUpdateContext()?.installDirWritable === false;
+}
+
 async function getAutoRelaunchBlockReasonForCurrentState(ownsRelaunch = false): Promise<AutoRelaunchBlockReason | null> {
   if (!readAutoUpdateSettings().autoRelaunchOnIdle) return 'disabled';
   if (isDev()) return 'dev';
   if (currentStatus !== 'ready') return 'not-ready';
+  if (isPersonalWindowsInstallReadOnly()) return 'install-dir-readonly';
   if (lastErrorCode === WINDOWS_UPDATER_RUNTIME_MISSING_ERROR_CODE) return 'not-ready';
   if (!ownsRelaunch && (isRelaunching || autoRelaunchInProgress)) return 'relaunching';
   const hasBusyTasksNow = await hasBusyTasks();
@@ -408,6 +415,7 @@ async function getStartupRelaunchBlockReason(): Promise<AutoRelaunchBlockReason 
   if (isDev()) return 'dev';
   if (currentStatus !== 'ready') return 'not-ready';
   if (lastErrorCode === WINDOWS_UPDATER_RUNTIME_MISSING_ERROR_CODE) return 'not-ready';
+  if (isPersonalWindowsInstallReadOnly()) return 'install-dir-readonly';
   if (isRelaunching || autoRelaunchInProgress) return 'relaunching';
   // pkexec 必须用户在场输入密码，启动时不能自己装。
   if (process.platform === 'linux') return 'interactive-auth';
@@ -1490,6 +1498,7 @@ function handleApplyFailure(reason: string): void {
   cancelStartupBinaryUpdateCheck = undefined;
   log.error('Update apply failed (reason=%s), clearing patch and notifying renderer', reason);
   removePatchInfo();
+  removePersonalApplyingMarkers();
   readyVersion = undefined;
   readyFilePath = undefined;
   readyChannelEpoch = undefined;
@@ -1518,7 +1527,19 @@ function handleApplyFailure(reason: string): void {
 
 // ── F3: Platform Executors ────────────────────────────────────────────────
 
-function executeUpdateWindows(zipPath: string, theme: 'light' | 'dark'): void {
+function removePersonalApplyingMarkers(): void {
+  if (process.platform !== 'win32') return;
+  try {
+    const context = personalUpdateContext();
+    if (!context) return;
+    for (const name of fs.readdirSync(context.root)) {
+      if (/^applying-\d+\.json$/.test(name)) fs.rmSync(path.join(context.root, name), { force: true });
+    }
+  } catch { /* Marker bookkeeping never changes the failure path. */ }
+}
+
+/** `beforeSpawn` runs after the last check that can still keep the patch staged and may veto the apply by throwing. */
+function executeUpdateWindows(zipPath: string, theme: 'light' | 'dark', beforeSpawn?: () => void): void {
   const appExePath = app.getPath('exe');
   const appDir = path.dirname(appExePath);
   const exeName = path.basename(appExePath);
@@ -1594,7 +1615,16 @@ function executeUpdateWindows(zipPath: string, theme: 'light' | 'dark'): void {
   // Count the attempt only after the last Runtime check. If security software
   // removes the bundled DLLs between the early guard and this copy, keeping the
   // patch staged must not consume a retry or recreate the relaunch loop.
-  incrementApplyAttempts();
+  // Personal updates keep their bounded state in applying/failed markers instead.
+  if (beforeSpawn) {
+    try { beforeSpawn(); } catch (err) {
+      log.error('Windows update pre-spawn step failed: %s', err instanceof Error ? err.message : String(err));
+      handleApplyFailure('pre_spawn_failed');
+      return;
+    }
+  } else {
+    incrementApplyAttempts();
+  }
 
   // Theme is resolved by the renderer (collapses 'system' via the live DOM
   // class) and forwarded through the `update-relaunch` IPC, so the updater's
@@ -2186,9 +2216,15 @@ async function executeRelaunchUnguarded(
   }
 
   switch (process.platform) {
-    case 'win32':
-      executeUpdateWindows(readyFilePath, theme);
+    case 'win32': {
+      // The Rust updater replaces the install directory and either relaunches the new version or rolls back.
+      // This durable marker lets the next startup tell "target never started" from "target is healthy".
+      const target = personalContext && personalPrepared ? personalPrepared.identity : null;
+      executeUpdateWindows(readyFilePath, theme, target && personalContext ? () => writeAtomicJson(
+        path.join(personalContext.root, `applying-${target.revision}.json`),
+        { revision: target.revision, sourceCommit: target.sourceCommit }) : undefined);
       break;
+    }
     case 'darwin':
       // Increment immediately before starting the platform executor so a
       // failed updater can be bounded across restarts. Windows and Linux do

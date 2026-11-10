@@ -29,6 +29,19 @@ A failed personal update check defers installation and retains verified cached b
 
 The manifest records `schemaVersion`, `repository`, `channel`, `revision`, `sourceCommit`, `platform`, `arch`, `region`, `bundleIdentifier`, `storageIdentity` and `asset` (`url`, `sha256`, `size`). The signed app's `cindy-source.json.personalUpdate` carries the same identity without the self-referential ZIP asset. `build-info.json.personalUpdate` mirrors that identity. A source commit alone cannot describe uncommitted feature files, which is why personal-channel builds require clean committed source.
 
+## Windows personal channel
+
+`apps/desktop/personal-update-channel.json` is schema 2 and maps each packaged target (`darwin-arm64`, `win32-x64`) to its channel; `resolvePersonalPolicy` in `contract.mjs` yields the flat per-channel policy used by producer and client. The Mac channel, its artifact names and manifest fields are unchanged.
+
+The **Package desktop for Windows** workflow follows the Mac rules: only `main` of `kiwabb/cindy`, the same `run_id * 100 + run_attempt` revision, clean tree, smoke on, unversioned Global build, and its own serialization group `personal-windows-x64`. `pnpm release:package --platform win32 --arch x64 --region global --no-sign` embeds the `personalUpdate` identity (`platform: win32`, `arch: x64`, `bundleIdentifier: com.xd.cindy`) in `resources/cindy-source.json` and, in addition to the installer, writes `cindy-unversioned-x64.zip` from the packaged directory contents (the same layout `cindy-updater.exe` consumes for hotfix ZIPs).
+
+`prepare-personal-update.mjs` reads `resources/cindy-source.json` from that ZIP (PowerShell 5.1 writes `\` separators; both forms are accepted), checks it against `build-info.json`, then writes `personal-update.json` and `SHA256SUMS`. `publish-personal-update.mjs` selects the channel from `build-info.json` and applies the same draft-by-ID, verification, revision-floor and retry order as the Mac channel.
+
+- Immutable release `personal-windows-x64-r<revision>` holds `cindy-unversioned-x64.zip`, `cindy-unversioned-Setup.exe`, `build-info.json`, `personal-update.json` and `SHA256SUMS`.
+- Moving release `personal-windows-x64` holds only `personal-update.json`; its feed is `https://github.com/kiwabb/cindy/releases/download/personal-windows-x64/personal-update.json`.
+- First installation is the revision release's `cindy-unversioned-Setup.exe` using the "only for me" (per-user) option. The installer and payload are unsigned.
+- The storage identity hash uses the same inputs as Mac, so it is identical for the same sources.
+
 ## Storage compatibility and signing
 
 `storageIdentity` hashes migration runtime resources, the schema source, personal-todo JSON persistence and the policy's explicit `storageCompatibilityVersion`. Personal-todo coverage includes `personalTodoStore.ts`, its underlying `botTodoStore.ts` and the shared `teammateTodo.ts` representation. Development-only numbered Drizzle snapshots are excluded because packaging removes them. Changes to these inputs conservatively block automatic replacement. Raise `storageCompatibilityVersion` for incompatible changes to other persisted formats, including preferences and credential envelopes. The client requires identical installed/candidate storage identities before automatic replacement.

@@ -351,9 +351,8 @@ test("client CI keeps the complete sharded unit gate on Windows", () => {
 	assert.match(runnerChecks, /^        if: steps\.database-changes\.outputs\.required == 'true'\n        run: node scripts\/ci-database-tests\.mjs run$/m);
 	assert.doesNotMatch(runnerChecks, /continue-on-error:/);
 	const events = workflow.slice(workflow.indexOf('\non:'), workflow.indexOf('\npermissions:'));
-	for (const event of ['pull_request', 'merge_group', 'push', 'workflow_dispatch']) {
-		assert.match(events, new RegExp(`^  ${event}:`, 'm'));
-	}
+	// Maintainer decision 2026-11-10: client CI runs on demand only (Actions → Run workflow).
+	assert.match(events, /^  workflow_dispatch:/m);
 	assert.doesNotMatch(events, /paths(?:-ignore)?:/);
 
 	const gate = workflowJob(workflow, "windows-unit");

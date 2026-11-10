@@ -6,12 +6,16 @@ import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { URL } from 'node:url';
-import { buildPersonalUpdateIdentity, computeStorageIdentity, personalRevisionForRun, parsePersonalRevision } from './ci/personal-update-metadata.mjs';
+import JSZip from 'jszip';
+import { assertPersonalUpdateBuildSource, buildPersonalUpdateIdentity, computeStorageIdentity, personalRevisionForRun, parsePersonalRevision } from './ci/personal-update-metadata.mjs';
 import { assertPackagedPersonalIdentity, createPersonalUpdateManifest, hashFile } from './ci/personal-update-artifacts.mjs';
+import { preparePersonalUpdate } from './prepare-personal-update.mjs';
 import { assertChannelAdvance, assertPublicationContext, publishPersonalUpdate } from './publish-personal-update.mjs';
 
 const policy = { schemaVersion: 1, repository: 'kiwabb/cindy', channel: 'personal-macos-arm64',
   feedUrl: 'https://github.com/kiwabb/cindy/releases/download/personal-macos-arm64/personal-update.json', storageCompatibilityVersion: 1 };
+const channelFile = { schemaVersion: 2, repository: policy.repository, storageCompatibilityVersion: 1,
+  channels: { 'darwin-arm64': 'personal-macos-arm64', 'win32-x64': 'personal-windows-x64' } };
 const sourceCommit = 'a'.repeat(40);
 const identity = { schemaVersion: 1, repository: policy.repository, channel: policy.channel, revision: 12301,
   sourceCommit, platform: 'darwin', arch: 'arm64', region: 'global', bundleIdentifier: 'com.xd.cindy', storageIdentity: 'b'.repeat(64) };
@@ -23,7 +27,7 @@ function fixture(t) {
   const desktopRoot = path.join(dir, 'repo', 'apps', 'desktop');
   const artifactDir = path.join(dir, 'artifacts');
   fs.mkdirSync(artifactDir); fs.mkdirSync(desktopRoot, { recursive: true });
-  fs.writeFileSync(path.join(desktopRoot, 'personal-update-channel.json'), JSON.stringify(policy));
+  fs.writeFileSync(path.join(desktopRoot, 'personal-update-channel.json'), JSON.stringify(channelFile));
   // Explicit unit fixture bytes. No app, database, account, keychain or model is started.
   const zip = 'cindy-unversioned-arm64.zip';
   fs.writeFileSync(path.join(artifactDir, zip), 'unit ZIP integrity bytes');
@@ -374,4 +378,32 @@ test('invalid release metadata cannot bypass draft, asset or source checks', t =
     assert.equal(fake.events.some(args => args[1] === 'upload'), false, name);
     assert.equal(fake.releases.has(policy.channel), false, name);
   }
+});
+
+test('Windows channel builds its own identity, ZIP name and tag, and reads backslash ZIP entries', async t => {
+  const { desktopRoot, artifactDir } = fixture(t);
+  for (const name of ['drizzle/0000_init.sql', 'drizzle/meta/_journal.json', 'src/main/localDb/schema.ts',
+    'src/main/maker-ipc/personalTodoStore.ts', 'src/main/maker-ipc/botTodoStore.ts', '../../packages/maker-shared/src/teammateTodo.ts']) {
+    fs.mkdirSync(path.dirname(path.join(desktopRoot, name)), { recursive: true });
+    fs.writeFileSync(path.join(desktopRoot, name), 'unit bytes');
+  }
+  const winIdentity = buildPersonalUpdateIdentity({ desktopRoot, sourceCommit, platform: 'win32', arch: 'x64', revision: '12301' });
+  assert.deepEqual([winIdentity.channel, winIdentity.platform, winIdentity.arch], ['personal-windows-x64', 'win32', 'x64']);
+  assert.equal(winIdentity.storageIdentity, buildPersonalUpdateIdentity({ desktopRoot, sourceCommit, platform: 'darwin', arch: 'arm64', revision: '1' }).storageIdentity);
+  assert.throws(() => assertPersonalUpdateBuildSource({ desktopRoot, sourceCommit, platform: 'win32', archs: ['arm64'], region: 'global' }), /win32-x64/);
+
+  const zip = new JSZip();
+  // PowerShell 5.1 Compress-Archive stores backslash separators.
+  zip.file('resources\\cindy-source.json', JSON.stringify({ sourceCommit, personalUpdate: winIdentity }));
+  const zipName = 'cindy-unversioned-x64.zip';
+  fs.writeFileSync(path.join(artifactDir, zipName), await zip.generateAsync({ type: 'nodebuffer' }));
+  const info = { personalUpdate: winIdentity, commitSha: sourceCommit, platform: 'win32', arch: 'x64', region: 'global', versionless: true,
+    files: [{ name: zipName, size: fs.statSync(path.join(artifactDir, zipName)).size, sha256: hashFile(path.join(artifactDir, zipName)) }] };
+  fs.writeFileSync(path.join(artifactDir, 'build-info.json'), JSON.stringify(info));
+  fs.writeFileSync(path.join(artifactDir, 'cindy-unversioned-Setup.exe'), 'unit installer bytes');
+  const manifest = await preparePersonalUpdate({ desktopRoot, artifactDir });
+  assert.equal(manifest.asset.url, `https://github.com/kiwabb/cindy/releases/download/personal-windows-x64-r12301/${zipName}`);
+  assert.match(fs.readFileSync(path.join(artifactDir, 'SHA256SUMS'), 'utf8'), /cindy-unversioned-Setup\.exe/);
+  fs.writeFileSync(path.join(artifactDir, 'build-info.json'), JSON.stringify({ ...info, files: [{ ...info.files[0], name: 'cindy-unversioned-arm64.zip' }] }));
+  await assert.rejects(preparePersonalUpdate({ desktopRoot, artifactDir }), /Windows packaged ZIP/);
 });

@@ -10,6 +10,8 @@ name: pr-code-review
 #   - repository secret `ANTHROPIC_API_KEY`(必需)。复用 workflow 声明为 required,
 #     缺了本 workflow 每次都失败,代码里无法兜底。
 #   - repository variable `ANTHROPIC_BASE_URL`(可选)。不设则走 api.anthropic.com。
+#   - repository variable `ENABLE_CODE_REVIEW` = `true`(必需)。配好 secret 后再设;
+#     不设时 job 跳过。
 
 on:
   pull_request:
@@ -57,7 +59,11 @@ jobs:
     # Dependabot secrets,再删掉这一行条件。上面那段说明了权限侧不需要额外动作,
     # 但这条链路(Dependabot + reusable workflow + permissions key)没有实机验证过,
     # 真要恢复时先拿一个 dependabot PR 实跑确认,别只依赖文档推断。
+    #
+    # 开关：repository variable `ENABLE_CODE_REVIEW` 为 'true' 才跑。没配
+    # ANTHROPIC_API_KEY 的仓库（例如个人 fork）不设这个变量，本检查显示跳过而不是每次失败。
     if: >-
+      vars.ENABLE_CODE_REVIEW == 'true' &&
       github.event.pull_request &&
       !github.event.pull_request.draft &&
       github.event.pull_request.head.repo.full_name == github.repository &&

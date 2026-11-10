@@ -1,7 +1,9 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "repository": "kiwabb/cindy",
-  "channel": "personal-macos-arm64",
-  "feedUrl": "https://github.com/kiwabb/cindy/releases/download/personal-macos-arm64/personal-update.json",
-  "storageCompatibilityVersion": 1
+  "storageCompatibilityVersion": 1,
+  "channels": {
+    "darwin-arm64": "personal-macos-arm64",
+    "win32-x64": "personal-windows-x64"
+  }
 }

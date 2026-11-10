@@ -3,14 +3,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { validatePersonalIdentity, validatePersonalPolicy } from '../../src/main/personal-update/contract.mjs';
+import { personalChannelTarget, resolvePersonalPolicy, validatePersonalIdentity, validatePersonalPolicy } from '../../src/main/personal-update/contract.mjs';
 
-export function readPersonalUpdatePolicy(desktopRoot) {
-  return validatePersonalPolicy(JSON.parse(fs.readFileSync(path.join(desktopRoot, 'personal-update-channel.json'), 'utf8')));
+export function readPersonalUpdatePolicy(desktopRoot, platform, arch) {
+  const policy = resolvePersonalPolicy(JSON.parse(fs.readFileSync(path.join(desktopRoot, 'personal-update-channel.json'), 'utf8')), platform, arch);
+  if (!policy) throw new Error(`No personal update channel for ${platform}-${arch}`);
+  return policy;
 }
 
 /** The same persisted bytes must remain readable by both sides of an automatic replacement. */
-export function computeStorageIdentity(desktopRoot, policy = readPersonalUpdatePolicy(desktopRoot)) {
+export function computeStorageIdentity(desktopRoot, policy) {
   validatePersonalPolicy(policy);
   const files = [];
   function collect(relative) {
@@ -57,27 +59,29 @@ export function personalRevisionForRun(runId, attempt) {
   return revision;
 }
 
-export function buildPersonalUpdateIdentity({ desktopRoot, sourceCommit, revision = process.env.CINDY_PERSONAL_UPDATE_REVISION }) {
+export function buildPersonalUpdateIdentity({ desktopRoot, sourceCommit, platform, arch, revision = process.env.CINDY_PERSONAL_UPDATE_REVISION }) {
   if (revision === undefined || revision === '') return null;
-  const policy = readPersonalUpdatePolicy(desktopRoot);
+  const policy = readPersonalUpdatePolicy(desktopRoot, platform, arch);
+  const target = personalChannelTarget(policy.channel);
   return validatePersonalIdentity({
     schemaVersion: 1,
     repository: policy.repository,
     channel: policy.channel,
     revision: parsePersonalRevision(revision),
     sourceCommit,
-    platform: 'darwin',
-    arch: 'arm64',
+    platform: target.platform,
+    arch: target.arch,
     region: 'global',
-    bundleIdentifier: 'com.xd.cindy',
+    bundleIdentifier: target.bundleIdentifier,
     storageIdentity: computeStorageIdentity(desktopRoot, policy),
   }, policy);
 }
 
 /** Run before the packager temporarily changes package.json and generated source metadata. */
 export function assertPersonalUpdateBuildSource({ desktopRoot, sourceCommit, platform, archs, region, versionSpec, skipSmoke }) {
-  if (platform !== 'darwin' || archs.length !== 1 || archs[0] !== 'arm64' || region !== 'global' || versionSpec || skipSmoke) {
-    throw new Error('Personal updates require unversioned Global darwin-arm64 packaging with smoke enabled');
+  const supported = archs.length === 1 && ['darwin-arm64', 'win32-x64'].includes(`${platform}-${archs[0]}`);
+  if (!supported || region !== 'global' || versionSpec || skipSmoke) {
+    throw new Error('Personal updates require unversioned Global darwin-arm64 or win32-x64 packaging with smoke enabled');
   }
   const status = execFileSync('git', ['status', '--porcelain', '--untracked-files=normal'], { cwd: desktopRoot, encoding: 'utf8' });
   if (status.trim()) throw new Error('Personal updates require a clean committed source tree');

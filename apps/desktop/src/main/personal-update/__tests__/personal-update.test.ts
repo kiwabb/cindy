@@ -1,13 +1,14 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import { deflateRawSync } from 'node:zlib';
 import { spawnSync } from 'node:child_process';
 import { describe, expect, it, vi } from 'vitest';
 import { validatePersonalManifest, validatePersonalPolicy, validatePersonalIdentity } from '../contract.mjs';
 import { handlePersonalRendererReadiness } from '../readiness';
-import { validPersonalSmokeReceipt } from '../prepareProcess';
-import { validateUpdateZip } from '../archive';
+import { validPersonalSmokeReceipt, prepareWindowsPersonalUpdate } from '../prepareProcess';
+import { validateUpdateZip, readWindowsUpdateZip } from '../archive';
 import { acknowledgePersonalStorageReady, writeAtomicJson, buildPersonalMacTransaction, resumePersonalTransactionSafely } from '../transaction';
 
 const policy = validatePersonalPolicy({ schemaVersion: 1, repository: 'kiwabb/cindy', channel: 'personal-macos-arm64',
@@ -192,5 +193,109 @@ describe('existing app readiness IPC personal extension', () => {
     expect(acknowledge).not.toHaveBeenCalled();
     expect(handlePersonalRendererReadiness(committed, true, session, acknowledge)).toBe(true);
     expect(acknowledge).toHaveBeenCalledExactlyOnceWith('fixture-owner', 'cloud', 1);
+  });
+});
+
+
+interface ZipFixtureEntry { name: string; data?: string; symlink?: boolean; encrypted?: boolean; deflate?: boolean }
+/** Multi-entry ZIP with a real central directory; `data` is stored or deflated. */
+function zipFixture(entries: ZipFixtureEntry[]): Buffer {
+  const parts: Buffer[] = [], central: Buffer[] = [];
+  let offset = 0;
+  for (const entry of entries) {
+    const raw = Buffer.from(entry.data ?? ''), body = entry.deflate ? deflateRawSync(raw) : raw, name = Buffer.from(entry.name);
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50); local.writeUInt16LE(entry.deflate ? 8 : 0, 8);
+    local.writeUInt32LE(body.length, 18); local.writeUInt32LE(raw.length, 22); local.writeUInt16LE(name.length, 26);
+    const header = Buffer.alloc(46);
+    header.writeUInt32LE(0x02014b50); header.writeUInt16LE(entry.symlink ? 0x031e : 0x0014, 4);
+    header.writeUInt16LE(entry.encrypted ? 1 : 0, 8); header.writeUInt16LE(entry.deflate ? 8 : 0, 10);
+    header.writeUInt32LE(body.length, 20); header.writeUInt32LE(raw.length, 24); header.writeUInt16LE(name.length, 28);
+    header.writeUInt32LE(entry.symlink ? (0o120777 << 16) >>> 0 : 0, 38); header.writeUInt32LE(offset, 42);
+    parts.push(local, name, body); central.push(header, name);
+    offset += local.length + name.length + body.length;
+  }
+  const directory = Buffer.concat(central), end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50); end.writeUInt16LE(entries.length, 8); end.writeUInt16LE(entries.length, 10);
+  end.writeUInt32LE(directory.length, 12); end.writeUInt32LE(offset, 16);
+  return Buffer.concat([...parts, directory, end]);
+}
+
+const windowsPolicy = validatePersonalPolicy({ schemaVersion: 1, repository: 'kiwabb/cindy', channel: 'personal-windows-x64',
+  feedUrl: 'https://github.com/kiwabb/cindy/releases/download/personal-windows-x64/personal-update.json', storageCompatibilityVersion: 1 });
+const windowsIdentity = validatePersonalIdentity({ schemaVersion: 1, repository: windowsPolicy.repository, channel: windowsPolicy.channel,
+  revision: 42, sourceCommit: 'a'.repeat(40), platform: 'win32', arch: 'x64', region: 'global',
+  bundleIdentifier: 'com.xd.cindy', storageIdentity: 'b'.repeat(64) }, windowsPolicy);
+const windowsSource = (value: object = {}) => JSON.stringify({ sourceCommit: windowsIdentity.sourceCommit, personalUpdate: windowsIdentity, ...value });
+const validWindowsEntries = (source = windowsSource()): ZipFixtureEntry[] => [
+  { name: 'Cindy.exe', data: 'MZ' }, { name: 'resources\\', data: '' }, { name: 'resources\\cindy-source.json', data: source, deflate: true },
+  { name: 'resources/app.asar', data: 'asar' }];
+
+describe('personal update Windows archive preflight', () => {
+  it('reads the identity from a ZIP using PowerShell backslash separators', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cindy-personal-win-zip-test-'));
+    try {
+      const archive = path.join(root, 'update.zip');
+      fs.writeFileSync(archive, zipFixture(validWindowsEntries()));
+      expect(readWindowsUpdateZip(archive)).toMatchObject({ sourceCommit: windowsIdentity.sourceCommit, personalUpdate: windowsIdentity });
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it.each([
+    ['a foreign macOS layout', [{ name: 'Cindy.app/Contents/MacOS/Cindy', data: 'x' }]],
+    ['a missing executable', validWindowsEntries().filter(entry => entry.name !== 'Cindy.exe')],
+    ['a missing source file', validWindowsEntries().filter(entry => !entry.name.endsWith('cindy-source.json'))],
+    ['a lower-case executable name', validWindowsEntries().map(entry => entry.name === 'Cindy.exe' ? { ...entry, name: 'cindy.exe' } : entry)],
+    ['parent traversal', [...validWindowsEntries(), { name: 'resources/../../outside.dll', data: 'x' }]],
+    ['backslash traversal', [...validWindowsEntries(), { name: '..\\outside.dll', data: 'x' }]],
+    ['an absolute path', [...validWindowsEntries(), { name: '/outside.dll', data: 'x' }]],
+    ['a drive path', [...validWindowsEntries(), { name: 'C:/outside.dll', data: 'x' }]],
+    ['an alternate data stream', [...validWindowsEntries(), { name: 'Cindy.exe:evil', data: 'x' }]],
+    ['a case-insensitive duplicate', [...validWindowsEntries(), { name: 'RESOURCES/APP.ASAR', data: 'x' }]],
+    ['a symlink', [...validWindowsEntries(), { name: 'resources/link', data: '../../outside', symlink: true }]],
+    ['an encrypted entry', [...validWindowsEntries(), { name: 'resources/secret.bin', data: 'x', encrypted: true }]],
+  ] as const)('rejects %s', (_label, entries) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cindy-personal-win-zip-test-'));
+    try {
+      const archive = path.join(root, 'update.zip');
+      fs.writeFileSync(archive, zipFixture([...entries]));
+      expect(() => readWindowsUpdateZip(archive)).toThrow();
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+  });
+});
+
+describe('personal update Windows preparation', () => {
+  function prepareFixture(source: string, edit: (hash: string) => string = hash => hash) {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cindy-personal-win-prepare-test-'));
+    const archive = path.join(root, 'incoming-42.zip'), jobDirectory = path.join(root, `job-${randomUUID()}`);
+    fs.mkdirSync(jobDirectory);
+    const bytes = zipFixture(validWindowsEntries(source));
+    fs.writeFileSync(archive, bytes);
+    const sha256 = createHash('sha256').update(bytes).digest('hex');
+    const request = { archive, outputDirectory: root, jobDirectory, policy: windowsPolicy, storageIdentity: windowsIdentity.storageIdentity,
+      manifest: { ...windowsIdentity, asset: { url: 'https://github.com/kiwabb/cindy/releases/download/personal-windows-x64-r42/app.zip', sha256: edit(sha256), size: bytes.length } } };
+    return { root, archive, sha256, size: bytes.length, request };
+  }
+
+  it('publishes the verified ZIP as personal-<revision>.zip without a team identity', () => {
+    const fixture = prepareFixture(windowsSource());
+    try {
+      const result = prepareWindowsPersonalUpdate(fixture.request);
+      expect(result).toEqual({ path: path.join(fixture.root, 'personal-42.zip'), sha256: fixture.sha256, size: fixture.size, identity: windowsIdentity });
+      expect(fs.existsSync(fixture.archive)).toBe(false);
+      expect(fs.statSync(result.path).size).toBe(fixture.size);
+    } finally { fs.rmSync(fixture.root, { recursive: true, force: true }); }
+  });
+
+  it.each([
+    ['a source revision different from the manifest', windowsSource({ personalUpdate: { ...windowsIdentity, revision: 43 } }), (hash: string) => hash],
+    ['a sourceCommit different from the identity', windowsSource({ sourceCommit: 'd'.repeat(40) }), (hash: string) => hash],
+    ['a hash different from the manifest', windowsSource(), () => 'e'.repeat(64)],
+  ] as const)('rejects %s and leaves nothing published', (_label, source, edit) => {
+    const fixture = prepareFixture(source, edit);
+    try {
+      expect(() => prepareWindowsPersonalUpdate(fixture.request)).toThrow();
+      expect(fs.existsSync(path.join(fixture.root, 'personal-42.zip'))).toBe(false);
+    } finally { fs.rmSync(fixture.root, { recursive: true, force: true }); }
   });
 });
