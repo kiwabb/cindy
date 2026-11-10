@@ -872,6 +872,26 @@
     "sourceDisabled": "Ya apagado",
     "botOwner": "ID del propietario {{id}}"
   },
+  "personalTodos": {
+    "title": "Tareas pendientes",
+    "add": "Nueva",
+    "open": "Abiertas",
+    "later": "Más tarde",
+    "done": "Hechas",
+    "titleField": "Título",
+    "notesField": "Notas",
+    "dateField": "Fecha",
+    "today": "Hoy",
+    "tomorrow": "Mañana",
+    "noDate": "Sin fecha",
+    "complete": "Completar",
+    "reopen": "Reabrir",
+    "deleteConfirm": "¿Eliminar esta tarea?",
+    "loadFailed": "No se pudo cargar",
+    "saveFailed": "No se pudo guardar",
+    "conflict": "Cambió en el ordenador, se recargó",
+    "gone": "Ya no existe"
+  },
   "glance": {
     "open": "{{name}} de un vistazo",
     "dueUnseen": "Una tarea pendiente ha vencido",

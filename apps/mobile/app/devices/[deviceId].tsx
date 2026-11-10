@@ -86,6 +86,7 @@ import { useConversationSearch } from '@/session/useConversationSearch';
 import { selectVisibleDeviceSessions, sessionMatchesProjectDir } from '@/session/mobileHome';
 import { HomeListViewportContext, HomeSessionRow } from '@/session/HomeSurface';
 import { useTeammateRoster } from '@/session/useTeammateRoster';
+import { PersonalTodoEntry } from '@/session/PersonalTodoEntry';
 import { createDisclosureListCell, ListDisclosureScope, useListDisclosureTransition } from '@/session/listDisclosureTransition';
 import { RenameSessionModal } from '@/session/RenameSessionModal';
 import { SessionImportSheet } from '@/session/SessionImportSheet';
@@ -1036,6 +1037,8 @@ function DeviceDetailScreenContent() {
             onPress: () => guardedPush({ pathname: '/devices/desktop/[deviceId]', params: { deviceId, deviceName } }),
             testID: 'deviceDetail.remoteDesktop',
           }} />
+          <PersonalTodoEntry deviceId={deviceId} deviceName={deviceName} enabled={screenFocused}
+            onOpen={() => guardedPush({ pathname: '/todos/[deviceId]', params: { deviceId, deviceName } })} />
           <MainWindowActionButton action={{
             label: t('devices.sessionImport.entry'),
             onPress: () => setSessionImportOpen(true),

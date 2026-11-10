@@ -19447,17 +19447,16 @@
   },
   "personalTodos": {
     "mine": "自分のToDo",
-    "assistant": "アシスタントのフォロー",
+    "teammates": "仲間のToDo",
     "all": "すべて",
     "scope": "ToDoの担当者",
     "add": "ToDoを追加",
     "details": "ToDoの詳細",
-    "ownerSource": "担当：自分 · 自分が作成 · 手動追加",
     "title": "タイトル",
     "notes": "メモ（任意）",
     "deadline": "期限（任意）",
+    "deadlineTime": "時刻（任意）",
     "deferUntil": "再開日時",
-    "deferHint": "延期しても期限は変わりません。",
     "save": "保存",
     "saving": "保存中…",
     "close": "閉じる",
@@ -19468,14 +19467,19 @@
     "delete": "削除",
     "deleteConfirm": "このToDoを削除しますか？",
     "empty": "この表示にはToDoがありません",
-    "emptyHint": "個人のToDoを追加できます。",
     "saveFailed": "保存できませんでした。入力は保持されています。もう一度保存してください。",
     "loadFailed": "個人のToDoを読み込めませんでした。",
-    "conflict": "別の場所で更新されたか、作成が完了しています。再読み込み後も入力は残り、保存すると最新バージョンのタイトル・メモ・期限を上書きします。",
+    "conflict": "ほかで更新されています",
     "reloadVersion": "上書きするため最新バージョンを読み込む",
-    "savedNotice": "「{{title}}」を保存しました。ボタンから一覧を表示できます。",
+    "savedNotice": "「{{title}}」を保存しました",
     "deletedNotice": "「{{title}}」を削除しました。",
-    "rowFailed": "更新できませんでした。再試行するか、詳細で最新バージョンを読み込んでください。",
-    "overwrite": "上書き保存"
+    "rowFailed": "操作に失敗しました",
+    "overwrite": "上書き保存",
+    "deferInPast": "再開時刻は現在より後にしてください",
+    "reminder": {
+      "due": "Todo の期限です",
+      "resumed": "再開する時間です",
+      "summary": "{{count}} 件の Todo が期限です"
+    }
   }
 }

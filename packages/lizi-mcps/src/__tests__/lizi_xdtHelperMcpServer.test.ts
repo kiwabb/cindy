@@ -195,6 +195,33 @@ describe("cindy_helper MCP server", () => {
     } finally { await client.close(); await server.close(); }
   });
 
+  it.each(['default', 'bot', 'bot-main'] as const)('offers personal todos on the %s surface and keeps them with a remote Pi task but not a remote Codex task', async (surface) => {
+    let remote: { remoteHostId?: string; agentKind: 'pi' | 'codex' } = { agentKind: 'pi' };
+    const personalTodos = vi.fn(async () => ({ ok: true as const, items: [] }));
+    const server = createXdtHelperMcpServer({ resolveSurface: async () => surface, personalTodos }, {
+      agentKind: 'pi', workingDir: '/repo', sessionId: 'todo-task',
+      getSessionContext: () => ({ workingDir: '/repo', sessionId: 'todo-task', sessionInstanceId: 'i1', ...remote }),
+    });
+    const [ct, st] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: 'personal-todo-test', version: '0.0.0' });
+    await Promise.all([server.connect(st), client.connect(ct)]);
+    try {
+      const categories = async () => ((parsePayload(await client.callTool({ name: 'list_tools', arguments: {} })).categories) as Array<{ name: string; description?: string }>);
+      const local = await categories();
+      expect(local.map((c) => c.name)).toContain('todos');
+      expect(JSON.stringify(local.find((c) => c.name === 'todos'))).toContain('当前登录账号');
+      const tools = parsePayload(await client.callTool({ name: 'list_tools', arguments: { category: 'todos' } }));
+      expect((tools.tools as Array<{ name: string }>).map((t) => t.name)).toEqual(['list_personal_todos', 'update_personal_todo']);
+      expect(parsePayload(await client.callTool({ name: 'call_tool', arguments: { name: 'list_personal_todos', args: {} } }))).toMatchObject({ ok: true, items: [] });
+      remote = { agentKind: 'pi', remoteHostId: 'ssh-host' };
+      expect((await categories()).map((c) => c.name)).toContain('todos');
+      remote = { agentKind: 'codex', remoteHostId: 'ssh-host' };
+      expect((await categories()).map((c) => c.name)).not.toContain('todos');
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
   it('offers update checks without installation only to a live local task', async () => {
     let context = {
       agentKind: 'codex' as const, workingDir: '/repo', sessionId: 'local-task',

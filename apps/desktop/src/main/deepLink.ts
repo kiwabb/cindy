@@ -111,6 +111,8 @@ export type DeepLinkPayload =
    * ghost id 白名单,不合法整条拒绝。
    */
   | { type: 'installed-plugin'; ghostId?: string }
+  /** 主进程内部入口(个人待办提醒的系统通知)打开待办页;URL 深链不产生它。 */
+  | { type: 'todos' }
   /**
    * 纯"把窗口拉回前台"意图,不携带导航语义 (典型来源:OAuth 授权成功页的
    * "打开 xdt-maker" 按钮 / 自动唤起)。main 进程内消化,不发给 renderer、
@@ -462,6 +464,11 @@ export function openMainWindowVoiceSettings(tab: 'voice-input' | 'providers'): v
 /** Internal menu-bar entry; reuse the existing main-window navigation queue. */
 export function openMainWindowRemoteControlSettings(): void {
   dispatchDeepLink({ type: 'settings', tab: 'remote-control' });
+}
+
+/** Personal todo reminder toast: bring the user to the todo board. */
+export function openMainWindowTodos(): void {
+  dispatchDeepLink({ type: 'todos' });
 }
 
 /** 主进程内部入口(菜单栏余量面板)打开账单页的充值流程;URL 深链不开放这个 tab。 */

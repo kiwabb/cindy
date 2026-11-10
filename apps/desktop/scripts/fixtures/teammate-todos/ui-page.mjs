@@ -30,6 +30,7 @@ export default {
   },
   async check(page, ui) {
     if (ui.case === 'personal-row') {
+      await page.getByRole('radio', { name: await ui.t('personalTodos.mine'), exact: true }).click();
       const row = page.getByTestId('todo-board-row');
       await row.waitFor();
       assert.equal(await row.locator('button button').count(), 0);
@@ -45,7 +46,7 @@ export default {
     await page.getByRole('button', { name: await ui.t('personalTodos.add') }).click();
     await ui.capture('personal-editor-empty');
     await page.getByRole('button', { name: await ui.t('personalTodos.close') }).click();
-    await page.getByRole('radio', { name: await ui.t('personalTodos.assistant'), exact: true }).click();
+    await page.getByRole('radio', { name: await ui.t('personalTodos.teammates'), exact: true }).click();
     if (ui.case === 'empty') {
       await page.getByTestId('todo-board-empty').waitFor();
       return;

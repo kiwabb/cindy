@@ -865,6 +865,26 @@
     "sourceDisabled": "원래 사용 중지됨",
     "botOwner": "소유자 ID {{id}}"
   },
+  "personalTodos": {
+    "title": "할 일",
+    "add": "새로 만들기",
+    "open": "진행 중",
+    "later": "나중에",
+    "done": "완료",
+    "titleField": "제목",
+    "notesField": "메모",
+    "dateField": "날짜",
+    "today": "오늘",
+    "tomorrow": "내일",
+    "noDate": "날짜 없음",
+    "complete": "완료",
+    "reopen": "다시 열기",
+    "deleteConfirm": "이 할 일을 삭제할까요?",
+    "loadFailed": "불러오지 못했습니다",
+    "saveFailed": "저장하지 못했습니다",
+    "conflict": "컴퓨터에서 변경되어 다시 불러왔습니다",
+    "gone": "더 이상 없습니다"
+  },
   "glance": {
     "open": "{{name}}의 근황",
     "dueUnseen": "기한이 된 할 일이 있습니다",

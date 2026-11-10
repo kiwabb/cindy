@@ -49,6 +49,7 @@ const RICH_REMOTE_RESOURCE_PRIMITIVES: readonly string[] = [
   'plugin-card-forms',
   'mail-message',
   'teammate-todos',
+  'personal-todos',
 ];
 
 /** Routines remain a desktop feature; other portable collections stay available. */

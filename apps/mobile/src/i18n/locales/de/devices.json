@@ -865,6 +865,26 @@
     "sourceDisabled": "Bereits ausgeschaltet",
     "botOwner": "Eigentümer-ID {{id}}"
   },
+  "personalTodos": {
+    "title": "Aufgaben",
+    "add": "Neu",
+    "open": "Offen",
+    "later": "Später",
+    "done": "Erledigt",
+    "titleField": "Titel",
+    "notesField": "Notizen",
+    "dateField": "Datum",
+    "today": "Heute",
+    "tomorrow": "Morgen",
+    "noDate": "Kein Datum",
+    "complete": "Erledigen",
+    "reopen": "Wieder öffnen",
+    "deleteConfirm": "Diese Aufgabe löschen?",
+    "loadFailed": "Laden fehlgeschlagen",
+    "saveFailed": "Speichern fehlgeschlagen",
+    "conflict": "Auf dem Computer geändert, neu geladen",
+    "gone": "Existiert nicht mehr"
+  },
   "glance": {
     "open": "{{name}} auf einen Blick",
     "dueUnseen": "Ein To-do ist fällig",

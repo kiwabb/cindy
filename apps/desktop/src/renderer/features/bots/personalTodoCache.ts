@@ -2,12 +2,14 @@ import type { PersonalTodo, PersonalTodoUpdate } from '../../../shared/personalT
 import {
   getDataOwnerGeneration,
   isDataOwnerGenerationCurrent,
+  isDataOwnerPushCurrent,
 } from '@/contexts/dataOwnerGeneration';
 
 let owner = getDataOwnerGeneration();
 let state = { items: [] as PersonalTodo[], loading: true, failed: false };
 let pending = false;
 let hasSnapshot = false;
+let staleRead = false;
 const duringRead = new Map<string, { item: PersonalTodo; deleted: boolean }>();
 let sequence = 0;
 let timer: ReturnType<typeof setTimeout> | undefined;
@@ -76,6 +78,10 @@ export async function refreshPersonalTodos() {
       duringRead.clear();
       emit();
       schedule();
+      if (staleRead) {
+        staleRead = false;
+        void refreshPersonalTodos();
+      }
     }
   }
 }
@@ -84,16 +90,30 @@ export function ensurePersonalTodos() {
   if (state.loading && !pending) void refreshPersonalTodos();
   schedule();
 }
+function changedElsewhere() {
+  current();
+  if (pending) staleRead = true; // the read in flight may predate this write
+  else void refreshPersonalTodos();
+}
 const focus = () => void refreshPersonalTodos();
+let unsubscribeChanged: (() => void) | undefined;
 export function subscribePersonalTodos(listener: () => void) {
   current();
   listeners.add(listener);
-  if (listeners.size === 1) window.addEventListener('focus', focus);
+  if (listeners.size === 1) {
+    window.addEventListener('focus', focus);
+    // Writes from any surface (Agent tools, phone) land here; stamps of another owner are ignored.
+    unsubscribeChanged = window.electronAPI?.localDb?.personalTodos?.onChanged?.((stamp) => {
+      if (isDataOwnerPushCurrent(stamp)) changedElsewhere();
+    });
+  }
   schedule();
   return () => {
     listeners.delete(listener);
     if (!listeners.size) {
       window.removeEventListener('focus', focus);
+      unsubscribeChanged?.();
+      unsubscribeChanged = undefined;
       clearTimeout(timer);
     }
   };
@@ -131,6 +151,7 @@ export const personalTodoCacheTesting = {
     sequence++;
     pending = false;
     hasSnapshot = false;
+    staleRead = false;
     duringRead.clear();
     owner = getDataOwnerGeneration();
     state = { items: [], loading: true, failed: false };

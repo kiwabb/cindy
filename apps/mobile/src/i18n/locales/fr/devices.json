@@ -872,6 +872,26 @@
     "sourceDisabled": "Déjà désactivé",
     "botOwner": "ID du propriétaire {{id}}"
   },
+  "personalTodos": {
+    "title": "Tâches à faire",
+    "add": "Nouvelle",
+    "open": "En cours",
+    "later": "Plus tard",
+    "done": "Terminées",
+    "titleField": "Titre",
+    "notesField": "Notes",
+    "dateField": "Date",
+    "today": "Aujourd'hui",
+    "tomorrow": "Demain",
+    "noDate": "Sans date",
+    "complete": "Terminer",
+    "reopen": "Rouvrir",
+    "deleteConfirm": "Supprimer cette tâche ?",
+    "loadFailed": "Chargement impossible",
+    "saveFailed": "Enregistrement impossible",
+    "conflict": "Modifiée sur l'ordinateur, rechargée",
+    "gone": "N'existe plus"
+  },
   "glance": {
     "open": "{{name}} en un coup d'œil",
     "dueUnseen": "Une tâche à faire arrive à échéance",

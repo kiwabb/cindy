@@ -19520,17 +19520,16 @@
   },
   "personalTodos": {
     "mine": "My todos",
-    "assistant": "Assistant follow-up",
+    "teammates": "Teammates’ todos",
     "all": "All",
     "scope": "Todo owner",
     "add": "Add todo",
     "details": "Todo details",
-    "ownerSource": "Owner: me · Created by me · Added manually",
     "title": "Title",
     "notes": "Notes (optional)",
     "deadline": "Due date (optional)",
+    "deadlineTime": "Due time (optional)",
     "deferUntil": "Resume at",
-    "deferHint": "Deferring does not change the due date.",
     "save": "Save",
     "saving": "Saving…",
     "close": "Close",
@@ -19541,14 +19540,19 @@
     "delete": "Delete",
     "deleteConfirm": "Delete this todo?",
     "empty": "No todos in this view",
-    "emptyHint": "Add a personal todo to get started.",
     "saveFailed": "Could not save. Your input is preserved. Try saving again.",
     "loadFailed": "Could not load personal todos.",
-    "conflict": "Changed elsewhere, or creation already committed. Reloading keeps your input. Saving again replaces that version’s title, notes and due date with your current input.",
+    "conflict": "Updated elsewhere",
     "reloadVersion": "Load latest version to overwrite these fields",
-    "savedNotice": "Saved “{{title}}”. Use the button to view its list.",
+    "savedNotice": "Saved “{{title}}”",
     "deletedNotice": "Deleted “{{title}}”.",
-    "rowFailed": "Could not update. Try again or open details to reload the latest version.",
-    "overwrite": "Overwrite and save"
+    "rowFailed": "Action failed",
+    "overwrite": "Overwrite and save",
+    "deferInPast": "Resume time must be in the future",
+    "reminder": {
+      "due": "Todo due",
+      "resumed": "Time to pick this up again",
+      "summary": "{{count}} todos due"
+    }
   }
 }

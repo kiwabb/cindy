@@ -865,6 +865,26 @@
     "sourceDisabled": "原本已停用",
     "botOwner": "主人 ID {{id}}"
   },
+  "personalTodos": {
+    "title": "待辦",
+    "add": "新增",
+    "open": "未完成",
+    "later": "稍後",
+    "done": "已完成",
+    "titleField": "標題",
+    "notesField": "備註",
+    "dateField": "日期",
+    "today": "今天",
+    "tomorrow": "明天",
+    "noDate": "無日期",
+    "complete": "完成",
+    "reopen": "重新開啟",
+    "deleteConfirm": "刪除這則待辦？",
+    "loadFailed": "無法讀取",
+    "saveFailed": "無法儲存",
+    "conflict": "電腦上已有變動，已重新讀取",
+    "gone": "已不存在"
+  },
   "glance": {
     "open": "{{name}}的近況",
     "dueUnseen": "有待辦到期",

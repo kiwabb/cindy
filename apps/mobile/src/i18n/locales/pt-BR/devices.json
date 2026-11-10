@@ -872,6 +872,26 @@
     "sourceDisabled": "Já desativado",
     "botOwner": "ID do proprietário {{id}}"
   },
+  "personalTodos": {
+    "title": "Tarefas",
+    "add": "Nova",
+    "open": "Abertas",
+    "later": "Mais tarde",
+    "done": "Concluídas",
+    "titleField": "Título",
+    "notesField": "Notas",
+    "dateField": "Data",
+    "today": "Hoje",
+    "tomorrow": "Amanhã",
+    "noDate": "Sem data",
+    "complete": "Concluir",
+    "reopen": "Reabrir",
+    "deleteConfirm": "Excluir esta tarefa?",
+    "loadFailed": "Não foi possível carregar",
+    "saveFailed": "Não foi possível salvar",
+    "conflict": "Alterada no computador, recarregada",
+    "gone": "Não existe mais"
+  },
   "glance": {
     "open": "Visão geral de {{name}}",
     "dueUnseen": "Uma pendência está vencendo",

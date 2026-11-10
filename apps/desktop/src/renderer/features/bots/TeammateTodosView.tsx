@@ -12,7 +12,7 @@ import type { PersonalTodo, PersonalTodoUpdate } from '../../../shared/personalT
  * 三种归属视图共用截止分组；个人归属不由伙伴 origin 字段推断。
  */
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Check, ChevronDown, ChevronRight, CircleDot, Circle, UserRound } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, CircleDot, Circle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -239,22 +239,18 @@ function PersonalTodoRow({
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const todo = item.personal!;
+  const done = todo.status === 'done';
+  const label = `${t(done ? 'personalTodos.reopen' : 'personalTodos.complete')}: ${todo.title}`;
   return (
-    <div data-testid="todo-board-row" className="px-2 py-1">
-      <div className="flex min-w-0 items-center gap-2">
-        <Button
+    <div data-testid="todo-board-row">
+      <div className="flex min-h-8 w-full items-center gap-3 rounded-lg px-2 py-1 hover:bg-[var(--surface-hover)] focus-within:ring-2 focus-within:ring-inset focus-within:ring-[var(--focus-ring)]">
+        <button
           type="button"
-          variant="secondary"
-          size="sm"
           role="checkbox"
-          aria-checked={todo.status === 'done'}
-          aria-label={
-            t(todo.status === 'done' ? 'personalTodos.reopen' : 'personalTodos.complete') +
-            ': ' +
-            todo.title
-          }
-          disabled={busy}
+          aria-checked={done}
+          aria-label={label}
           aria-busy={busy}
+          disabled={busy}
           onClick={async () => {
             setBusy(true);
             setFailed(false);
@@ -262,7 +258,7 @@ function PersonalTodoRow({
               await onUpdate({
                 id: todo.id,
                 expectedRevision: todo.revision,
-                operation: todo.status === 'done' ? 'reopen' : 'complete',
+                operation: done ? 'reopen' : 'complete',
               });
             } catch {
               setFailed(true);
@@ -270,53 +266,55 @@ function PersonalTodoRow({
               setBusy(false);
             }
           }}
+          className="-mx-0.5 inline-flex size-6 shrink-0 items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
         >
-          {todo.status === 'done' ? (
-            <Check size={14} aria-hidden />
+          {done ? (
+            <span
+              aria-hidden
+              className={cn(
+                'inline-flex size-5 items-center justify-center rounded-full bg-[var(--surface-chip)] text-[var(--text-primary)]',
+                busy && 'opacity-50',
+              )}
+            >
+              <Check size={12} />
+            </span>
           ) : (
-            <Circle size={14} aria-hidden />
+            <Circle
+              size={20}
+              aria-hidden
+              className={cn('text-[var(--text-tertiary)]', busy && 'opacity-50')}
+            />
           )}
-          <span>
-            {t(
-              busy
-                ? 'personalTodos.saving'
-                : todo.status === 'done'
-                  ? 'personalTodos.reopen'
-                  : 'personalTodos.complete',
-            )}
-          </span>
-        </Button>
+        </button>
         <button
           type="button"
-          onClick={() => onOpen(item)}
           aria-label={todo.title}
-          className="flex min-h-8 min-w-0 flex-1 flex-col rounded-full px-2 py-1 text-left outline-none hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
+          onClick={() => onOpen(item)}
+          className="flex min-h-8 min-w-0 flex-1 items-center gap-3 self-stretch rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--focus-ring)]"
         >
-          <span
-            title={todo.title}
-            className="block w-full truncate text-13 text-[var(--text-primary)]"
-          >
-            {todo.title}
-          </span>
-          <span className="text-12 text-[var(--text-tertiary)]">
-            {t('personalTodos.ownerSource')}
-            {todo.completedAt
-              ? ' · ' +
-                t('bots.todoBoard.completedOn', {
+          <span className="min-w-0 flex-1">
+            <span
+              title={todo.title}
+              className={cn(
+                'block truncate text-13 leading-5',
+                done ? 'text-[var(--text-secondary)]' : 'text-[var(--text-primary)]',
+              )}
+            >
+              {todo.title}
+            </span>
+            {todo.completedAt ? (
+              <span className="block truncate text-12 leading-4 text-[var(--text-tertiary)]">
+                {t('bots.todoBoard.completedOn', {
                   date: shortDate(todo.completedAt, i18n.language),
-                })
-              : ''}
+                })}
+              </span>
+            ) : null}
           </span>
+          {view !== 'done' ? <Deadline todo={item.todo} view={view} offline={false} /> : null}
         </button>
-        {view !== 'done' ? <Deadline todo={item.todo} view={view} offline={false} /> : null}
       </div>
-      {busy ? (
-        <p role="status" className="text-12 text-[var(--text-tertiary)]">
-          {t('personalTodos.saving')}
-        </p>
-      ) : null}
       {failed ? (
-        <p role="alert" className="text-12 text-[var(--error-fg)]">
+        <p role="alert" className="px-2 text-12 text-[var(--error-fg)]">
           {t('personalTodos.rowFailed')}
         </p>
       ) : null}
@@ -353,7 +351,7 @@ function TodoRow({
     .join(' · ');
   return (
     <Tip
-      text={item.personal ? t('personalTodos.ownerSource') : tipText(todo, t, i18n.language)}
+      text={tipText(todo, t, i18n.language)}
       side="top"
       contentClassName="max-w-[440px]"
     >
@@ -364,13 +362,7 @@ function TodoRow({
         onClick={() => onOpen(item)}
         className="flex min-h-8 w-full items-center gap-3 rounded-lg px-2 py-1 text-left outline-none hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--focus-ring)]"
       >
-        <>
-          {item.personal ? (
-            <UserRound size={20} className="shrink-0 text-[var(--text-secondary)]" aria-hidden />
-          ) : (
-            <BotAvatar bot={teammate} size="sm" className={offline ? 'opacity-50' : undefined} />
-          )}
-        </>
+        <BotAvatar bot={teammate} size="sm" className={offline ? 'opacity-50' : undefined} />
         <span className="min-w-0 flex-1">
           <span
             className={cn(
@@ -382,7 +374,7 @@ function TodoRow({
           </span>
           <span className="flex min-w-0 items-center gap-1.5 text-12 leading-4 text-[var(--text-tertiary)]">
             <span className="min-w-0 shrink truncate">
-              {item.personal ? t('personalTodos.ownerSource') : done ? doneMeta : metaText(item, t)}
+              {done ? doneMeta : metaText(item, t)}
             </span>
             {done ? null : <Next todo={todo} offline={offline} />}
           </span>
@@ -567,7 +559,7 @@ function TodoBoard() {
     () =>
       [
         ...(personal.scope !== 'mine' ? todoBoardItems(teammates, entries, view, filter) : []),
-        ...(personal.scope !== 'assistant'
+        ...(personal.scope !== 'teammates'
           ? personalBoardItems(personal.items, view, t('personalTodos.mine'))
           : []),
       ].sort((a, b) =>
@@ -584,7 +576,7 @@ function TodoBoard() {
             ...(personal.scope !== 'mine'
               ? todoBoardItems(teammates, entries, 'done', filter)
               : []),
-            ...(personal.scope !== 'assistant'
+            ...(personal.scope !== 'teammates'
               ? personalBoardItems(personal.items, 'done', t('personalTodos.mine'))
               : []),
           ].sort((a, b) => completionTime(b) - completionTime(a))
@@ -593,7 +585,7 @@ function TodoBoard() {
   );
   const groups = useMemo(() => (view === 'done' ? [] : groupTodoBoardItems(items)), [items, view]);
   const loading =
-    (personal.scope !== 'assistant' && personal.loading) ||
+    (personal.scope !== 'teammates' && personal.loading) ||
     (personal.scope !== 'mine' &&
       teammates.some((teammate) => !teammate.offline && !entries.has(teammate.key)));
 
@@ -622,9 +614,9 @@ function TodoBoard() {
       data-testid="todo-board-empty"
     >
       <span className="text-13 text-[var(--text-secondary)]">{text}</span>
-      <span className="text-12 text-[var(--text-tertiary)]">
-        {t(personal.scope === 'mine' ? 'personalTodos.emptyHint' : 'bots.todoBoard.empty.hint')}
-      </span>
+      {personal.scope !== 'mine' ? (
+        <span className="text-12 text-[var(--text-tertiary)]">{t('bots.todoBoard.empty.hint')}</span>
+      ) : null}
       {personal.scope !== 'mine' && chatTarget ? (
         <Button
           variant="secondary"
@@ -775,7 +767,7 @@ function TodoBoard() {
             aria-label={t('personalTodos.scope')}
             value={personal.scope}
             onValueChange={personal.selectScope}
-            options={(['mine', 'assistant', 'all'] as const).map((value) => ({
+            options={(['mine', 'teammates', 'all'] as const).map((value) => ({
               value,
               label: t(`personalTodos.${value}`),
             }))}
@@ -785,7 +777,7 @@ function TodoBoard() {
           </Button>
         </div>
         {personal.scope !== 'mine' ? <TeammateNotes teammates={teammates} /> : null}
-        {personal.scope !== 'assistant' && personal.failed ? (
+        {personal.scope !== 'teammates' && personal.failed ? (
           <p role="alert" className="px-4 text-12 text-[var(--error-fg)]">
             {t('personalTodos.loadFailed')}{' '}
             <Button variant="secondary" size="sm" onClick={() => void personal.refresh()}>

@@ -748,7 +748,7 @@ export function MainLayout() {
         | { type: 'provider-share-join'; link: string }
         | { type: 'plugin'; pluginId: string }
         | { type: 'local-plugin-share'; snapshotId: string }
-        | { type: 'installed-plugin'; ghostId?: string }
+        | { type: 'installed-plugin'; ghostId?: string } | { type: 'todos' }
         | { type: 'settings'; tab: 'voice-input' | 'providers' | 'billing' | 'remote-control' | 'builtin-tools'; connect?: string; intent?: 'topup' },
     ) => {
       if (payload.type === 'chat-message') {
@@ -780,6 +780,10 @@ export function MainLayout() {
       }
       if (payload.type === 'plugin') {
         navigate(`/plugins?market=${encodeURIComponent(payload.pluginId)}`);
+        return;
+      }
+      if (payload.type === 'todos') {
+        navigate('/bots/todos');
         return;
       }
       if (payload.type === 'installed-plugin') {

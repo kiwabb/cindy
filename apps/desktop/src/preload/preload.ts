@@ -4245,7 +4245,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         | { type: 'provider-import'; importId: string }
         | { type: 'plugin'; pluginId: string }
         | { type: 'local-plugin-share'; snapshotId: string }
-        | { type: 'installed-plugin'; ghostId?: string }
+        | { type: 'installed-plugin'; ghostId?: string } | { type: 'todos' }
         | { type: 'shared-task-join'; invitation: string; server: string }
         | { type: 'provider-share-join'; link: string }
         | { type: 'chat-invite'; token: string }
@@ -4296,6 +4296,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
         callback({ type: 'plugin', pluginId: p.pluginId });
       } else if (p.type === 'local-plugin-share' && isLocalPluginSnapshotId(p.snapshotId)) {
         callback({ type: 'local-plugin-share', snapshotId: p.snapshotId });
+      } else if (p.type === 'todos') {
+        callback({ type: 'todos' });
       } else if (p.type === 'installed-plugin' && (p.ghostId === undefined || (typeof p.ghostId === 'string' && /^[a-z0-9][a-z0-9-]{0,31}$/.test(p.ghostId)))) {
         // A plugin's own id (same rule as isValidGhostId in shared/ghost), not a market resource id.
         // The bare list link carries none. Main validated it already; a malformed id drops the payload.
@@ -4369,7 +4371,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     | { type: 'provider-import'; importId: string }
     | { type: 'plugin'; pluginId: string }
     | { type: 'local-plugin-share'; snapshotId: string }
-    | { type: 'installed-plugin'; ghostId?: string }
+    | { type: 'installed-plugin'; ghostId?: string } | { type: 'todos' }
     | { type: 'shared-task-join'; invitation: string; server: string }
     | { type: 'provider-share-join'; link: string }
     | { type: 'chat-invite'; token: string }
@@ -6107,6 +6109,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     personalTodos: {
       list: () => ipcRenderer.invoke('local-db:personal-todos:list'),
       update: (input: import('../shared/personalTodo').PersonalTodoUpdate) => ipcRenderer.invoke('local-db:personal-todos:update', input),
+      onChanged: (listener: (ownerStamp?: import('../shared/dataOwnerPush').DataOwnerPushStamp) => void) => {
+        const wrapped = (_event: Electron.IpcRendererEvent, ownerStamp?: import('../shared/dataOwnerPush').DataOwnerPushStamp) => listener(ownerStamp);
+        ipcRenderer.on('local-db:personal-todos:changed', wrapped);
+        return () => ipcRenderer.removeListener('local-db:personal-todos:changed', wrapped);
+      },
     },
     bots: {
       generateAvatar: (token: string): Promise<{ avatarImageBase64: string }> =>
