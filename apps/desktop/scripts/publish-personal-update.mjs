@@ -44,13 +44,60 @@ export function publishPersonalUpdate({ artifactDir, desktopRoot, env = process.
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'cindy-publish-'));
   fs.chmodSync(temp, 0o700);
   const api = endpoint => JSON.parse(runGh(['api', `repos/${repository}/${endpoint}`]));
-  function release(tagName) {
-    try { return api(`releases/tags/${tagName}`); }
-    catch (error) {
-      // Authentication, transport failures and throttling must never look like an empty channel.
-      if (/HTTP 404/.test(String(error.stderr ?? error.message))) return null;
-      throw error;
+  function releaseById(id, tagName) {
+    if (!Number.isSafeInteger(id) || id <= 0) throw new Error('Invalid release ID');
+    const value = api(`releases/${id}`);
+    if (!value || typeof value !== 'object' || Array.isArray(value) || typeof value.draft !== 'boolean'
+      || !Array.isArray(value.assets) || typeof value.target_commitish !== 'string' || !value.target_commitish) {
+      throw new Error('Invalid release metadata');
     }
+    if (value.id !== id || value.tag_name !== tagName) throw new Error('Release ID does not match the expected tag');
+    return value;
+  }
+  function release(tagName) {
+    try {
+      const published = api(`releases/tags/${tagName}`);
+      return releaseById(published.id, tagName);
+    } catch (error) {
+      // This endpoint only returns published releases. Other failures remain fatal.
+      if (!/HTTP 404/.test(String(error.stderr ?? error.message))) throw error;
+    }
+    // Drafts have no published tag lookup. Search every page for this exact tag,
+    // rejecting distinct draft IDs instead of selecting an arbitrary recovery target.
+    let matchingId;
+    for (let page = 1; ; page++) {
+      const values = api(`releases?per_page=100&page=${page}`);
+      if (!Array.isArray(values)) throw new Error('Invalid release listing');
+      for (const value of values.filter(item => item.tag_name === tagName)) {
+        if (!Number.isSafeInteger(value.id) || value.id <= 0) throw new Error('Invalid release ID');
+        if (matchingId !== undefined && matchingId !== value.id) throw new Error('Ambiguous releases for the expected tag');
+        matchingId = value.id;
+      }
+      if (values.length < 100) return matchingId === undefined ? null : releaseById(matchingId, tagName);
+    }
+  }
+  function createImmutableDraft() {
+    const input = path.join(temp, 'draft-release.json');
+    fs.writeFileSync(input, JSON.stringify({ tag_name: tag, target_commitish: candidate.sourceCommit,
+      draft: true, make_latest: 'false', name: `Cindy Mac personal revision ${candidate.revision}`,
+      body: `Source ${candidate.sourceCommit}. Global Apple Silicon payload. Locally re-sign before installation.`,
+    }), { mode: 0o600 });
+    let created;
+    try {
+      created = JSON.parse(runGh(['api', `repos/${repository}/releases`, '--method', 'POST', '--input', input]));
+    } catch (error) {
+      // Recover only a documented duplicate tag conflict. A validation, access or
+      // transport failure must not be reinterpreted as a successful creation.
+      let detail;
+      try { detail = JSON.parse(String(error.stdout)); } catch { throw error; }
+      if (!/HTTP 422/.test(String(error.stderr ?? error.message))
+        || !Array.isArray(detail?.errors)
+        || !detail.errors.some(item => item.resource === 'Release' && item.field === 'tag_name' && item.code === 'already_exists')) throw error;
+      const existing = release(tag);
+      if (!existing) throw error;
+      return existing;
+    }
+    return releaseById(created.id, tag);
   }
   function download(tagName, name) {
     const dir = fs.mkdtempSync(path.join(temp, 'asset-'));
@@ -60,6 +107,7 @@ export function publishPersonalUpdate({ artifactDir, desktopRoot, env = process.
   function currentChannel() {
     const current = release(policy.channel);
     if (!current) return null;
+    if (current.draft) throw new Error('Personal update channel must be published');
     const match = /^Personal update revision (\d+)$/m.exec(current.body ?? '');
     const floor = match ? parsePersonalRevision(match[1]) : 0;
     if (floor > candidate.revision) throw new Error('Refusing to downgrade the personal update channel floor');
@@ -97,12 +145,7 @@ export function publishPersonalUpdate({ artifactDir, desktopRoot, env = process.
     if (head.commit.sha !== candidate.sourceCommit) throw new Error('Main advanced while building; publish its newer workflow instead');
     assertChannelAdvance(currentChannel()?.manifest, candidate);
     let immutable = release(tag);
-    if (!immutable) {
-      runGh(['release', 'create', tag, '--repo', repository, '--target', candidate.sourceCommit,
-        '--draft', '--latest=false', '--title', `Cindy Mac personal revision ${candidate.revision}`,
-        '--notes', `Source ${candidate.sourceCommit}. Global Apple Silicon payload. Locally re-sign before installation.`]);
-      immutable = release(tag);
-    }
+    if (!immutable) immutable = createImmutableDraft();
     if (immutable.target_commitish !== candidate.sourceCommit) throw new Error('Immutable release points to another source');
     for (const name of files) {
       if (!immutable.assets.some(asset => asset.name === name)) {
@@ -110,10 +153,10 @@ export function publishPersonalUpdate({ artifactDir, desktopRoot, env = process.
         runGh(['release', 'upload', tag, path.join(artifactDir, name), '--repo', repository]);
       }
     }
-    immutable = release(tag);
+    immutable = releaseById(immutable.id, tag);
     verifyAssets(immutable);
     if (immutable.draft) runGh(['release', 'edit', tag, '--repo', repository, '--draft=false', '--latest=false']);
-    if (release(tag).draft) throw new Error('Immutable release is still a draft');
+    if (releaseById(immutable.id, tag).draft) throw new Error('Immutable release is still a draft');
     verifyReleaseTag();
     // All immutable bytes are public and verified before the mutable pointer is advanced.
     const current = currentChannel();
