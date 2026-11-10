@@ -1559,6 +1559,8 @@ describe('app update forward-only policy', () => {
     readAutoUpdateSettings.mockReturnValue({ autoRelaunchOnIdle: false });
     appGetVersion.mockReturnValue('0.0.0');
     const { zip } = personalUpdateFixture();
+    let acknowledge: (() => void) | undefined;
+    personalApply.mockImplementationOnce(() => new Promise<void>(resolve => { acknowledge = resolve; }));
     const service = await freshUpdateService('darwin');
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
     service.initUpdateService();
@@ -1566,7 +1568,17 @@ describe('app update forward-only policy', () => {
       await expect(service.checkForUpdate()).resolves.toBe('ready');
       ipcListeners.get('update-relaunch')?.({}, 'dark');
       await vi.waitFor(() => expect(personalApply).toHaveBeenCalledWith(zip));
-      expect(exitSpy).toHaveBeenCalledWith(0);
+      expect(appQuit).not.toHaveBeenCalled();
+      acknowledge?.();
+      await vi.waitFor(() => expect(appQuit).toHaveBeenCalledOnce());
+      // app.quit returns while the normal lifecycle is still disposing. A second
+      // UI request must retain the in-progress guard until that process exits.
+      ipcListeners.get('update-relaunch')?.({}, 'dark');
+      await vi.waitFor(() => expect(logInfo).toHaveBeenCalledWith('executeRelaunch() skipped — already in progress'));
+      expect(personalApply).toHaveBeenCalledOnce();
+      expect(appQuit).toHaveBeenCalledOnce();
+      expect(exitSpy).not.toHaveBeenCalled();
+      expect(logError.mock.calls.some(call => String(call[0]).includes('incrementApplyAttempts failed'))).toBe(false);
       expect(fs.existsSync(zip)).toBe(true);
     } finally { exitSpy.mockRestore(); service.stopUpdateService(); }
   });

@@ -11,6 +11,8 @@
 #include <libproc.h>
 #include <limits.h>
 #include <dirent.h>
+#include <sys/proc.h>
+#include <sys/sysctl.h>
 
 /* Atomic same-volume exchange keeps the canonical application present even
  * across power loss. No deletion, process control, or credential access. */
@@ -31,7 +33,89 @@ static void terminate_children(pid_t parent) {
   free(children);
 }
 
+static void json_string(const char *value) {
+  putchar('"');
+  for (const unsigned char *byte = (const unsigned char *)value; *byte; byte++) {
+    if (*byte == '"' || *byte == '\\') { putchar('\\'); putchar(*byte); }
+    else if (*byte < 32) printf("\\u%04x", *byte);
+    else putchar(*byte);
+  }
+  putchar('"');
+}
+
+static int read_process_info(pid_t pid, struct proc_bsdinfo *info) {
+  if (proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, info, sizeof(*info)) == sizeof(*info)) return 1;
+  /* libproc can omit zombies. sysctl retains their identity until the parent reaps them. */
+  struct kinfo_proc process;
+  size_t size = sizeof(process);
+  int query[] = { CTL_KERN, KERN_PROC, KERN_PROC_PID, pid };
+  if (sysctl(query, 4, &process, &size, NULL, 0) != 0 || size != sizeof(process) || process.kp_proc.p_stat != SZOMB) return 0;
+  memset(info, 0, sizeof(*info));
+  info->pbi_ppid = process.kp_eproc.e_ppid;
+  info->pbi_status = SZOMB;
+  info->pbi_start_tvsec = process.kp_proc.p_starttime.tv_sec;
+  info->pbi_start_tvusec = process.kp_proc.p_starttime.tv_usec;
+  return 1;
+}
+
+/* Read only kernel process identity. Never inspect arguments or environment. */
+static int bundle_status(const char *bundle, pid_t old_pid, const char *expected_birth) {
+  size_t prefix_length = strlen(bundle);
+  if (!prefix_length || bundle[0] != '/' || bundle[prefix_length - 1] == '/') return 2;
+  int capacity = proc_listallpids(NULL, 0) + 256;
+  if (capacity <= 256 || capacity > 65536) return 2;
+  pid_t *pids = calloc((size_t)capacity, sizeof(pid_t));
+  if (!pids) return 2;
+  int count = proc_listallpids(pids, capacity * (int)sizeof(pid_t));
+  if (count <= 0 || count >= capacity) { free(pids); return 2; }
+  int old_listed = 0;
+  for (int index = 0; index < count; index++) if (pids[index] == old_pid) old_listed = 1;
+  if (!old_listed) pids[count++] = old_pid;
+  int blocking = 0, recorded = 0, unknown = 0;
+  printf("{\"schemaVersion\":1,\"processes\":[");
+  for (int index = 0; index < count; index++) {
+    char executable[PROC_PIDPATHINFO_MAXSIZE] = {0};
+    int has_path = proc_pidpath(pids[index], executable, sizeof(executable)) > 0;
+    int in_bundle = has_path && strncmp(executable, bundle, prefix_length) == 0 && executable[prefix_length] == '/';
+    struct proc_bsdinfo info;
+    if (!read_process_info(pids[index], &info)) {
+      if (in_bundle || (pids[index] == old_pid && (kill(old_pid, 0) == 0 || errno == EPERM))) {
+        unknown = blocking = 1;
+        if (recorded < 64) {
+          if (recorded++) putchar(',');
+          printf("{\"pid\":%d,\"ppid\":null,\"state\":null,\"birth\":null,\"executable\":", pids[index]);
+          json_string(in_bundle ? executable + prefix_length + 1 : "<unavailable>");
+          putchar('}');
+        }
+      }
+      continue;
+    }
+    char birth[64];
+    snprintf(birth, sizeof(birth), "%llu:%llu", (unsigned long long)info.pbi_start_tvsec, (unsigned long long)info.pbi_start_tvusec);
+    int old_matches = pids[index] == old_pid && strcmp(birth, expected_birth) == 0;
+    int old_relevant = old_matches || (pids[index] == old_pid && strcmp(expected_birth, "-") == 0);
+    if (!in_bundle && pids[index] != old_pid) continue;
+    if (info.pbi_status != SZOMB && (in_bundle || (old_relevant && !has_path))) blocking = 1;
+    if (old_relevant && !has_path && info.pbi_status != SZOMB) unknown = 1;
+    if (recorded >= 64) { blocking = 1; continue; }
+    if (recorded++) putchar(',');
+    printf("{\"pid\":%d,\"ppid\":%d,\"state\":%u,\"zombie\":%s,\"birth\":", pids[index], info.pbi_ppid, info.pbi_status, info.pbi_status == SZOMB ? "true" : "false");
+    json_string(birth);
+    printf(",\"oldIdentityMatches\":%s,\"executable\":", old_matches ? "true" : "false");
+    json_string(in_bundle ? executable + prefix_length + 1 : "<outside-bundle-or-unavailable>");
+    putchar('}');
+  }
+  printf("],\"blocked\":%s,\"unknown\":%s}\n", blocking ? "true" : "false", unknown ? "true" : "false");
+  free(pids);
+  return unknown ? 2 : blocking ? 75 : 0;
+}
+
 int main(int argc, char **argv) {
+  if (argc == 5 && strcmp(argv[1], "--bundle-status") == 0) {
+    char *end; long pid = strtol(argv[3], &end, 10);
+    if (*end || pid <= 1 || pid > INT_MAX) return 2;
+    return bundle_status(argv[2], (pid_t)pid, argv[4]);
+  }
   if (argc == 3 && strcmp(argv[1], "--pid-birth") == 0) {
     char *end; long pid = strtol(argv[2], &end, 10);
     struct proc_bsdinfo info;
