@@ -154,7 +154,7 @@ function verifyPackagedSourceMetadata({ appName, platform, arch, expectedCommit,
       `packaged Cindy source metadata commit mismatch: expected ${expectedCommit}, got ${metadata.sourceCommit}`,
     );
   }
-  if (personalUpdate) assertPackagedPersonalIdentity(metadata, personalUpdate, readPersonalUpdatePolicy(DESKTOP_ROOT));
+  if (personalUpdate) assertPackagedPersonalIdentity(metadata, personalUpdate, readPersonalUpdatePolicy(DESKTOP_ROOT, platform, arch));
   console.log(`    verified packaged source metadata: ${metadata.sourceCommit}`);
 }
 
@@ -289,7 +289,7 @@ function findSetupExe(makeBaseDir) {
   return walk(makeBaseDir);
 }
 
-async function finishWindows({ artifactDir, baseName, appName, versionless, allowUnsigned, noSign }) {
+async function finishWindows({ artifactDir, baseName, appName, versionless, allowUnsigned, noSign, personalUpdate }) {
   const makeBaseDir = path.join(DESKTOP_ROOT, 'out', 'make');
   const packagedDir = path.join(DESKTOP_ROOT, 'out', `${appName}-win32-x64`);
   const setupExe = findSetupExe(makeBaseDir);
@@ -380,6 +380,21 @@ async function finishWindows({ artifactDir, baseName, appName, versionless, allo
       { stdio: 'inherit' },
     );
     files.push(fileEntry('hotfix', hotfixZipPath));
+  } else if (personalUpdate) {
+    // Personal update payload: same packaged-dir layout that cindy-updater.exe consumes for hotfix ZIPs.
+    const personalZipPath = path.join(artifactDir, `${baseName}-x64.zip`);
+    console.log('==> Creating personal update ZIP from packaged app...');
+    if (fs.existsSync(personalZipPath)) fs.unlinkSync(personalZipPath);
+    execFileSync(
+      'powershell',
+      [
+        '-NoProfile',
+        '-Command',
+        `Compress-Archive -Path '${psq(packagedDir)}\\*' -DestinationPath '${psq(personalZipPath)}'`,
+      ],
+      { stdio: 'inherit' },
+    );
+    files.push(fileEntry('personal-update', personalZipPath));
   }
 
   return { files, signing: { installerSigned, internalExesSigned: Boolean(winSignCmd) } };
@@ -516,8 +531,10 @@ async function main() {
     process.exit(1);
   }
   const { platform, archs, region, versionSpec, skipSmoke, allowUnsigned, noSign, localSign } = args;
-  const personalUpdate = buildPersonalUpdateIdentity({ desktopRoot: DESKTOP_ROOT, sourceCommit: collectBuildMeta().commitSha });
-  if (personalUpdate) assertPersonalUpdateBuildSource({ desktopRoot: DESKTOP_ROOT, sourceCommit: personalUpdate.sourceCommit, ...args });
+  const personalRequested = process.env.CINDY_PERSONAL_UPDATE_REVISION !== undefined && process.env.CINDY_PERSONAL_UPDATE_REVISION !== '';
+  // Validate the target before resolving its channel so unsupported targets get the build-source error.
+  if (personalRequested) assertPersonalUpdateBuildSource({ desktopRoot: DESKTOP_ROOT, sourceCommit: collectBuildMeta().commitSha, ...args });
+  const personalUpdate = buildPersonalUpdateIdentity({ desktopRoot: DESKTOP_ROOT, sourceCommit: collectBuildMeta().commitSha, platform, arch: archs[0] });
   const localSigningIdentity = localSign ? readLocalSigningIdentity() : undefined;
   if (localSigningIdentity) verifyLocalSigningTrust(localSigningIdentity);
   // ensureBinary 的 CDN fallback 按此 region 选择清单基址；必须早于二进制准备。
@@ -687,6 +704,7 @@ async function main() {
         region,
         skipSmoke,
         webAuthnProvisioningProfile,
+        personalUpdate,
       }));
 
       const buildInfo = buildBuildInfo({

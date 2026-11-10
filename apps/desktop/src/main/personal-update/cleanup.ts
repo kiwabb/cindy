@@ -4,7 +4,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { isDeepStrictEqual } from 'node:util';
-import { validatePersonalIdentity, validatePersonalPolicy, type PersonalIdentity } from './contract.mjs';
+import { validatePersonalIdentity, resolvePersonalPolicy, type PersonalIdentity, type PersonalPolicy } from './contract.mjs';
 import { appleDevelopmentRequirement } from './signing-core.mjs';
 import type { PersonalJournal } from './transaction.js';
 import policyValue from '../../../personal-update-channel.json';
@@ -21,7 +21,7 @@ export interface PersonalCleanupContext {
   teamId: string;
 }
 
-const policy = validatePersonalPolicy(policyValue);
+const policy = resolvePersonalPolicy(policyValue, 'darwin', 'arm64') as PersonalPolicy;
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 
 async function readJson(file: string): Promise<unknown> {

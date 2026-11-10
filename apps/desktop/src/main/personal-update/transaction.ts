@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
-import { validatePersonalIdentity, validatePersonalPolicy, type PersonalIdentity } from './contract.mjs';
+import { validatePersonalIdentity, resolvePersonalPolicy, type PersonalIdentity, type PersonalPolicy } from './contract.mjs';
 import policyValue from '../../../personal-update-channel.json';
 import { fileSha256 } from './prepareProcess.js';
 import { appleDevelopmentRequirement, readLocalSigningIdentifier, verifyAppleDevelopmentSignature } from './signing-core.mjs';
@@ -20,6 +20,8 @@ export function writeAtomicJson(file: string, data: unknown): void {
   try { fs.writeFileSync(fd, JSON.stringify(data)); fs.fsyncSync(fd); }
   finally { fs.closeSync(fd); }
   fs.renameSync(temporary, file);
+  // Windows cannot open a directory for fsync; the file itself was already flushed and renamed atomically.
+  if (process.platform === 'win32') return;
   const directory = fs.openSync(path.dirname(file), 'r');
   try { fs.fsyncSync(directory); } finally { fs.closeSync(directory); }
 }
@@ -43,7 +45,7 @@ export function acknowledgePersonalStorageReady(root: string, canonicalApp: stri
 }
 
 export function buildPersonalMacTransaction(journal: PersonalJournal, root: string): string {
-  const policy = validatePersonalPolicy(policyValue);
+  const policy = resolvePersonalPolicy(policyValue, 'darwin', 'arm64') as PersonalPolicy;
   validatePersonalIdentity(journal.identity, policy);
   validatePersonalIdentity(journal.previousIdentity, policy);
   if (journal.identity.revision <= journal.previousIdentity.revision

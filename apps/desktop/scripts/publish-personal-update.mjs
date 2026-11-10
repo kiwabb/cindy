@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 import { readPersonalUpdatePolicy, personalRevisionForRun, parsePersonalRevision } from './ci/personal-update-metadata.mjs';
-import { createPersonalUpdateManifest, hashFile } from './ci/personal-update-artifacts.mjs';
+import { createPersonalUpdateManifest, hashFile, personalReleaseAssets } from './ci/personal-update-artifacts.mjs';
 import { validatePersonalManifest } from '../src/main/personal-update/contract.mjs';
 
 export function assertPublicationContext(manifest, env) {
@@ -31,15 +31,17 @@ function gh(args) {
 }
 
 export function publishPersonalUpdate({ artifactDir, desktopRoot, env = process.env, runGh = gh }) {
-  const policy = readPersonalUpdatePolicy(desktopRoot);
   const info = JSON.parse(fs.readFileSync(path.join(artifactDir, 'build-info.json'), 'utf8'));
+  const policy = readPersonalUpdatePolicy(desktopRoot, info.platform, info.arch);
   const candidate = createPersonalUpdateManifest({ buildInfo: info, artifactDir, policy });
   const supplied = validatePersonalManifest(JSON.parse(fs.readFileSync(path.join(artifactDir, 'personal-update.json'), 'utf8')), policy);
   if (!isDeepStrictEqual(candidate, supplied)) throw new Error('Published manifest does not describe the verified ZIP');
   assertPublicationContext(candidate, env);
   const repository = policy.repository;
   const tag = `${policy.channel}-r${candidate.revision}`;
-  const files = ['cindy-unversioned-arm64.zip', 'cindy-unversioned-arm64.dmg', 'build-info.json', 'personal-update.json', 'SHA256SUMS'];
+  const files = personalReleaseAssets(policy).files;
+  const label = candidate.platform === 'win32' ? { name: 'Windows x64', payload: 'Global Windows x64 payload. Run the Setup.exe for a first manual installation.', title: 'Windows' }
+    : { name: 'Mac', payload: 'Global Apple Silicon payload. Locally re-sign before installation.', title: 'Mac' };
   const expected = new Map(files.map(name => [name, { size: fs.statSync(path.join(artifactDir, name)).size, sha256: hashFile(path.join(artifactDir, name)) }]));
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'cindy-publish-'));
   fs.chmodSync(temp, 0o700);
@@ -79,8 +81,8 @@ export function publishPersonalUpdate({ artifactDir, desktopRoot, env = process.
   function createImmutableDraft() {
     const input = path.join(temp, 'draft-release.json');
     fs.writeFileSync(input, JSON.stringify({ tag_name: tag, target_commitish: candidate.sourceCommit,
-      draft: true, make_latest: 'false', name: `Cindy Mac personal revision ${candidate.revision}`,
-      body: `Source ${candidate.sourceCommit}. Global Apple Silicon payload. Locally re-sign before installation.`,
+      draft: true, make_latest: 'false', name: `Cindy ${label.name} personal revision ${candidate.revision}`,
+      body: `Source ${candidate.sourceCommit}. ${label.payload}`,
     }), { mode: 0o600 });
     let created;
     try {
@@ -167,7 +169,7 @@ export function publishPersonalUpdate({ artifactDir, desktopRoot, env = process.
     // A failed upload can then be repaired at the same revision, never downgraded.
     if (!current) {
       runGh(['release', 'create', policy.channel, '--repo', repository, '--target', candidate.sourceCommit,
-        '--latest=false', '--title', 'Cindy personal Mac update channel',
+        '--latest=false', '--title', `Cindy personal ${label.title} update channel`,
         '--notes', notes]);
     } else {
       runGh(['release', 'edit', policy.channel, '--repo', repository, '--latest=false', '--notes', notes]);

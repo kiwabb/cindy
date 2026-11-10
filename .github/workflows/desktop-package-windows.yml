@@ -4,22 +4,24 @@ on:
   workflow_dispatch:
     inputs:
       publish:
-        description: Publish the tested installer to GitHub Releases
+        description: Publish the tested app to GitHub Releases
         type: boolean
         default: true
   push:
     branches:
-      - codex/windows-packaging
+      - main
 
 permissions:
   contents: read
 
 concurrency:
-  group: desktop-package-windows-${{ github.ref }}
+  # Serialize the complete build/publication transaction for this sole Windows channel.
+  group: personal-windows-x64
   cancel-in-progress: false
 
 jobs:
   package:
+    if: github.repository == 'kiwabb/cindy' && github.ref == 'refs/heads/main'
     runs-on: windows-2025
     timeout-minutes: 90
     env:
@@ -50,31 +52,35 @@ jobs:
           node -e "if (process.platform !== 'win32' || process.arch !== 'x64') process.exit(1)"
           cargo --version
 
+      - name: Assign update revision
+        shell: bash
+        run: |
+          node --input-type=module <<'JS' >> "$GITHUB_ENV"
+          import { personalRevisionForRun } from './apps/desktop/scripts/ci/personal-update-metadata.mjs';
+          console.log(`CINDY_PERSONAL_UPDATE_REVISION=${personalRevisionForRun(process.env.GITHUB_RUN_ID, process.env.GITHUB_RUN_ATTEMPT)}`);
+          JS
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Package and smoke-test the app
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        # Keep the community 0.0.0 version: no official app updates or signing secrets.
+        # Keep the community 0.0.0 version. The embedded personal identity carries its own revision.
         # Retain the packager's real packaged startup/database smoke test.
         run: pnpm release:package --platform win32 --arch x64 --region global --no-sign
 
-      - name: Check installer and write checksums
+      - name: Verify the update payload and write checksums
+        shell: bash
         working-directory: apps/desktop/release/artifacts/global/unversioned/win32-x64
         run: |
-          $ErrorActionPreference = 'Stop'
-          $files = @('cindy-unversioned-Setup.exe', 'build-info.json')
-          $lines = foreach ($file in $files) {
-            if (!(Test-Path -LiteralPath $file) -or (Get-Item -LiteralPath $file).Length -eq 0) {
-              throw "Missing or empty distributable: $file"
-            }
-            $hash = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()
-            "$hash  $file"
-          }
-          $lines | Set-Content -LiteralPath SHA256SUMS -Encoding utf8NoBOM
+          node "$GITHUB_WORKSPACE/apps/desktop/scripts/prepare-personal-update.mjs" "$PWD"
+          for file in cindy-unversioned-x64.zip cindy-unversioned-Setup.exe build-info.json personal-update.json SHA256SUMS; do
+            test -s "$file"
+          done
+          sha256sum --check SHA256SUMS
 
-      - name: Upload tested Windows installer
+      - name: Upload downloadable app
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: cindy-windows-x64
@@ -91,35 +97,30 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Download tested Windows installer
+      - name: Download tested app
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: cindy-windows-x64
           path: dist
 
-      - name: Publish Windows installation download
+      - name: Checkout verified publication scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          path: source
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      - name: Publish immutable assets then advance the Windows channel
         env:
           GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          SOURCE_COMMIT: ${{ github.sha }}
-        working-directory: dist
         run: |
+          cd dist
           sha256sum --check SHA256SUMS
-          tag="desktop-windows-x64-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          cat > /tmp/cindy-windows-release-notes.md <<'NOTES'
-          Windows x64 community build from kiwabb/cindy.
-
-          Download and run `cindy-unversioned-Setup.exe`. The installer is unsigned; verify its SHA-256 against `SHA256SUMS` before running it.
-
-          This package uses the community version `0.0.0` and does not install official Cindy app updates. Download newer community builds from this repository.
-
-          The packaged startup/database smoke test ran in CI. Real account, model, and device workflows require separate acceptance.
-          NOTES
-          printf '\nSource commit `%s`\n' "$SOURCE_COMMIT" >> /tmp/cindy-windows-release-notes.md
-          gh release create "$tag" \
-            --target "$SOURCE_COMMIT" \
-            --title "Cindy for Windows x64 (${SOURCE_COMMIT:0:7})" \
-            --notes-file /tmp/cindy-windows-release-notes.md \
-            --latest \
-            cindy-unversioned-Setup.exe build-info.json SHA256SUMS
-          printf '## Windows installation download\n\n[Download Cindy for Windows](https://github.com/%s/releases/tag/%s)\n' "$GH_REPO" "$tag" >> "$GITHUB_STEP_SUMMARY"
+          cd ..
+          node source/apps/desktop/scripts/publish-personal-update.mjs dist
+          printf '## Personal Windows update\n\nSource `%s`\n' "$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"

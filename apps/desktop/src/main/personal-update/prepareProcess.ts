@@ -1,9 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import { spawn, spawnSync } from 'node:child_process';
 import { validatePersonalManifest, validatePersonalIdentity, type PersonalPolicy, type PersonalManifest } from './contract.mjs';
-import { validateUpdateZip, verifyExtractedTree } from './archive.js';
+import { validateUpdateZip, verifyExtractedTree, readWindowsUpdateZip } from './archive.js';
 import { readLocalSigningIdentity, signLocalMacApp, writeMacEntitlements, verifyAppleDevelopmentSignature, withLocalSigningCommandRunner, readLocalSigningIdentifier } from './signing-core.mjs';
 
 export function validPersonalSmokeReceipt(value: unknown): boolean {
@@ -65,7 +66,25 @@ export interface PreparationRequest {
   archive: string; outputDirectory: string; jobDirectory: string; manifest: PersonalManifest; policy: PersonalPolicy; storageIdentity: string;
 }
 
+/** Windows has no re-signing or smoke step: verify bytes and structure, then publish the exact ZIP. */
+export function prepareWindowsPersonalUpdate(request: PreparationRequest) {
+  const manifest = validatePersonalManifest(request.manifest, request.policy);
+  if (manifest.storageIdentity !== request.storageIdentity) throw new Error('PERSONAL_UPDATE_STORAGE_INCOMPATIBLE');
+  if (fs.statSync(request.archive).size !== manifest.asset.size || fileSha256(request.archive) !== manifest.asset.sha256) throw new Error('PERSONAL_UPDATE_ARCHIVE_HASH');
+  fs.mkdirSync(request.outputDirectory, { recursive: true, mode: 0o700 });
+  if (request.jobDirectory !== path.join(request.outputDirectory, path.basename(request.jobDirectory))
+    || !/^job-[a-f0-9-]{36}$/.test(path.basename(request.jobDirectory))
+    || fs.lstatSync(request.jobDirectory).isSymbolicLink()) throw new Error('PERSONAL_UPDATE_JOB_INVALID');
+  const metadata = readWindowsUpdateZip(request.archive) as { sourceCommit?: unknown; personalUpdate?: unknown };
+  const identity = validatePersonalIdentity(metadata?.personalUpdate, request.policy);
+  if (!isDeepStrictEqual(identity, validatePersonalIdentity(manifest, request.policy)) || metadata.sourceCommit !== identity.sourceCommit) throw new Error('PERSONAL_UPDATE_SOURCE_MISMATCH');
+  const output = path.join(request.outputDirectory, `personal-${manifest.revision}.zip`);
+  fs.renameSync(request.archive, output);
+  return { path: output, sha256: manifest.asset.sha256, size: manifest.asset.size, identity };
+}
+
 export async function preparePersonalUpdate(request: PreparationRequest) {
+  if (process.platform === 'win32') return prepareWindowsPersonalUpdate(request);
   process.env.CINDY_UPDATE_SUPERVISOR_LEDGER = path.join(request.jobDirectory, 'supervisors');
   const helper = '/Applications/Cindy.app/Contents/Resources/tools/personal-update/swap-apps';
   const signing = readLocalSigningIdentity();

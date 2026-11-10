@@ -1661,6 +1661,45 @@ describe('app update forward-only policy', () => {
     await expect(service.checkForUpdate()).resolves.toBe('ready');
   });
 
+  it('refuses an automatic Windows personal apply in a read-only install directory but lets a manual one reach the updater', async () => {
+    readAutoUpdateSettings.mockReturnValue({ autoRelaunchOnIdle: true });
+    appGetVersion.mockReturnValue('0.0.0');
+    const { context, zip, prepared } = personalUpdateFixture();
+    const { teamId: _teamId, ...windowsPrepared } = prepared;
+    personalPrepared.mockReturnValue(windowsPrepared);
+    personalContext.mockReturnValue({ ...context, installDirWritable: false });
+    const resourcesPath = path.join(TEST_ROOT, 'resources');
+    fs.mkdirSync(resourcesPath, { recursive: true });
+    fs.writeFileSync(path.join(resourcesPath, 'cindy-updater.exe'), 'installed updater');
+    const resourcesDescriptor = Object.getOwnPropertyDescriptor(process, 'resourcesPath');
+    Object.defineProperty(process, 'resourcesPath', { value: resourcesPath, configurable: true });
+    const tmpdirSpy = vi.spyOn(os, 'tmpdir').mockReturnValue(TEST_ROOT);
+    const service = await freshUpdateService('win32');
+    spawnProcess.mockClear();
+    spawnProcess.mockImplementationOnce(() => ({ unref: vi.fn(), on: vi.fn() }));
+    service.initUpdateService();
+    try {
+      await expect(service.checkForUpdate()).resolves.toBe('ready');
+      await expect(ipcHandlers.get('update-relaunch-auto')?.({}, 'dark')).resolves.toMatchObject({
+        accepted: false, blockReason: 'install-dir-readonly',
+      });
+      expect(spawnProcess).not.toHaveBeenCalled();
+      expect(fs.existsSync(path.join(context.root, 'applying-42.json'))).toBe(false);
+      expect(service.getUpdateStatus()).toBe('ready');
+
+      ipcListeners.get('update-relaunch')?.({}, 'dark');
+      await vi.waitFor(() => expect(spawnProcess).toHaveBeenCalledOnce());
+      expect((spawnProcess.mock.calls[0] as unknown as [string, string[]])[1]).toContain(zip);
+      expect(JSON.parse(fs.readFileSync(path.join(context.root, 'applying-42.json'), 'utf8')))
+        .toEqual({ revision: 42, sourceCommit: 'a'.repeat(40) });
+    } finally {
+      service.stopUpdateService();
+      tmpdirSpy.mockRestore();
+      if (resourcesDescriptor) Object.defineProperty(process, 'resourcesPath', resourcesDescriptor);
+      else Reflect.deleteProperty(process, 'resourcesPath');
+    }
+  });
+
   it.each(['busy', 'setting', 'active', 'target', 'channel', 'disabled'] as const)
   ('rechecks personal %s after asynchronous runner reclaim before automatic apply', async change => {
     const { prepared } = personalUpdateFixture();

@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { validatePersonalIdentity, validatePersonalManifest, validatePersonalPolicy, type PersonalManifest, type PersonalIdentity } from './contract.mjs';
+import { validatePersonalIdentity, validatePersonalManifest, resolvePersonalPolicy, type PersonalManifest, type PersonalIdentity, type PersonalPolicy } from './contract.mjs';
 import policyValue from '../../../personal-update-channel.json';
 import { writeAtomicJson, acknowledgePersonalStorageReady, launchPersonalTransaction, resumePersonalTransactionSafely } from './transaction.js';
 import type { PreparationRequest } from './prepareProcess.js';
@@ -15,17 +15,41 @@ import { cleanupCommittedPersonalUpdates } from './cleanup.js';
 import { readLocalSigningIdentity } from './signing-core.mjs';
 import { createPreparationJob, recordPreparationWorker, finishPreparationJob, cleanupAbandonedPreparation } from './jobs.js';
 
-const policy = validatePersonalPolicy(policyValue);
-export function personalUpdateContext() {
+export interface PersonalUpdateContext {
+  policy: PersonalPolicy;
+  identity: PersonalIdentity;
+  root: string;
+  /** Windows only: whether the current user can write the install directory (probed once per process). */
+  readonly installDirWritable?: boolean;
+}
+
+let installDirWritableCache: boolean | undefined;
+function probeInstallDirWritable(directory: string): boolean {
+  if (installDirWritableCache !== undefined) return installDirWritableCache;
+  const probe = path.join(directory, `.cindy-write-probe-${process.pid}`);
+  try { fs.writeFileSync(probe, ''); fs.rmSync(probe, { force: true }); installDirWritableCache = true; }
+  catch { installDirWritableCache = false; }
+  return installDirWritableCache;
+}
+
+export function personalUpdateContext(): PersonalUpdateContext | null {
   try {
-    if (!app.isPackaged || process.platform !== 'darwin' || process.arch !== 'arm64'
-      || app.getPath('exe') !== '/Applications/Cindy.app/Contents/MacOS/Cindy') return null;
+    // Resolved per call: the channel file maps each packaged target to its own policy.
+    const policy = resolvePersonalPolicy(policyValue, process.platform, process.arch);
+    if (!policy || !app.isPackaged) return null;
+    const windows = process.platform === 'win32';
+    if (windows ? process.arch !== 'x64' || path.basename(app.getPath('exe')) !== 'Cindy.exe'
+      : process.platform !== 'darwin' || process.arch !== 'arm64'
+        || app.getPath('exe') !== '/Applications/Cindy.app/Contents/MacOS/Cindy') return null;
     const configuration = JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'personal-app-update.json'), 'utf8'));
     if (configuration.enabled !== true || Object.keys(configuration).some(key => key !== 'enabled')) return null;
     const metadata = JSON.parse(fs.readFileSync(path.join(process.resourcesPath, 'cindy-source.json'), 'utf8'));
     const identity = validatePersonalIdentity(metadata.personalUpdate, policy);
     if (metadata.sourceCommit !== identity.sourceCommit) return null;
-    return { policy, identity, root: path.join(app.getPath('userData'), 'personal-app-updates') };
+    const root = path.join(app.getPath('userData'), 'personal-app-updates');
+    if (!windows) return { policy, identity, root };
+    const installDir = path.dirname(app.getPath('exe'));
+    return { policy, identity, root, get installDirWritable() { return probeInstallDirWritable(installDir); } };
   } catch { return null; }
 }
 
@@ -43,7 +67,11 @@ export async function checkPersonalManifest(): Promise<PersonalManifest | null> 
   return manifest;
 }
 
-interface Prepared { path: string; sha256: string; size: number; identity: PersonalIdentity; teamId: string }
+/** `teamId` is the macOS Apple Development team; Windows preparation does no signing and carries none. */
+interface Prepared { path: string; sha256: string; size: number; identity: PersonalIdentity; teamId?: string }
+function validTeamId(teamId: unknown): boolean {
+  return process.platform === 'darwin' ? typeof teamId === 'string' && /^[A-Z0-9]{10}$/.test(teamId) : teamId === undefined;
+}
 export async function prepareInUtilityProcess(archive: string, manifest: PersonalManifest): Promise<Prepared> {
   const context = personalUpdateContext();
   if (!context) throw new Error('PERSONAL_UPDATE_DISABLED');
@@ -77,7 +105,7 @@ export async function prepareInUtilityProcess(archive: string, manifest: Persona
           if (JSON.stringify(candidateIdentity) !== JSON.stringify(validatePersonalIdentity(manifest, context.policy))
           || !Number.isSafeInteger(candidate.size) || candidate.size <= 0
           || candidate.path !== expectedPath || !/^[a-f0-9]{64}$/.test(candidate.sha256)
-          || !/^[A-Z0-9]{10}$/.test(candidate.teamId) || candidate.identity.revision !== manifest.revision
+          || !validTeamId(candidate.teamId) || candidate.identity.revision !== manifest.revision
           || candidate.identity.storageIdentity !== context.identity.storageIdentity || fs.statSync(expectedPath).size !== candidate.size) {
           return finish(new Error('PERSONAL_UPDATE_PREPARED_RESULT_INVALID'));
         }
@@ -115,7 +143,7 @@ export function readPreparedPersonalUpdate(): Prepared | null {
     const identity = validatePersonalIdentity(candidate.identity, context.policy);
     if (identity.revision <= context.identity.revision || identity.storageIdentity !== context.identity.storageIdentity
       || fs.existsSync(path.join(context.root, `failed-${identity.revision}.json`))
-      || !/^[A-Z0-9]{10}$/.test(candidate.teamId) || !/^[a-f0-9]{64}$/.test(candidate.sha256)
+      || !validTeamId(candidate.teamId) || !/^[a-f0-9]{64}$/.test(candidate.sha256)
       || !Number.isSafeInteger(candidate.size) || candidate.size <= 0
       || candidate.path !== path.join(context.root, `personal-${identity.revision}.zip`)
       || fs.statSync(candidate.path).size !== candidate.size) return null;
@@ -124,8 +152,9 @@ export function readPreparedPersonalUpdate(): Prepared | null {
 }
 
 export async function applyPreparedPersonalUpdate(zip: string): Promise<void> {
+  if (process.platform !== 'darwin') throw new Error('PERSONAL_UPDATE_PLATFORM_UNSUPPORTED');
   const context = personalUpdateContext(), candidate = readPreparedPersonalUpdate();
-  if (!context || !candidate || candidate.path !== zip) throw new Error('PERSONAL_UPDATE_READY_INVALID');
+  if (!context || !candidate || candidate.path !== zip || !candidate.teamId) throw new Error('PERSONAL_UPDATE_READY_INVALID');
   const { getActiveAppSession } = await import('../appSessionState.js');
   const session = getActiveAppSession();
   if (!session.dataOwnerId || session.mode === 'signed-out') throw new Error('PERSONAL_UPDATE_OWNER_UNAVAILABLE');
@@ -143,6 +172,7 @@ function acknowledgeReadyOwner(): void {
   if (!storageReadyOwner || storageReadyOwner !== rendererReadyOwner || storageReadyGeneration !== rendererReadyGeneration) return;
   const context = personalUpdateContext();
   if (!context) return;
+  if (process.platform === 'win32') { finalizeWindowsPersonalUpdate(context); return; }
   const result = spawnSync(path.join(process.resourcesPath, 'tools', 'personal-update', 'swap-apps'),
     ['--pid-birth', String(process.pid)], { encoding: 'utf8', timeout: 2_000 });
   const birth = result.stdout?.trim();
@@ -169,10 +199,54 @@ export async function resumePersonalUpdateStartup(): Promise<void> {
   const context = personalUpdateContext();
   if (!context) return;
   try { await cleanupAbandonedPreparation(context.root); } catch { /* A live/unknown job is preserved and preparation stays blocked. */ }
+  if (process.platform === 'win32') { reconcileWindowsPersonalUpdate(context); return; }
   resumePersonalTransactionSafely(context.root, '/Applications/Cindy.app', context.identity);
   void cleanCommitted(context);
 }
 
+
+const revisionOf = (name: string, pattern: RegExp): number | null => {
+  const match = pattern.exec(name);
+  const revision = match ? Number(match[1]) : NaN;
+  return Number.isSafeInteger(revision) ? revision : null;
+};
+
+function readyRevision(root: string): number | null {
+  try {
+    const revision = Number(JSON.parse(fs.readFileSync(path.join(root, 'ready.json'), 'utf8'))?.identity?.revision);
+    return Number.isSafeInteger(revision) ? revision : null;
+  } catch { return null; }
+}
+
+/**
+ * Windows startup: the external updater replaces the install directory and relaunches the new version, or
+ * rolls back. An `applying-<revision>.json` newer than the running revision therefore means that target
+ * never started, so it is recorded as failed and its staged files are dropped.
+ */
+export function reconcileWindowsPersonalUpdate(context: PersonalUpdateContext): void {
+  try {
+    for (const name of fs.readdirSync(context.root)) {
+      const revision = revisionOf(name, /^applying-(\d+)\.json$/);
+      if (revision === null || revision <= context.identity.revision) continue;
+      writeAtomicJson(path.join(context.root, `failed-${revision}.json`), { revision, phase: 'windows-apply-failed' });
+      fs.rmSync(path.join(context.root, name), { force: true });
+      fs.rmSync(path.join(context.root, 'ready.json'), { force: true });
+      fs.rmSync(path.join(context.root, `personal-${revision}.zip`), { force: true });
+    }
+  } catch { /* Unknown leftovers are preserved; startup never fails on update bookkeeping. */ }
+}
+
+/** Windows health: the running revision opened storage and committed its renderer, so older staging is obsolete. */
+export function finalizeWindowsPersonalUpdate(context: PersonalUpdateContext): void {
+  try {
+    const ready = readyRevision(context.root);
+    if (ready !== null && ready <= context.identity.revision) fs.rmSync(path.join(context.root, 'ready.json'), { force: true });
+    for (const name of fs.readdirSync(context.root)) {
+      const revision = revisionOf(name, /^applying-(\d+)\.json$/) ?? revisionOf(name, /^(?:personal|incoming)-(\d+)\.zip$/);
+      if (revision !== null && revision <= context.identity.revision) fs.rmSync(path.join(context.root, name), { force: true });
+    }
+  } catch { /* Best-effort; a later startup retries. */ }
+}
 
 async function cleanCommitted(context: NonNullable<ReturnType<typeof personalUpdateContext>>): Promise<void> {
   try {

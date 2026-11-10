@@ -14,7 +14,9 @@ export type AutoRelaunchBlockReason =
   | 'recent-resume'
   | 'user-active'
   | 'screen-state-unknown'
-  | 'interactive-auth';
+  | 'interactive-auth'
+  /** Windows personal install directory needs elevation; only an explicit update may show UAC. */
+  | 'install-dir-readonly';
 
 export interface AutoRelaunchReadinessInput {
   enabled: boolean;
