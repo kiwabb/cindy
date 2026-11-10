@@ -69,10 +69,10 @@ function formatLocalBuildTime(date = new Date()): string {
  * Cindy can identify the exact source checkout that produced it, even when
  * package.json still contains the 0.0.0 placeholder.
  */
-function stageCindySourceMetadata(): void {
+function stageCindySourceMetadata(platform: string, arch: string): void {
   const sourceCommit = resolveSourceCommit();
   const builtAt = formatLocalBuildTime();
-  const personalUpdate = buildPersonalUpdateIdentity({ desktopRoot: __dirname, sourceCommit });
+  const personalUpdate = buildPersonalUpdateIdentity({ desktopRoot: __dirname, sourceCommit, platform, arch });
   fs.writeFileSync(
     CINDY_SOURCE_METADATA_PATH,
     `${JSON.stringify({ sourceCommit, builtAt, ...(personalUpdate ? { personalUpdate } : {}) }, null, 2)}\n`,
@@ -2059,7 +2059,7 @@ const config: ForgeConfig = {
     prePackage: async (_forgeConfig, platform, arch) => {
       const targetPlatform = requestedTargetPlatform();
       const targetArch = requestedTargetArch();
-      stageCindySourceMetadata();
+      stageCindySourceMetadata(platform, arch);
       if (targetPlatform === 'win32') {
         if (targetArch !== 'x64') {
           throw new Error(
