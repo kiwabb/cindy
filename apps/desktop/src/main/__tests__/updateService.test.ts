@@ -32,7 +32,7 @@ const appGetPath = vi.fn((name: string) => {
 const personalContext = vi.fn<() => unknown>(() => null);
 const personalPrepared = vi.fn<() => unknown>(() => null);
 const personalManifest = vi.fn<() => Promise<unknown>>(async () => null);
-const personalApply = vi.fn(async () => undefined);
+const personalApply = vi.fn<() => Promise<void>>(async () => undefined);
 vi.mock('../personal-update/runtime.js', () => ({
   personalUpdateContext: personalContext, readPreparedPersonalUpdate: personalPrepared,
   checkPersonalManifest: personalManifest, prepareInUtilityProcess: vi.fn(),
