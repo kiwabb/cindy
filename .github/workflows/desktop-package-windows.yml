@@ -63,6 +63,32 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # The updater and the Windows native helpers are Rust crates compiled from scratch on
+      # every fresh runner (~7 of the ~13 packaging minutes). Cache the registry and their
+      # target dirs; a new entry is saved only when Rust sources or lockfiles change.
+      - name: Restore Rust build cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            apps/desktop/cindy-updater/src-tauri/target/
+            apps/desktop/native/**/target/
+          key: rust-windows-x64-${{ hashFiles('apps/desktop/cindy-updater/src-tauri/Cargo.lock', 'apps/desktop/native/**/Cargo.lock') }}-${{ hashFiles('apps/desktop/cindy-updater/**/*.rs', 'apps/desktop/cindy-updater/**/Cargo.toml', 'apps/desktop/native/**/*.rs', 'apps/desktop/native/**/Cargo.toml', 'apps/desktop/native/**/.cargo/config.toml') }}
+          restore-keys: |
+            rust-windows-x64-${{ hashFiles('apps/desktop/cindy-updater/src-tauri/Cargo.lock', 'apps/desktop/native/**/Cargo.lock') }}-
+            rust-windows-x64-
+
+      # Restored files are newer than the fresh checkout, so cargo would treat cached local
+      # crates (and the post-processed updater exe) as up to date. Touch our own sources so
+      # local crates always rebuild from this commit; third-party crates stay cached.
+      - name: Rebuild local Rust crates from this checkout
+        shell: bash
+        run: |
+          find apps/desktop/cindy-updater apps/desktop/native \( -name target -o -name node_modules \) -prune -o \
+            \( -name '*.rs' -o -name 'Cargo.toml' -o -name 'build.rs' \) -type f -print0 | xargs -0 touch
+
       - name: Package and smoke-test the app
         env:
           GITHUB_TOKEN: ${{ github.token }}
