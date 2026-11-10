@@ -220,8 +220,9 @@ DCO 是否通过以 PR 上的 DCO App check 和真实提交范围（`origin/main
 提交前完成与风险匹配的测试和相关 package 类型检查，默认使用 `pnpm test:unit:related`；
 已完成等效定向验证时不要求重跑整仓，纯文档运行 `pnpm check:dev-docs`。完成后 review
 整体 diff。失败、既有故障、未验证项和需要用户决定的事项须如实报告，不得通过跳过、删除
-或弱化测试制造通过。本机资源预算、并发与跨任务排队由用户或宿主决定，完整检查与合并门禁
-仍由 CI 保障。DCO 核验、按风险追加验证及直推门禁见[开发工作流](docs/dev-rules/development-workflow.md)。
+或弱化测试制造通过。本机资源预算、并发与跨任务排队由用户或宿主决定。完整检查由 CI
+（`client-ci`）提供，它只在手动触发时运行，PR 与 main 推送不会自动跑；改动风险高时
+提交者应手动触发并在 PR 写明结果。DCO 核验、按风险追加验证及直推门禁见[开发工作流](docs/dev-rules/development-workflow.md)。
 
 可复用的项目知识写进仓库；个人路径、设备标识、账号偏好、凭据和私聊原文留在本地。
 整理文档只改组织与索引，Cindy 特有的信息不得丢失或弱化；细则见
