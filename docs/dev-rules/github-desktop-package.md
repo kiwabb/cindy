@@ -10,6 +10,8 @@ Each update uses `github.run_id * 100 + github.run_attempt` as its positive safe
 
 Download `cindy-unversioned-arm64.dmg` from a revision release for a first manual installation. Open the DMG and drag `Cindy.app` to Applications. An existing personally signed installation uses the personal updater to preserve its Apple identity. The run also retains its artifacts for 14 days. Installed profiles remain separate from source-development sandboxes.
 
+A successful main-branch Actions package and official smoke job can also supply the first bootstrap while a publisher repair is pending. Verify its actual run source, artifact digest, inner ZIP hash and embedded build/storage identity. Re-sign on the owning Mac and run the official isolated smoke before installation. Record the successful package job and failed publisher separately, including that the bootstrap artifact has not entered the public feed.
+
 ## Personal update publication
 
 `apps/desktop/personal-update-channel.json` fixes the repository, channel and feed URL. The shared validator in `src/main/personal-update/contract.mjs` is used by both producer and client.
@@ -18,6 +20,8 @@ Download `cindy-unversioned-arm64.dmg` from a revision release for a first manua
 2. Extract that ZIP for DMG creation and verify its actual source metadata again. Generate `personal-update.json` and `SHA256SUMS` from those bytes.
 3. Create `personal-macos-arm64-r<revision>` as a draft, upload all assets and verify every remote asset's SHA256 and size. Publish the immutable release and verify the actual Git tag resolves to its source commit. Keep it outside GitHub's general latest release. Retries may complete a draft but cannot overwrite existing immutable bytes.
 4. Recheck the current channel revision, persist and verify the revision floor in the separate `personal-macos-arm64` release notes, then replace its single manifest asset. Verify the published manifest after upload. All Mac workflow runs share a serialization group. A higher existing floor or manifest revision stops an older run. A missing asset can be repaired at the same revision using the verified immutable release.
+
+GitHub REST release-by-tag returns published releases. Keep the ID returned by draft creation and refresh drafts by ID. Recovery searches every release-list page for the exact tag and rejects ambiguous IDs or invalid publication state. Only a documented duplicate-tag conflict may reuse an existing draft. Asset verification and actual published-tag commit verification must finish before the channel advances. Unit API fixtures must model unpublished drafts with no by-tag result or Git ref. [GitHub release API contract](https://docs.github.com/en/rest/releases/releases#get-a-release-by-tag-name)
 
 The feed is `https://github.com/kiwabb/cindy/releases/download/personal-macos-arm64/personal-update.json`. The general GitHub latest release can belong to Windows and is not an update input. An immutable release left behind by a failed channel publication is safe to retry. GitHub asset replacement can briefly return 404, so clients retain the installed app and retry later.
 
@@ -33,7 +37,7 @@ CI produces an ad-hoc-signed payload. The owning Mac prepares it with its existi
 
 The upstream official feed remains disabled for the `0.0.0` community version. This separately approved personal channel provides its own source, revision, storage and signature checks. Public ad-hoc downloads are not notarized. macOS can block their first manual launch. After attempting to open a trusted download, use **System Settings → Privacy & Security → Open Anyway** if offered.
 
-The producer unit tests cover revision bounds, storage identity changes, ZIP/source mismatches, publisher restrictions, publication order, retry, remote corruption, racing channel revisions and authentication failures. A real CI build and installed two-release update still require runtime acceptance.
+The producer unit tests cover revision bounds, storage identity changes, ZIP/source mismatches, publisher restrictions, publication order, retry, remote corruption, racing channel revisions and authentication failures. A genuine CI bootstrap and an automatically applied higher published revision still require runtime acceptance.
 
 ## Personal signing on one Mac
 
@@ -61,6 +65,6 @@ A stable self-signed designated requirement does not guarantee uninterrupted Key
 
 In the local two-build trial, both builds passed strict signature checks with the same leaf-bound requirement and different CDHashes. The second build stalled in Keychain credential access during isolated smoke and normal startup at the same Applications path. Restoring the first build recovered the account UI and microphone and automatic-input authorization. Native upgrade acceptance must include successful existing-login credential decryption, entry into the main UI, and retention of prior permissions. Preserve failed smoke results and resolve their cause before accepting an upgrade. Do not bypass this acceptance with `--skip-smoke` or broader Keychain ACLs.
 
-The subsequent Apple Development trial used two copies of the existing functional app with different bundle build numbers and CDHashes. Both passed the official isolated startup and database smoke test. After initial Keychain, microphone and Accessibility consent for the Apple identity, replacing the first build with the second at the same Applications path entered the existing account UI and retained microphone and automatic-input authorization without another consent prompt. These local signing checks cover the signing identity. Acceptance of the personal feed additionally requires two actual published revisions through the installed updater.
+The subsequent Apple Development trial used two copies of the existing functional app with different bundle build numbers and CDHashes. Both passed the official isolated startup and database smoke test. After initial Keychain, microphone and Accessibility consent for the Apple identity, replacing the first build with the second at the same Applications path entered the existing account UI and retained microphone and automatic-input authorization without another consent prompt. These local signing checks cover the signing identity. Acceptance of the personal feed additionally requires a genuine tested CI bootstrap followed by a higher published CI revision applied through the installed updater.
 
 CI validates packaged startup and database access. A successful build does not establish real account login, model calls, native permissions, or device connectivity on the user's Mac.

@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
+import { URL } from 'node:url';
 import { buildPersonalUpdateIdentity, computeStorageIdentity, personalRevisionForRun, parsePersonalRevision } from './ci/personal-update-metadata.mjs';
 import { assertPackagedPersonalIdentity, createPersonalUpdateManifest, hashFile } from './ci/personal-update-artifacts.mjs';
 import { assertChannelAdvance, assertPublicationContext, publishPersonalUpdate } from './publish-personal-update.mjs';
@@ -38,24 +39,40 @@ function fixture(t) {
 function fakeGitHub({ current, failApi, beforePublish, badImmutable = false, tagCommit = sourceCommit,
   annotatedTag = false, keepDraft = false, failFeedUploadOnce = false } = {}) {
   const releases = new Map(); const events = [];
-  if (current) releases.set(policy.channel, { target_commitish: current.sourceCommit, draft: false, body: '', assets: [asset('personal-update.json', Buffer.from(JSON.stringify(current)))] });
+  let nextId = 1;
+  if (current) releases.set(policy.channel, { id: nextId++, tag_name: policy.channel, target_commitish: current.sourceCommit, draft: false, body: '', assets: [asset('personal-update.json', Buffer.from(JSON.stringify(current)))] });
   function asset(name, bytes) { return { name, bytes, size: bytes.length, digest: `sha256:${createHash('sha256').update(bytes).digest('hex')}` }; }
   function runGh(args) {
     events.push(args);
     if (args[0] === 'api') {
       if (failApi) throw Object.assign(new Error('HTTP 403'), { stderr: 'HTTP 403' });
       if (args[1].endsWith('branches/main')) return JSON.stringify({ commit: { sha: sourceCommit } });
-      if (args[1].includes('/git/ref/tags/')) return JSON.stringify({ object: {
-        type: annotatedTag ? 'tag' : 'commit', sha: annotatedTag ? 'd'.repeat(40) : tagCommit,
-      } });
+      if (args.includes('POST')) {
+        const body = JSON.parse(fs.readFileSync(args[args.indexOf('--input') + 1], 'utf8'));
+        const value = { ...body, id: nextId++, assets: [] };
+        releases.set(body.tag_name, value);
+        return JSON.stringify(value);
+      }
+      if (args[1].includes('/git/ref/tags/')) {
+        const value = releases.get(args[1].split('/').at(-1));
+        if (!value || value.draft) throw Object.assign(new Error('HTTP 404'), { stderr: 'HTTP 404' });
+        return JSON.stringify({ object: { type: annotatedTag ? 'tag' : 'commit', sha: annotatedTag ? 'd'.repeat(40) : tagCommit } });
+      }
       if (args[1].includes('/git/tags/')) return JSON.stringify({ object: { type: 'commit', sha: tagCommit } });
-      const tag = args[1].split('/').at(-1); const release = releases.get(tag);
-      if (!release) throw Object.assign(new Error('HTTP 404'), { stderr: 'HTTP 404' });
-      return JSON.stringify(release);
+      if (args[1].includes('/releases?')) {
+        const query = new URL(`https://api.github.test/${args[1]}`).searchParams;
+        const page = Number(query.get('page'));
+        return JSON.stringify([...releases.values()].slice((page - 1) * 100, page * 100));
+      }
+      const key = args[1].split('/').at(-1);
+      const byTag = args[1].includes('/releases/tags/');
+      const value = byTag ? releases.get(key) : [...releases.values()].find(item => item.id === Number(key));
+      if (!value || (byTag && value.draft)) throw Object.assign(new Error('HTTP 404'), { stderr: 'HTTP 404' });
+      return JSON.stringify(value);
     }
     const [, command, tag] = args;
     const value = flag => args[args.indexOf(flag) + 1];
-    if (command === 'create') releases.set(tag, { target_commitish: value('--target'), draft: args.includes('--draft'), assets: [], body: value('--notes') });
+    if (command === 'create') releases.set(tag, { id: nextId++, tag_name: tag, target_commitish: value('--target'), draft: args.includes('--draft'), assets: [], body: value('--notes') });
     if (command === 'upload') {
       const file = args[3]; const r = releases.get(tag); const name = path.basename(file);
       if (r.assets.some(item => item.name === name)) assert.ok(args.includes('--clobber'));
@@ -162,7 +179,7 @@ test('a newer channel appearing during publication blocks the stale candidate', 
   const fake = fakeGitHub({ beforePublish(releases, asset) {
     const newer = { ...setup.manifest, revision: setup.manifest.revision + 1,
       asset: { ...setup.manifest.asset, url: setup.manifest.asset.url.replace('-r12301/', '-r12302/') } };
-    releases.set(policy.channel, { assets: [asset('personal-update.json', Buffer.from(JSON.stringify(newer)))] });
+    releases.set(policy.channel, { id: 1000, tag_name: policy.channel, target_commitish: sourceCommit, draft: false, assets: [asset('personal-update.json', Buffer.from(JSON.stringify(newer)))] });
   } });
   assert.throws(() => publishPersonalUpdate({ ...setup, env: environment, runGh: fake.runGh }), /downgrade/);
   assert.equal(fake.events.some(args => args[1] === 'upload' && args[2] === policy.channel), false);
@@ -238,4 +255,123 @@ test('an interrupted immutable draft upload resumes without overwriting existing
   assert.equal(immutable.assets.length, 1);
   assert.deepEqual(publishPersonalUpdate(options), setup.manifest);
   assert.equal(fake.events.filter(args => args[1] === 'upload' && args[3].endsWith('.zip')).length, 1);
+});
+
+test('new drafts use the POST release ID while tag lookup and git refs remain unpublished', t => {
+  const setup = fixture(t);
+  const fake = fakeGitHub();
+  assert.deepEqual(publishPersonalUpdate({ ...setup, env: environment, runGh: fake.runGh }), setup.manifest);
+  const created = fake.events.findIndex(args => args[0] === 'api' && args.includes('POST'));
+  assert.ok(created >= 0);
+  assert.equal(fake.events[created + 1][1], `repos/${policy.repository}/releases/1`);
+  const published = fake.events.findIndex(args => args[1] === 'edit' && args.includes('--draft=false'));
+  const checkedTag = fake.events.findIndex(args => args[1].includes('/git/ref/tags/'));
+  assert.ok(checkedTag > published);
+});
+
+test('draft recovery searches every page for the exact tag and refreshes its ID', t => {
+  const setup = fixture(t);
+  const fake = fakeGitHub();
+  for (let index = 0; index < 100; index++) {
+    const name = `unrelated-${index}`;
+    fake.releases.set(name, { id: index + 100, tag_name: name, draft: true, assets: [] });
+  }
+  const tag = `${policy.channel}-r${identity.revision}`;
+  fake.releases.set(tag, { id: 500, tag_name: tag, target_commitish: sourceCommit, draft: true, assets: [] });
+  assert.deepEqual(publishPersonalUpdate({ ...setup, env: environment, runGh: fake.runGh }), setup.manifest);
+  assert.ok(fake.events.some(args => args[1].endsWith('releases?per_page=100&page=2')));
+  assert.ok(fake.events.some(args => args[1].endsWith('/releases/500')));
+  assert.equal(fake.events.some(args => args[0] === 'api' && args.includes('POST')), false);
+});
+
+test('ambiguous drafts and a draft with another source cannot be chosen for recovery', t => {
+  const setup = fixture(t);
+  const tag = `${policy.channel}-r${identity.revision}`;
+  const ambiguous = fakeGitHub();
+  for (const id of [501, 502]) {
+    ambiguous.releases.set(`draft-${id}`, { id, tag_name: tag, target_commitish: sourceCommit, draft: true, assets: [] });
+  }
+  assert.throws(() => publishPersonalUpdate({ ...setup, env: environment, runGh: ambiguous.runGh }), /Ambiguous releases/);
+  assert.equal(ambiguous.events.some(args => args[0] === 'release'), false);
+  const wrongSource = fakeGitHub();
+  wrongSource.releases.set(tag, { id: 503, tag_name: tag, target_commitish: 'c'.repeat(40), draft: true, assets: [] });
+  assert.throws(() => publishPersonalUpdate({ ...setup, env: environment, runGh: wrongSource.runGh }), /another source/);
+  assert.equal(wrongSource.events.some(args => args[0] === 'release'), false);
+  const missingId = fakeGitHub();
+  missingId.releases.set(tag, { tag_name: tag, target_commitish: sourceCommit, draft: true, assets: [] });
+  assert.throws(() => publishPersonalUpdate({ ...setup, env: environment, runGh: missingId.runGh }), /Invalid release ID/);
+  assert.equal(missingId.events.some(args => args.includes('POST')), false);
+});
+
+test('an ID refresh cannot substitute another release tag', t => {
+  const setup = fixture(t);
+  const fake = fakeGitHub();
+  const runGh = args => {
+    const output = fake.runGh(args);
+    if (args[0] === 'api' && args[1].endsWith('/releases/1')) {
+      return JSON.stringify({ ...JSON.parse(output), tag_name: 'another-tag' });
+    }
+    return output;
+  };
+  assert.throws(() => publishPersonalUpdate({ ...setup, env: environment, runGh }), /expected tag/);
+  assert.equal(fake.events.some(args => args[1] === 'upload'), false);
+});
+
+test('an explicit duplicate-tag POST conflict can resume only the exact existing release', t => {
+  const setup = fixture(t);
+  const fake = fakeGitHub();
+  const tag = `${policy.channel}-r${identity.revision}`;
+  const runGh = args => {
+    if (args[0] === 'api' && args.includes('POST')) {
+      fake.releases.set(tag, { id: 600, tag_name: tag, target_commitish: sourceCommit, draft: true, assets: [] });
+      throw Object.assign(new Error('HTTP 422'), { stderr: 'HTTP 422', stdout: JSON.stringify({
+        errors: [{ resource: 'Release', field: 'tag_name', code: 'already_exists' }],
+      }) });
+    }
+    return fake.runGh(args);
+  };
+  assert.deepEqual(publishPersonalUpdate({ ...setup, env: environment, runGh }), setup.manifest);
+});
+
+for (const failure of ['HTTP 403', 'HTTP 500', 'HTTP 409', 'HTTP 422', 'connection reset']) {
+  test(`creation failure ${failure} cannot be masked by an unrelated or newly visible draft`, t => {
+    const setup = fixture(t);
+    const fake = fakeGitHub();
+    const tag = `${policy.channel}-r${identity.revision}`;
+    const runGh = args => {
+      if (args[0] === 'api' && args.includes('POST')) {
+        fake.releases.set(tag, { id: 700, tag_name: tag, target_commitish: sourceCommit, draft: true, assets: [] });
+        throw Object.assign(new Error(failure), { stderr: failure, stdout: JSON.stringify({
+          errors: [{ resource: 'Release', field: 'name', code: 'invalid' }],
+        }) });
+      }
+      return fake.runGh(args);
+    };
+    assert.throws(() => publishPersonalUpdate({ ...setup, env: environment, runGh }), new RegExp(failure));
+    assert.equal(fake.events.some(args => args[1] === 'upload'), false);
+  });
+}
+
+
+test('invalid release metadata cannot bypass draft, asset or source checks', t => {
+  const variants = [
+    ['missing draft', value => ({ ...value, draft: undefined })],
+    ['nonboolean draft', value => ({ ...value, draft: 'false' })],
+    ['nonarray assets', value => ({ ...value, assets: {} })],
+    ['missing source', value => ({ ...value, target_commitish: undefined })],
+    ['null response', () => null],
+    ['array response', () => []],
+  ];
+  for (const [name, change] of variants) {
+    const setup = fixture(t);
+    const fake = fakeGitHub();
+    const runGh = args => {
+      const output = fake.runGh(args);
+      return args[0] === 'api' && args[1].endsWith('/releases/1')
+        ? JSON.stringify(change(JSON.parse(output))) : output;
+    };
+    assert.throws(() => publishPersonalUpdate({ ...setup, env: environment, runGh }), /Invalid release metadata/, name);
+    assert.equal(fake.events.some(args => args[1] === 'upload'), false, name);
+    assert.equal(fake.releases.has(policy.channel), false, name);
+  }
 });
