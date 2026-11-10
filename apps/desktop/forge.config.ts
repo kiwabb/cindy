@@ -1782,6 +1782,10 @@ if (isWin) {
         directories: {
           buildResources: path.join(__dirname, 'resources'),
         },
+        // Cindy publishes through its own scripts. Without an explicit null, electron-builder
+        // turns GITHUB_TOKEN (needed by CI runtime downloads) into a GitHub publish target,
+        // and the NSIS step fails trying to detect the repository from apps/desktop.
+        publish: null,
         // NSIS installer(Setup.exe)与 uninstaller(Uninstall <App>.exe)的签名。
         // 这是签卸载器的唯一入口(Issue #998):uninstaller 由 NSIS 编译期两遍生成后
         // 嵌入 installer,postPackage 阶段还不存在、也没有独立成品文件可事后补签,
