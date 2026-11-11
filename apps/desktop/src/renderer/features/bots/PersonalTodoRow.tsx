@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Check, ChevronDown, ListChecks } from 'lucide-react';
+import { Check, ChevronDown, ListChecks, TriangleAlert } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { TaskTag } from '@cindy/maker-shared';
 
+import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tip } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
@@ -33,6 +34,7 @@ export function PersonalTodoRow({
   onUpdate,
   onSteps,
   reserveStepsToggle = false,
+  conflict,
 }: {
   todo: PersonalTodo;
   view: TodoBoardView;
@@ -48,6 +50,8 @@ export function PersonalTodoRow({
   onSteps: (input: PersonalTodoUpdate) => Promise<void>;
   /** Keep the toggle's slot when another row in the list has steps, so tags and dates line up. */
   reserveStepsToggle?: boolean;
+  /** Multi-computer sync: an edit made here that the main computer refused, with the owner's choices. */
+  conflict?: { busy: boolean; onResolve: (choice: 'mine' | 'theirs') => void };
 }) {
   const { t, i18n } = useTranslation();
   const [busy, setBusy] = useState(false);
@@ -251,6 +255,33 @@ export function PersonalTodoRow({
             </li>
           ))}
         </ul>
+) : null}
+      {conflict ? (
+        <div
+          data-testid="todo-sync-conflict"
+          className="flex flex-wrap items-center gap-2 pb-1.5 pl-10 pr-2 text-12 text-[var(--text-primary)]"
+        >
+          <span className="inline-flex items-center gap-1">
+            <TriangleAlert size={12} className="text-[var(--warning-fg)]" aria-hidden />
+            {t('personalTodos.conflict')}
+          </span>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={conflict.busy}
+            onClick={() => conflict.onResolve('mine')}
+          >
+            {t('personalTodos.sync.useMine')}
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={conflict.busy}
+            onClick={() => conflict.onResolve('theirs')}
+          >
+            {t('personalTodos.sync.keepTheirs')}
+          </Button>
+        </div>
       ) : null}
       {failed ? (
         <p role="alert" className="px-2 text-12 text-[var(--error-fg)]">

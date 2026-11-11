@@ -82,3 +82,32 @@ export function projectPersonalTodo(todo: TeammateTodo): PersonalTodo {
     source: 'manual',
   };
 }
+
+/** Multi-computer sync of personal todos as the desktop page sees it. */
+export interface PersonalTodoSyncStatus {
+  role: 'off' | 'home' | 'replica';
+  homeName?: string;
+  homeOnline: boolean;
+  /** Edits made here that the main computer has not accepted yet. */
+  pending: number;
+  conflicts: number;
+  lastSyncedAt?: number;
+  /** The last sync attempt failed with this code (e.g. `REMOTE_DISABLED` = main computer has remote control off). */
+  lastError?: string;
+  /** Replica only: the main computer's tag catalog, which the tag picker uses. */
+  tags?: import('@cindy/maker-shared').TaskTag[];
+}
+
+/** An edit made here that the main computer refused (it was changed there first). */
+export interface PersonalTodoSyncConflict {
+  /** Stable id of the refused edit; resolve by it. */
+  id: string;
+  /** Why the main computer refused it (e.g. `CONFLICT`, `NOT_FOUND`). */
+  code: string;
+  /** The todo the edit was about; absent for a creation that never reached the main computer. */
+  todoId?: string;
+  /** A refused creation: the todo as drafted here, since the main computer never stored it. */
+  draft?: PersonalTodoUpdate;
+}
+
+export type PersonalTodoSyncChoice = 'mine' | 'theirs';

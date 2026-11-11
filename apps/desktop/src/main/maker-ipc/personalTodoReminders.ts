@@ -9,7 +9,13 @@ import { t } from '../i18n.desktop.js';
 import { createLogger } from '../logger.js';
 import { getDesktopNotificationsEnabled } from '../notificationService.js';
 import { createBotTodoStore } from './botTodoStore.js';
-import { onPersonalTodosChanged, openPersonalTodoStore, PERSONAL_TODO_FILE } from './personalTodoAccess.js';
+import {
+  onPersonalTodosChanged,
+  openPersonalTodoStore,
+  PERSONAL_TODO_FILE,
+  PERSONAL_TODOS_DATASET_ID,
+} from './personalTodoAccess.js';
+import { getSharedDatasetRole } from '../shared-datasets/api.js';
 
 const log = createLogger('personalTodoReminders');
 
@@ -143,6 +149,11 @@ export interface ReminderRuntimeDeps {
   purge(params: { olderThanMs: number; now: number; keyPrefix: string }): Promise<number>;
   notify(toast: ReminderToast): void;
   notificationsEnabled(): boolean;
+  /**
+   * False on a replica of the multi-computer sync: reminders fire only on the main computer (or
+   * when sync is off), so one deadline never rings on every computer. Absent = always.
+   */
+  remindersActive?(): Promise<boolean>;
   now(): number;
   setInterval(fn: () => void, ms: number): { unref?: () => void } | number;
   clearInterval(handle: { unref?: () => void } | number): void;
@@ -161,6 +172,9 @@ export function createPersonalTodoReminderRuntime(deps: ReminderRuntimeDeps) {
   async function pass(): Promise<void> {
     const current = deps.scopeKey();
     if (!current) return;
+    // A replica neither announces nor records anything: becoming the main computer later starts clean.
+    if (deps.remindersActive && !(await deps.remindersActive())) return;
+    if (deps.scopeKey() !== current) return;
     if (current !== scope) {
       sent = await deps.loadSent();
       scope = current;
@@ -301,6 +315,8 @@ export function startPersonalTodoReminders() {
     purge: (params) => botStore().purgeDeleted(params),
     notify: show,
     notificationsEnabled: getDesktopNotificationsEnabled,
+    remindersActive: async () =>
+      (await getSharedDatasetRole(PERSONAL_TODOS_DATASET_ID)) !== 'replica',
     now: Date.now,
     setInterval: (fn, ms) => setInterval(fn, ms),
     clearInterval: (h) => clearInterval(h as ReturnType<typeof setInterval>),

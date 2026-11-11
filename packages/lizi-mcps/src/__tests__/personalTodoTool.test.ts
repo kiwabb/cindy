@@ -55,6 +55,44 @@ describe('personal todo tools', () => {
     expect(parse(await reg.call('list_personal_todos', {}))).toMatchObject({ scope: 'local-current-account' });
   });
 
+  // 多台电脑同步(docs/product-rules/personal-todos.md):副本上的写入是「待主力电脑接收」,不是失败,Agent 必须能读到。
+  it('passes the multi-computer sync summary and a replica write receipt through to the model', async () => {
+    const sync = { role: 'replica', homeName: 'Desk', homeOnline: false, pending: 2, conflicts: 0 };
+    const reg = new XdtHelperToolRegistry();
+    registerPersonalTodoTools(reg, async (operation) =>
+      operation === 'update'
+        ? { ok: true as const, todo: { id: 'a', revision: 2 }, sync: 'pending' }
+        : { ok: true as const, items: [], sync },
+    );
+    expect(parse(await reg.call('list_personal_todos', {}))).toMatchObject({ sync });
+    expect(parse(await reg.call('update_personal_todo', { id: 'a', expectedRevision: 1, title: 'x' }))).toMatchObject({
+      ok: true,
+      sync: 'pending',
+    });
+  });
+
+  // 用户在待办页能做的同步管理(状态、开关、设为主力电脑、冲突)Agent 也要能做(agent-user-parity.md)。
+  it('exposes the sync management the todo page has, only when the host provides it', async () => {
+    const without = new XdtHelperToolRegistry();
+    registerPersonalTodoTools(without, async () => ({ ok: true as const, items: [] }));
+    expect((await without.call('get_personal_todo_sync', {})).isError).toBe(true);
+
+    const sync = vi.fn(async () => ({ ok: true as const, status: { role: 'replica', pending: 0 } }));
+    const reg = new XdtHelperToolRegistry();
+    registerPersonalTodoTools(reg, async () => ({ ok: true as const, items: [] }), sync);
+    await reg.call('get_personal_todo_sync', {});
+    await reg.call('set_personal_todo_sync', { action: 'set_home' });
+    await reg.call('set_personal_todo_sync', { action: 'enable' });
+    await reg.call('resolve_personal_todo_conflict', { conflictId: 'c-3', choice: 'theirs' });
+    expect(sync.mock.calls).toEqual([
+      ['status', undefined],
+      ['set-home', undefined],
+      ['enable', undefined],
+      ['resolve', { conflictId: 'c-3', choice: 'theirs' }],
+    ]);
+    expect((await reg.call('resolve_personal_todo_conflict', { conflictId: 'c-3', choice: 'x' })).isError).toBe(true);
+  });
+
   it('forwards priority/tagIds/reminder and lists them with resolved tag names and the catalog', async () => {
     const items = [
       { id: 'a', revision: 1, title: 'A', notes: '', deadline: null, status: 'open', deferredUntil: null, priority: 3, tagIds: ['t1', 'gone'], reminder: 'before-1h' },

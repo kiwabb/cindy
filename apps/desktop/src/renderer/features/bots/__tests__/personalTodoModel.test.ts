@@ -26,6 +26,7 @@ import {
   stepsProgress,
   toggledSteps,
   type PersonalListInput,
+  personalTodoSyncLabels,
 } from '../personalTodoModel';
 
 const zone = 'Asia/Shanghai';
@@ -171,5 +172,27 @@ describe('personal todo steps', () => {
     // A new step has no id; blank titles add nothing.
     expect(appendedSteps(steps, '  Archive  ')).toEqual([...steps, { title: 'Archive' }]);
     expect(appendedSteps(steps, '   ')).toBeNull();
+  });
+});
+
+// 多台电脑同步页头状态（docs/product-rules/personal-todos.md「多台电脑同步」）：主力电脑离线与主力电脑未开远程控制必须分开显示。
+describe('personalTodoSyncLabels', () => {
+  const t = (key: string, options?: Record<string, unknown>) =>
+    `${key.replace('personalTodos.sync.', '')}${options?.name !== undefined ? `:${options.name}` : ''}${options?.count !== undefined ? `:${options.count}` : ''}`;
+  const base = { role: 'replica' as const, homeName: 'Desk', homeOnline: true, pending: 0, conflicts: 0 };
+  const texts = (status: Parameters<typeof personalTodoSyncLabels>[0]) =>
+    personalTodoSyncLabels(status, t).map((label) => label.text);
+
+  it('tells apart synced, pending, offline and remote control off', () => {
+    expect(texts({ ...base })).toEqual(['mainComputer:Desk', 'synced']);
+    expect(texts({ ...base, pending: 2 })).toEqual(['mainComputer:Desk', 'pending:2']);
+    expect(texts({ ...base, homeOnline: false, pending: 1 })).toEqual([
+      'mainComputer:Desk',
+      'homeOffline',
+      'pending:1',
+    ]);
+    expect(texts({ ...base, lastError: 'REMOTE_DISABLED' })).toEqual(['mainComputer:Desk', 'homeRemoteOff']);
+    expect(texts({ ...base, role: 'home', homeName: undefined })).toEqual(['mainComputer:thisComputer']);
+    expect(texts({ ...base, role: 'off' })).toEqual([]);
   });
 });

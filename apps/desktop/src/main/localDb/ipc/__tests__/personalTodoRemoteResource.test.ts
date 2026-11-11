@@ -19,6 +19,19 @@ const env = vi.hoisted(() => ({
   tap: vi.fn(),
   catalog: [] as Array<Record<string, unknown>>,
   catalogFails: false,
+  role: 'off' as 'off' | 'home' | 'replica',
+  homeCatalog: [] as Array<Record<string, unknown>>,
+  enqueue: vi.fn(),
+}));
+vi.mock('../../../shared-datasets/api.js', () => ({
+  getSharedDatasetRole: async () => env.role,
+  getSharedDatasetExtras: async () => env.homeCatalog,
+  // The real one decides the role under the engine's lock; here the role is the test's switch.
+  writeSharedDataset: async (dataset: string, update: unknown, options: { localWrite: () => Promise<unknown>; waitMs?: number }) =>
+    env.role === 'replica'
+      ? { local: false, result: await env.enqueue(dataset, update, { waitMs: options.waitMs }) }
+      : { local: true, value: await options.localWrite() },
+  getSyncStatus: async () => ({ role: env.role, homeOnline: true, pending: 0, conflicts: 0 }),
 }));
 vi.mock('../taskTags.js', () => ({
   executeTaskTags: async () => {
@@ -39,6 +52,8 @@ vi.mock('../../../device-link/broadcast-tap.js', () => ({
 }));
 
 import { remoteResourceRegistry } from '../../../device-link/remoteResourceRegistry';
+import { openPersonalTodoStore } from '../../../maker-ipc/personalTodoAccess';
+import { personalTodosDataset } from '../../../maker-ipc/personalTodoSharedDataset';
 import { registerPersonalTodoRemoteResource } from '../personalTodoRemoteResource';
 import { emitTaskTagCatalogChanged } from '../taskTagChanges';
 
@@ -64,6 +79,9 @@ beforeEach(async () => {
   env.owner = 'a';
   env.tap.mockReset();
   env.catalogFails = false;
+  env.role = 'off';
+  env.homeCatalog = [];
+  env.enqueue.mockReset();
   env.catalog = [
     { id: 'preset:work', name: 'Work', color: 'indigo', favoriteOrder: null, revision: 1 },
     { id: 'tag-1', name: '客户', color: 'red', nameCustomized: true, favoriteOrder: null, revision: 1 },
@@ -205,4 +223,71 @@ it('projects subtasks, advertises the subtasks marker and round-trips a whole-li
   expect((await remoteResourceRegistry.get(context, { client, ref })).revision).not.toBe(before.revision);
   await expect(update({ id: items[0].id, subtasks: 'x' })).rejects.toMatchObject({ code: 'INVALID_PARAMS' });
   await expect(update({ id: items[0].id, subtasks: [{ title: 1 }] })).rejects.toMatchObject({ code: 'INVALID_PARAMS' });
+});
+
+// 多台电脑同步（docs/shared-datasets-plan.md §5.3）：副本只有主力电脑一个写入者，手机经副本写入进待发队列；标签按主力电脑的目录解析。
+it('on a replica queues the phone write for the main computer instead of writing the account file', async () => {
+  env.role = 'replica';
+  env.homeCatalog = [{ id: 'home-tag', name: '主力标签', color: 'green', favoriteOrder: null, revision: 1 }];
+  env.enqueue.mockImplementation(async (_dataset: string, input: Record<string, unknown>) => ({
+    id: 'todo:local',
+    revision: 1,
+    title: input.title,
+    notes: '',
+    deadline: null,
+    status: 'open',
+    deferredUntil: null,
+    createdAt: 'x',
+    updatedAt: 'x',
+    priority: 0,
+    tagIds: ['home-tag'],
+    reminder: 'default',
+  }));
+  const written = (await update({ creationRequestId: 'req-6', title: '副本新建', tagIds: ['home-tag'] })) as {
+    result: { todo: Item };
+  };
+  expect(env.enqueue).toHaveBeenCalledWith('personal-todos', expect.objectContaining({ creationRequestId: 'req-6' }), { waitMs: 3000 });
+  // The local file is the mirror: nothing is written to it by this call, and no change is announced here.
+  expect((await read()).total).toBe(0);
+  expect(env.tap).not.toHaveBeenCalled();
+  expect(written.result.todo).toMatchObject({ title: '副本新建', tags: [{ id: 'home-tag', name: '主力标签' }] });
+  expect(env.catalog.some((tag) => tag.id === 'home-tag')).toBe(false);
+});
+
+// 加入同步/降级时带过去的待办：已完成保持完成、稍后保持稍后（不重开）、已删除不带（docs/product-rules/personal-todos.md「多台电脑同步」）。
+it('carries completed and deferred todos over faithfully and skips deleted ones', async () => {
+  const later = new Date(Date.now() + 86_400_000).toISOString();
+  await update({ creationRequestId: 'c-open', title: '进行中', subtasks: [{ title: '一步' }, { title: '二步', done: true }] });
+  await update({ creationRequestId: 'c-done', title: '已完成' });
+  await update({ creationRequestId: 'c-later', title: '稍后' });
+  await update({ creationRequestId: 'c-gone', title: '已删除' });
+  const byTitle = async (title: string) => (await read()).items.find((item) => item.title === title)!;
+  const op = async (title: string, input: Record<string, unknown>) => {
+    const item = await byTitle(title);
+    await update({ id: item.id, expectedRevision: item.revision, ...input });
+  };
+  await op('已完成', { operation: 'complete' });
+  await op('稍后', { operation: 'later', until: later });
+  await op('已删除', { operation: 'delete' });
+
+  const raw = await personalTodosDataset.readItems();
+  const carried = raw.map((item, index) => personalTodosDataset.creationUpdate(item, `import-x-${index}`));
+  expect(carried.filter(Boolean)).toHaveLength(3);
+
+  // Replay onto a fresh account file (the other computer's home).
+  env.dir = await mkdtemp(path.join(os.tmpdir(), 'personal-todo-carry-'));
+  for (const creation of carried) if (creation) await personalTodosDataset.applySubmit(creation);
+  const { store } = openPersonalTodoStore();
+  const after = new Map((await store.list()).map((todo) => [todo.title, todo]));
+  expect([...after.keys()].sort()).toEqual(['已完成', '稍后', '进行中']);
+  expect(after.get('已完成')?.status).toBe('done');
+  expect(after.get('稍后')).toMatchObject({ status: 'open', deferredUntil: later });
+  expect(after.get('进行中')).toMatchObject({ status: 'open', deferredUntil: null });
+  expect(after.get('进行中')?.subtasks.map((s) => [s.title, s.done])).toEqual([['一步', false], ['二步', true]]);
+  const home = personalTodosDataset.reviseUpdate!(raw.find((r) => r.title === '进行中')!, raw.find((r) => r.title === '进行中')!);
+  expect((home as { subtasks: unknown[] }).subtasks).toHaveLength(2);
+  // The same creation again (a retried flush) changes nothing.
+  for (const creation of carried) if (creation) await personalTodosDataset.applySubmit(creation);
+  expect(await store.list()).toHaveLength(3);
+  await rm(env.dir, { recursive: true, force: true });
 });

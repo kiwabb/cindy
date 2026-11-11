@@ -32,11 +32,11 @@ import {
   type RemoteResourceProvider,
 } from '../../device-link/remoteResourceRegistry.js';
 import {
-  notifyPersonalTodosChanged,
   onPersonalTodosChanged,
   openPersonalTodoStore,
   listPersonalTodoTagCatalog,
   PersonalTodoOwnerChangedError,
+  writePersonalTodo,
 } from '../../maker-ipc/personalTodoAccess.js';
 import { onTaskTagCatalogChanged } from './taskTagChanges.js';
 
@@ -333,12 +333,10 @@ export function createPersonalTodoRemoteProvider(): RemoteResourceProvider {
       const update = parseUpdate(request.input);
       const scope = captureDataOwnerBroadcastScope();
       try {
-        const { store, assertCurrent } = openPersonalTodoStore();
-        const todo = await store.update(update);
-        assertCurrent();
+        // A replica queues the edit for the main computer; the phone sees it on the mirror at once.
+        const { todo } = await writePersonalTodo(update, scope);
         // The write is durable; the changed push must not report a different account's write.
         if (!isDataOwnerBroadcastScopeCurrent(scope)) throw changedAccount();
-        notifyPersonalTodosChanged(scope);
         return {
           result: { todo: personalTodoRemoteProjection(todo, await readTagCatalog()) },
           effects: [],

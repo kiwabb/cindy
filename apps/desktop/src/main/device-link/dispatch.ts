@@ -14,6 +14,7 @@ import {
   FILE_PEER_CHANNEL,
   REMOTE_AGENT_CHANNEL,
   SETUP_SNAPSHOT_CHANNEL,
+  SHARED_DATASETS_CHANNEL,
   SETUP_TRANSFER_CHANNEL,
   TASK_MIGRATION_CHANNEL,
   encodeSessionTagCatalog,
@@ -142,7 +143,7 @@ import type {
   assertRemoteBotInvocationAllowed, projectRemoteSessionResult, projectRemoteBotPush,
   hasRemoteBotSessionLookup, setRemoteBotSessionLookup,
 } from './remoteBotSessionBoundary.js';
-import { getControllerPlatform } from './controllerPlatform';
+import { getControllerPlatform, isDesktopPlatform } from './controllerPlatform';
 import { getDeviceLinkInvokeContext, runDeviceLinkInvokeContext } from './invoke-context';
 import {
   redactInputProjectionForSharedGuest,
@@ -800,6 +801,12 @@ let setupSnapshotRemoteHandler: SetupSnapshotRemoteHandler | null = null;
 
 function setSetupSnapshotRemoteHandler(handler: SetupSnapshotRemoteHandler | null): void {
   setupSnapshotRemoteHandler = handler;
+}
+type SharedDatasetsRemoteHandler = { handle(src: string, arg: unknown): Promise<unknown> };
+let sharedDatasetsRemoteHandler: SharedDatasetsRemoteHandler | null = null;
+
+function setSharedDatasetsRemoteHandler(handler: SharedDatasetsRemoteHandler | null): void {
+  sharedDatasetsRemoteHandler = handler;
 }
 let setupTransferRemoteHandler: SetupTransferRemoteHandler | null = null;
 
@@ -4903,6 +4910,30 @@ async function executeRemoteInvoke(src: string, payload: InvokePayload | undefin
       return { ok: false, error: { code: 'IPC_ERROR', message: `[${code}] setup snapshot unavailable` } };
     }
   }
+  if (payload.channel === SHARED_DATASETS_CHANNEL) {
+    // 只给同账号电脑：共享任务访客与供应商分享受邀者是其他账号，通道清单里也没有它。
+    // Same-account desktops only (same gate as the `changed` push): a paired phone must not be able to
+    // submit or hand over the home. Revoked controllers were already refused above; the platform is
+    // self-reported and unknown fails closed.
+    if (!isSameAccountController(src) || !isDesktopPlatform(getControllerPlatform(src))) {
+      return { ok: false, error: { code: 'CHANNEL_NOT_ALLOWED', message: `channel '${payload.channel}' not allowed` } };
+    }
+    const handler = sharedDatasetsRemoteHandler;
+    if (!handler || payload.args?.length !== 1) {
+      return { ok: false, error: { code: 'IPC_ERROR', message: '[SHARED_DATASETS_UNAVAILABLE] not ready yet' } };
+    }
+    try {
+      const result = await runDeviceLinkInvokeContext(
+        { controllerDeviceId: src, channel: payload.channel },
+        () => timing.measure('handler', () => handler.handle(src, payload.args?.[0])),
+      );
+      return { ok: true, result };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      const code = /SHARED_DATASETS_[A-Z_]+/.exec(message)?.[0] ?? 'SHARED_DATASETS_UNAVAILABLE';
+      return { ok: false, error: { code: 'IPC_ERROR', message: `[${code}] shared datasets unavailable` } };
+    }
+  }
   if (payload.channel === SETUP_TRANSFER_CHANNEL) {
     // 同 setup-snapshot：只给同账号电脑；共享任务访客与供应商分享受邀者再拒一次。
     if (!isSameAccountController(src)) {
@@ -5437,6 +5468,7 @@ return {
   setRemoteAgentHandler,
   setProviderGroupRemoteHandler,
   setSetupSnapshotRemoteHandler,
+  setSharedDatasetsRemoteHandler,
   setSetupTransferRemoteHandler,
   setRemoteTurnChangeAction,
   setRemoteSubscriptionPoolQuotaReader,

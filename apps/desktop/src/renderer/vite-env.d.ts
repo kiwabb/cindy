@@ -5159,6 +5159,19 @@ interface ElectronAPI {
       list: () => Promise<import('../shared/personalTodo').PersonalTodo[]>;
       update: (input: import('../shared/personalTodo').PersonalTodoUpdate) => Promise<import('../shared/personalTodo').PersonalTodo>;
       onChanged: (listener: (ownerStamp?: import('../shared/dataOwnerPush').DataOwnerPushStamp) => void) => () => void;
+      /** Multi-computer sync of personal todos (trusted app renderer only). */
+      sync: {
+        status: () => Promise<import('../shared/personalTodo').PersonalTodoSyncStatus>;
+        enable: () => Promise<import('../shared/personalTodo').PersonalTodoSyncStatus>;
+        disable: () => Promise<import('../shared/personalTodo').PersonalTodoSyncStatus>;
+        setAsHome: () => Promise<import('../shared/personalTodo').PersonalTodoSyncStatus>;
+        conflicts: () => Promise<import('../shared/personalTodo').PersonalTodoSyncConflict[]>;
+        resolve: (
+          conflictId: string,
+          choice: import('../shared/personalTodo').PersonalTodoSyncChoice,
+        ) => Promise<import('../shared/personalTodo').PersonalTodoSyncStatus>;
+        onChanged: (listener: () => void) => () => void;
+      };
     };
     bots: {
       getModelChainSettings: () => Promise<{
