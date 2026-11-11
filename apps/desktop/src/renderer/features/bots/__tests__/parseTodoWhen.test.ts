@@ -36,8 +36,15 @@ describe('parseTodoWhen', () => {
     ['后天寄快递', '后天', '寄快递', { kind: 'date', date: '2026-11-13' }],
     ['晚上8点半复盘', '晚上8点半', '复盘', { kind: 'instant', date: '2026-11-11', at: '2026-11-11T12:30:00.000Z' }],
     ['中午12点吃饭', '中午12点', '吃饭', { kind: 'instant', date: '2026-11-11', at: '2026-11-11T04:00:00.000Z' }],
-    ['10:30站会', '10:30', '站会', { kind: 'instant', date: '2026-11-11', at: '2026-11-11T02:30:00.000Z' }],
-    ['今天 5点10分 取件', '今天 5点10分', '取件', { kind: 'instant', date: '2026-11-11', at: '2026-11-10T21:10:00.000Z' }],
+    // A time alone that already passed today rolls to tomorrow.
+    ['10:30站会', '10:30', '站会', { kind: 'instant', date: '2026-11-12', at: '2026-11-12T02:30:00.000Z' }],
+    // Without 上午/下午, 1–7 o'clock reads as afternoon.
+    ['今天 5点10分 取件', '今天 5点10分', '取件', { kind: 'instant', date: '2026-11-11', at: '2026-11-11T09:10:00.000Z' }],
+    ['明天3点开会', '明天3点', '开会', { kind: 'instant', date: '2026-11-12', at: '2026-11-12T07:00:00.000Z' }],
+    ['周五前提交', '周五前', '提交', { kind: 'date', date: '2026-11-13' }],
+    ['週五提交', '週五', '提交', { kind: 'date', date: '2026-11-13' }],
+    ['下週一開會', '下週一', '開會', { kind: 'date', date: '2026-11-16' }],
+    ['下午3點開會', '下午3點', '開會', { kind: 'instant', date: '2026-11-11', at: '2026-11-11T07:00:00.000Z' }],
   ])('recognises %s in Shanghai', (text, phrase, rest, expected) => {
     const parsed = run(text, shanghaiNoon, 'Asia/Shanghai', 'zh-CN');
     expect(parsed).toMatchObject({ phrase, rest, deadline: { ...expected, timeZone: 'Asia/Shanghai' } });
@@ -48,7 +55,8 @@ describe('parseTodoWhen', () => {
     ['review next fri', 'next fri', 'review', { kind: 'date', date: '2026-11-20' }],
     ['Monday standup 9:30', 'Monday 9:30', 'standup', { kind: 'instant', date: '2026-11-16', at: '2026-11-16T14:30:00.000Z' }],
     ['lunch 12pm', '12pm', 'lunch', { kind: 'instant', date: '2026-11-11', at: '2026-11-11T17:00:00.000Z' }],
-    ['backup 12am', '12am', 'backup', { kind: 'instant', date: '2026-11-11', at: '2026-11-11T05:00:00.000Z' }],
+    ['backup 12am', '12am', 'backup', { kind: 'instant', date: '2026-11-12', at: '2026-11-12T05:00:00.000Z' }],
+    ['report on sat', 'on sat', 'report', { kind: 'date', date: '2026-11-14' }],
     ['pay rent today', 'today', 'pay rent', { kind: 'date', date: '2026-11-11' }],
   ])('recognises "%s" in New York', (text, phrase, rest, expected) => {
     const parsed = run(text, newYorkMorning, 'America/New_York', 'en');
@@ -72,6 +80,13 @@ describe('parseTodoWhen', () => {
 
   it.each([
     ['买3点心', 'zh-CN'],
+    // A bare N点 is a count as often as a time; English weekday abbreviations are ordinary words.
+    ['3点开会', 'zh-CN'],
+    ['总结3点经验', 'zh-CN'],
+    ['列出5点建议', 'zh-CN'],
+    ['sat down with Bob', 'en'],
+    ['watch the sun set', 'en'],
+    ['they wed in June', 'en'],
     ['整理桌面', 'zh-CN'],
     ['25点开会', 'zh-CN'],
     ['ship it', 'en'],

@@ -38,6 +38,7 @@ import {
   listPersonalTodoTagCatalog,
   PersonalTodoOwnerChangedError,
 } from '../../maker-ipc/personalTodoAccess.js';
+import { onTaskTagCatalogChanged } from './taskTagChanges.js';
 
 export const PERSONAL_TODOS_COLLECTION = 'personal-todos';
 export const PERSONAL_TODOS_PRIMITIVE = 'personal-todos';
@@ -162,9 +163,11 @@ function capItems(items: PersonalTodo[]): PersonalTodo[] {
   return [...open, ...done];
 }
 
-function resourceRevision(items: PersonalTodo[]): string {
+function resourceRevision(items: PersonalTodo[], catalog: Map<string, TaskTag>): string {
   const hash = createHash('sha256');
-  for (const todo of items) hash.update(`${todo.id}:${todo.revision};`);
+  // Resolved tag names and colors are part of the projection, so a catalog rename or delete is a new revision.
+  for (const todo of items)
+    hash.update(`${todo.id}:${todo.revision}:${JSON.stringify(resolveTags(todo, catalog))};`);
   return hash.digest('hex').slice(0, 16);
 }
 
@@ -276,7 +279,7 @@ export function createPersonalTodoRemoteProvider(): RemoteResourceProvider {
         if (!isDataOwnerBroadcastScopeCurrent(scope)) throw changedAccount();
         return {
           ref: resourceRef,
-          revision: resourceRevision(items),
+          revision: resourceRevision(items, catalog),
           display: { title },
           links: [],
           blocks: [
@@ -345,5 +348,7 @@ export function registerPersonalTodoRemoteResource(): void {
   if (registered) return;
   remoteResourceRegistry.register(createPersonalTodoRemoteProvider());
   onPersonalTodosChanged(broadcastPersonalTodosRemoteChanged);
+  // Rows carry resolved tag names: a catalog change invalidates them on every controller.
+  onTaskTagCatalogChanged(broadcastPersonalTodosRemoteChanged);
   registered = true;
 }

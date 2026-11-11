@@ -40,6 +40,7 @@ vi.mock('../../../device-link/broadcast-tap.js', () => ({
 
 import { remoteResourceRegistry } from '../../../device-link/remoteResourceRegistry';
 import { registerPersonalTodoRemoteResource } from '../personalTodoRemoteResource';
+import { emitTaskTagCatalogChanged } from '../taskTagChanges';
 
 const context = { controllerDeviceId: 'phone' };
 const client = { protocolVersion: 1, primitives: ['personal-todos'], locale: 'zh-CN' };
@@ -163,4 +164,23 @@ it('still serves the list with no tags when the tag catalog cannot be read', asy
   const { items } = await read();
   expect(items).toHaveLength(1);
   expect(items[0].tags).toEqual([]);
+});
+
+// Rows carry resolved tag names, so a catalog rename must reach controllers: new revision + changed push.
+it('treats a tag catalog change as a new revision and pushes a change for the todo list', async () => {
+  await update({ creationRequestId: 'req-5', title: '标签改名', tagIds: ['tag-1'] });
+  const before = (await remoteResourceRegistry.get(context, { client, ref })).revision;
+  env.catalog = env.catalog.map((tag) => (tag.id === 'tag-1' ? { ...tag, name: '大客户' } : tag));
+  env.tap.mockReset();
+  emitTaskTagCatalogChanged({ ownerStamp: { owner: env.owner }, owner: env.owner } as never);
+  expect(env.tap).toHaveBeenCalledWith(
+    expect.any(String),
+    expect.objectContaining({ collectionId: 'personal-todos' }),
+    expect.anything(),
+  );
+  const after = await remoteResourceRegistry.get(context, { client, ref });
+  expect(after.revision).not.toBe(before);
+  expect((after.blocks![0].data as { items: Item[] }).items[0].tags).toEqual([
+    { id: 'tag-1', name: '大客户', color: 'red', nameCustomized: true },
+  ]);
 });

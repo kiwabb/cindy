@@ -5041,7 +5041,7 @@ Agent 的 GitHub 工具和脚本入口仍不支持 GitLab，不复用其 GitHub 
 ### 优先级 / 标签 / 提醒（新增字段，2026-11-11）
 
 - `data.items[]` 追加 `priority`（0 无、1 低、2 中、3 高）、`reminder`（`default / off / before-15m / before-1h / before-1d`）与 `tags: [{ id, name, color, nameCustomized? }]`。`tags` 由主机按本机任务标签目录解析：目录里不存在的 id 丢弃（等同无标签），顺序同 `tagIds`；`nameCustomized` 仅在为 true 时出现，手机据此只对未改名的预设标签按自己的语言包本地化。目录读取失败时 `tags` 为 `[]`，不影响待办读取。`tagIds` 不上线：手机只展示、不编辑，解析后的 `tags` 已足够，且已删除标签的 id 不应泄露到手机。
-- 块 `data` 追加支持标记 `capabilities: { organize: 1 }`。动作 `update` 追加可选输入 `priority`（0–3）、`tagIds`（字符串数组，条数与内容由主机存储校验）、`reminder`；形状不合法 → `INVALID_PARAMS`。已发布的桌面（r3）拒绝未知更新字段，所以手机只有在读到 `capabilities.organize >= 1` 时才发送这三个字段，读不到则在发送前剥掉；手机只发有变化的字段，编辑标题、备注、日期时不带它们，因此不会覆盖电脑上设置的值。本期手机不提供优先级、标签、提醒的编辑，只展示（优先级圈色与第一个标签）并保留。
+- 块 `data` 追加支持标记 `capabilities: { organize: 1 }`。动作 `update` 追加可选输入 `priority`（0–3）、`tagIds`（字符串数组，条数与内容由主机存储校验）、`reminder`；形状不合法 → `INVALID_PARAMS`。已发布的桌面（r3）拒绝未知更新字段，所以手机只有在读到 `capabilities.organize >= 1` 时才发送这三个字段，读不到则在发送前剥掉；手机只发有变化的字段，编辑标题、备注、日期时不带它们，因此不会覆盖电脑上设置的值。本期手机不提供优先级、标签、提醒的编辑，只展示（优先级圈色与第一个标签）并保留。行里的标签名是主机按任务标签目录解析的，所以资源 revision 把解析结果算在内，任务标签目录增改删（`executeTaskTags` 经 `taskTagChanges.ts`）也会对 `personal-todos` 推一次 changed，让控制端重读。
 - 兼容矩阵：旧主机 × 新手机：`data` 没有 `capabilities`，条目没有新字段，手机按无优先级、无标签显示，且永不发送新字段，行为同旧版；新主机 × 旧手机：多出的 `priority / reminder / tags / capabilities` 被旧手机的白名单解析忽略，无副作用，旧手机的更新不含新字段，主机照常接受；新主机 × 新手机：显示优先级圈与标签，且具备发送新字段的条件；旧主机 × 旧手机：不变。
 兼容：旧主机的 manifest 没有该集合，新手机据此隐藏入口，不请求该资源；旧手机只展示 `placement: home-scope` 的集合，且未知集合、未知原语、未知动作不得影响首页与会话，因此不受影响。新主机对旧手机无新增负担。手机端需随 JS 发布（原语 `personal-todos` 加入富原语表，不触及原生指纹）。
 

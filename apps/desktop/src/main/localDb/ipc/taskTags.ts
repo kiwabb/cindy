@@ -13,6 +13,7 @@ import {
   isDataOwnerBroadcastScopeCurrent,
 } from '../../device-link/broadcast-tap.js';
 import { broadcastSessionPatched } from './sessions';
+import { emitTaskTagCatalogChanged } from './taskTagChanges';
 
 const log = createLogger('taskTags');
 export const TASK_TAG_CHANNEL = 'local-db:task-tags:execute';
@@ -54,6 +55,7 @@ export async function executeTaskTags(
   }
   if (['create', 'update', 'delete', 'reorder', 'attach', 'detach'].includes(request.action)) {
     const payload = { tags: result.tags };
+    emitTaskTagCatalogChanged(scope);
     // A closed renderer must not turn an already committed write into a failed request.
     try {
       tapWindowBroadcast('local-db:task-tags:changed', payload, scope.ownerStamp);
