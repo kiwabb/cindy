@@ -1598,13 +1598,16 @@ describe('app update forward-only policy', () => {
     service.initUpdateService();
     try {
       await expect(service.checkForUpdate()).resolves.toBe('ready');
+      // The feed carries no build time here, so the user-facing label is the short commit alone.
+      expect(sends.filter(s => s.channel === 'update-status').at(-1)?.payload)
+        .toEqual({ status: 'ready', version: 'personal-r42', displayVersion: 'aaaaaaa' });
       download.mockClear();
       personalManifest.mockResolvedValueOnce({
-        kind: 'manual', manifest: { ...identity, revision: 43, storageIdentity: 'different-storage' },
+        kind: 'manual', manifest: { ...identity, revision: 43, storageIdentity: 'different-storage', builtAt: new Date(2026, 10, 11, 8, 53).toISOString() },
       });
       await expect(service.checkForUpdate()).resolves.toBe('manual_download');
       const expected = {
-        status: 'manual', version: 'personal-r43',
+        status: 'manual', version: 'personal-r43', displayVersion: '2026-11-11 08:53 · aaaaaaa',
         downloadUrl: 'https://github.com/kiwabb/cindy/releases/tag/personal-windows-x64-r43',
       };
       expect(service.getUpdateStatus()).toBe('manual');

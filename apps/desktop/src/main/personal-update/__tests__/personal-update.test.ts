@@ -6,6 +6,7 @@ import { deflateRawSync } from 'node:zlib';
 import { spawnSync } from 'node:child_process';
 import { describe, expect, it, vi } from 'vitest';
 import { validatePersonalManifest, validatePersonalPolicy, validatePersonalIdentity } from '../contract.mjs';
+import { formatPersonalBuildVersion } from '../../../shared/personalBuildVersion';
 import { handlePersonalRendererReadiness } from '../readiness';
 import { validPersonalSmokeReceipt, prepareWindowsPersonalUpdate } from '../prepareProcess';
 import { validateUpdateZip, readWindowsUpdateZip } from '../archive';
@@ -27,6 +28,23 @@ describe('personal update trust boundary', () => {
     }
     expect(() => validatePersonalManifest({ ...manifest, revision: 0 }, policy)).toThrow();
     expect(() => validatePersonalManifest({ ...manifest, storageIdentity: '' }, policy)).toThrow();
+  });
+
+  it('passes the optional display build time through only when it is a valid ISO date-time', () => {
+    const builtAt = '2026-11-11T00:53:59.613+00:00';
+    expect(validatePersonalManifest({ ...manifest, builtAt }, policy).builtAt).toBe(builtAt);
+    // A feed from an older producer has no builtAt and stays valid; garbage is dropped, never fatal.
+    for (const bad of [undefined, 'yesterday', '2026-13-45T00:00:00Z', 1762822439000, null]) {
+      expect(validatePersonalManifest({ ...manifest, builtAt: bad }, policy)).toEqual(manifest);
+    }
+  });
+
+  it('formats a personal build as local time and short commit, or the commit alone without a time', () => {
+    const sha = 'a'.repeat(40);
+    // Local-time constructor, so the expectation holds in any timezone.
+    expect(formatPersonalBuildVersion(sha, new Date(2026, 10, 11, 8, 5).toISOString())).toBe('2026-11-11 08:05 · aaaaaaa');
+    expect(formatPersonalBuildVersion(sha)).toBe('aaaaaaa');
+    expect(formatPersonalBuildVersion(sha, 'not a date')).toBe('aaaaaaa');
   });
 
   it.skipIf(process.platform !== 'darwin')('durably acknowledges only the exact canonical revision, nonce and opened-storage transaction', () => {

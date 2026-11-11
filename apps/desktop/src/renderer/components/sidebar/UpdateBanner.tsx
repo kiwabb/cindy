@@ -81,7 +81,9 @@ export const UPDATE_BUTTON_TREATMENT =
   '[--button-face-bg:var(--update-btn-bg)] [--button-face-border:var(--update-btn-border)] text-[var(--update-btn-text)] enabled:[&:not([aria-disabled=true])]:hover:[--button-face-bg:var(--update-btn-hover)] enabled:[&:not([aria-disabled=true])]:hover:[--button-face-border:var(--update-btn-border)] enabled:[&:not([aria-disabled=true])]:active:[--button-face-bg:var(--update-btn-pressed)] enabled:[&:not([aria-disabled=true])]:active:[--button-face-border:var(--update-btn-border)]';
 
 export function UpdateBanner({ isCollapsed, onOpenVersionNotice }: UpdateBannerProps) {
-  const { status, version, errorCode, downloadUrl } = useUpdateStatus();
+  const { status, version, displayVersion, errorCode, downloadUrl } = useUpdateStatus();
+  // What the user reads; `version` stays the key for comparisons, dismiss snapshots and release notes.
+  const shownVersion = displayVersion ?? version;
   const { effectiveLocale } = useLocale();
   // 用户主动关闭态(仅本次进程内存,由 UserInfoSection 的火焰按钮唤回)。
   // 新一版更新到达时 useDeferUpdateBannerWhileBusy 会清掉上一版的决定并重新探针。
@@ -364,8 +366,8 @@ export function UpdateBanner({ isCollapsed, onOpenVersionNotice }: UpdateBannerP
   const notesVersion =
     status === 'ready' && !confirming && hasNotes && version ? version : undefined;
 
-  const versionSuffix = version ? ` (v${version})` : '';
-  const versionForAria = version ?? 'latest';
+  const versionSuffix = shownVersion ? ` (v${shownVersion})` : '';
+  const versionForAria = shownVersion ?? 'latest';
 
   // Error states (translocated / spawn_failed) suppress the banner body —
   // the only useful UI in those cases is the modal dialog, and the "Updated
@@ -456,7 +458,7 @@ export function UpdateBanner({ isCollapsed, onOpenVersionNotice }: UpdateBannerP
           </Tip>
           <Download className="h-9 w-9 text-sidebar-muted" strokeWidth={1.5} />
           <p className="text-center text-sm font-semibold text-foreground">{t('update.banner.manualTitle')}</p>
-          {version && <p className="text-center text-xs text-sidebar-muted">{version}</p>}
+          {shownVersion && <p className="text-center text-xs text-sidebar-muted">{shownVersion}</p>}
           <Button
             variant="cta"
             size="md"
@@ -618,7 +620,7 @@ export function UpdateBanner({ isCollapsed, onOpenVersionNotice }: UpdateBannerP
             ? t('update.banner.preparingTitle')
             : confirming
               ? t('update.banner.confirmTitle')
-              : t('update.banner.title', { version: version ?? '…' })}
+              : t('update.banner.title', { version: shownVersion ?? '…' })}
         </p>
 
         {/* Subtitle + 「查看更新公告」文字链 —— 同一视觉组(gap-1),所以链接读作副标题的
@@ -700,7 +702,7 @@ export function UpdateBanner({ isCollapsed, onOpenVersionNotice }: UpdateBannerP
             compact
             ref={relaunchTriggerRef}
             onClick={() => { void handleRelaunchClick(); }}
-            aria-label={t('update.banner.ariaExpanded', { version: version ?? '' })}
+            aria-label={t('update.banner.ariaExpanded', { version: shownVersion ?? '' })}
             className={cn('w-full', UPDATE_BUTTON_TREATMENT)}
           >
             {t('update.banner.button')}

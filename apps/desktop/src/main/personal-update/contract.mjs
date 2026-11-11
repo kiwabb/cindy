@@ -9,6 +9,12 @@ const feedFor = channel => `https://github.com/${REPO}/releases/download/${chann
 const hex = (value, length) => typeof value === 'string' && new RegExp(`^[a-f0-9]{${length}}$`).test(value);
 const positive = value => Number.isSafeInteger(value) && value > 0;
 
+/** ISO 8601 date-time with an explicit offset, as `new Date().toISOString()` or `+00:00` writers produce. */
+export function isIsoDateString(value) {
+  return typeof value === 'string' && value.length <= 64
+    && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/.test(value) && !Number.isNaN(Date.parse(value));
+}
+
 export function personalChannelTarget(channel) {
   const target = Object.hasOwn(TARGETS, channel) ? TARGETS[channel] : undefined;
   if (!target) throw new Error('Unknown personal update channel');
@@ -67,5 +73,7 @@ export function validatePersonalManifest(value, policy) {
     || !/^[A-Za-z0-9._-]+\.zip$/.test(url.pathname.slice(prefix.length))) {
     throw new Error('Personal update asset must belong to its immutable revision release');
   }
-  return { ...identity, asset: { url: url.href, sha256: asset.sha256, size: asset.size } };
+  // Optional display-only build time; an invalid value is dropped, never a reason to reject the manifest.
+  const builtAt = isIsoDateString(value.builtAt) ? { builtAt: value.builtAt } : {};
+  return { ...identity, ...builtAt, asset: { url: url.href, sha256: asset.sha256, size: asset.size } };
 }
