@@ -9979,7 +9979,10 @@
       "confirmAria": "Reiniciar mesmo assim e aplicar a atualização, interrompendo a tarefa em execução",
       "cancelAria": "Cancelar atualização",
       "dismiss": "Mais tarde",
-      "dismissAria": "Dispensar aviso de atualização por enquanto"
+      "dismissAria": "Dispensar aviso de atualização por enquanto",
+      "manualTitle": "A nova versão requer instalação manual",
+      "manualButton": "Baixar instalador",
+      "manualAria": "Baixar o instalador da versão {{version}}"
     },
     "notice": {
       "title": "Novidades",

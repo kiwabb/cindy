@@ -53,7 +53,15 @@ export function personalUpdateContext(): PersonalUpdateContext | null {
   } catch { return null; }
 }
 
-export async function checkPersonalManifest(): Promise<PersonalManifest | null> {
+/**
+ * `install`: a newer release with the installed storage identity; it can be applied in place.
+ * `manual`: a newer release whose storage identity differs; the installer must be downloaded by hand.
+ */
+export type PersonalManifestCheck =
+  | { kind: 'install'; manifest: PersonalManifest }
+  | { kind: 'manual'; manifest: PersonalManifest };
+
+export async function checkPersonalManifest(): Promise<PersonalManifestCheck | null> {
   const context = personalUpdateContext();
   if (!context) return null;
   if (fs.existsSync(path.join(context.root, 'recovery-blocked.json'))) throw new Error('PERSONAL_UPDATE_RECOVERY_BLOCKED');
@@ -62,9 +70,9 @@ export async function checkPersonalManifest(): Promise<PersonalManifest | null> 
   const text = await response.text();
   if (text.length > 32 * 1024) throw new Error('PERSONAL_UPDATE_FEED_TOO_LARGE');
   const manifest = validatePersonalManifest(JSON.parse(text), context.policy);
-  if (manifest.storageIdentity !== context.identity.storageIdentity) throw new Error('PERSONAL_UPDATE_STORAGE_INCOMPATIBLE');
   if (manifest.revision <= context.identity.revision || fs.existsSync(path.join(context.root, `failed-${manifest.revision}.json`))) return null;
-  return manifest;
+  if (manifest.storageIdentity !== context.identity.storageIdentity) return { kind: 'manual', manifest };
+  return { kind: 'install', manifest };
 }
 
 /** `teamId` is the macOS Apple Development team; Windows preparation does no signing and carries none. */

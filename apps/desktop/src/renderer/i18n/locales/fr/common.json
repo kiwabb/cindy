@@ -9979,7 +9979,10 @@
       "confirmAria": "Redémarrer quand même et appliquer la mise à jour, en interrompant la tâche en cours",
       "cancelAria": "Annuler la mise à jour",
       "dismiss": "Plus tard",
-      "dismissAria": "Fermer la bannière de mise à jour pour l'instant"
+      "dismissAria": "Fermer la bannière de mise à jour pour l'instant",
+      "manualTitle": "La nouvelle version nécessite une installation manuelle",
+      "manualButton": "Télécharger l'installateur",
+      "manualAria": "Télécharger l'installateur de {{version}}"
     },
     "notice": {
       "title": "Nouveautés",

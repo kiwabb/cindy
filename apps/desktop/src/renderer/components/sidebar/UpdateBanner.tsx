@@ -47,7 +47,7 @@ import { Button } from '@/components/ui/button';
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Flame, Check, X } from 'lucide-react';
+import { Flame, Check, X, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Spinner } from '@/components/ui/spinner';
 import { useUpdateStatus } from '@/hooks/useUpdateStatus';
@@ -81,11 +81,11 @@ export const UPDATE_BUTTON_TREATMENT =
   '[--button-face-bg:var(--update-btn-bg)] [--button-face-border:var(--update-btn-border)] text-[var(--update-btn-text)] enabled:[&:not([aria-disabled=true])]:hover:[--button-face-bg:var(--update-btn-hover)] enabled:[&:not([aria-disabled=true])]:hover:[--button-face-border:var(--update-btn-border)] enabled:[&:not([aria-disabled=true])]:active:[--button-face-bg:var(--update-btn-pressed)] enabled:[&:not([aria-disabled=true])]:active:[--button-face-border:var(--update-btn-border)]';
 
 export function UpdateBanner({ isCollapsed, onOpenVersionNotice }: UpdateBannerProps) {
-  const { status, version, errorCode } = useUpdateStatus();
+  const { status, version, errorCode, downloadUrl } = useUpdateStatus();
   const { effectiveLocale } = useLocale();
   // 用户主动关闭态(仅本次进程内存,由 UserInfoSection 的火焰按钮唤回)。
   // 新一版更新到达时 useDeferUpdateBannerWhileBusy 会清掉上一版的决定并重新探针。
-  const { dismissed, dismiss, reason } = useUpdateBannerDismiss();
+  const { dismissed, dismiss, reason, restore, isNewUpdateAfterDismiss } = useUpdateBannerDismiss();
   const hideUntilBusyDecision = useDeferUpdateBannerWhileBusy(status, version);
   // 就地中断警告态:只在点击入口时探到「有任务在跑」才进入。
   const [confirming, setConfirming] = useState(false);
@@ -136,6 +136,16 @@ export function UpdateBanner({ isCollapsed, onOpenVersionNotice }: UpdateBannerP
   const isLinuxInstallationUnsupported =
     status === 'ready' && errorCode === 'linux_installation_unsupported';
   const isPreparing = status === 'superseding';
+  // 需手动安装的新版本(个人更新通道存储不兼容):不下载、不重启,只给下载入口。
+  const isManual = status === 'manual' && Boolean(downloadUrl);
+  // 同一版本的 manual → checking → manual 轮询不算新更新,关掉就一直关着;版本变了才重新出现。
+  const manualDismissed = isManual && dismissed && !isNewUpdateAfterDismiss(status, version ?? null);
+
+  useEffect(() => {
+    if (isManual && dismissed && isNewUpdateAfterDismiss(status, version ?? null)) {
+      restore({ pin: false });
+    }
+  }, [isManual, dismissed, status, version, restore, isNewUpdateAfterDismiss]);
 
   useEffect(() => {
     if (isLinuxInstallationUnsupported) setShowLinuxInstallationDialog(true);
@@ -407,7 +417,60 @@ export function UpdateBanner({ isCollapsed, onOpenVersionNotice }: UpdateBannerP
   // Banner is visible for ready (relaunch available), superseding (preparing
   // a newer version on top of an already-ready patch), or error fallback
   // dialogs. Everything else hides the banner.
-  if (status !== 'ready' && !isPreparing && !isTranslocated && !isSpawnFailed) return null;
+  if (status !== 'ready' && !isPreparing && !isTranslocated && !isSpawnFailed && !isManual) return null;
+
+  if (isManual) {
+    if (manualDismissed) return null;
+    const openInstaller = () => { void window.electronAPI.openExternal(downloadUrl!); };
+    if (isCollapsed) {
+      return (
+        <div className="flex flex-col items-center border-t border-sidebar-border">
+          <Tip text={t('update.banner.manualTitle')} side="right">
+            <button
+              onClick={openInstaller}
+              aria-label={t('update.banner.manualAria', { version: versionForAria })}
+              className="flex w-full items-center justify-center py-2 transition-colors hover:bg-sidebar-item-hover"
+            >
+              <div className="flex items-center justify-center py-1">
+                <Download className="h-5 w-5 text-sidebar-muted" />
+              </div>
+            </button>
+          </Tip>
+        </div>
+      );
+    }
+    return (
+      <div className="flex select-none flex-col border-t border-sidebar-border">
+        <div className="relative flex flex-col items-center gap-[10px] px-4 py-3">
+          <Tip text={t('update.banner.dismiss')} side="left">
+            <button
+              onClick={handleDismiss}
+              aria-label={t('update.banner.dismissAria')}
+              className={cn(
+                'absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full',
+                'text-sidebar-muted transition-colors hover:bg-sidebar-item-hover hover:text-foreground',
+              )}
+            >
+              <X className="h-3.5 w-3.5" strokeWidth={2} />
+            </button>
+          </Tip>
+          <Download className="h-9 w-9 text-sidebar-muted" strokeWidth={1.5} />
+          <p className="text-center text-sm font-semibold text-foreground">{t('update.banner.manualTitle')}</p>
+          {version && <p className="text-center text-xs text-sidebar-muted">{version}</p>}
+          <Button
+            variant="cta"
+            size="md"
+            compact
+            onClick={openInstaller}
+            aria-label={t('update.banner.manualAria', { version: versionForAria })}
+            className={cn('w-full', UPDATE_BUTTON_TREATMENT)}
+          >
+            {t('update.banner.manualButton')}
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (isErrorOnly) {
     // onOpenChange is a no-op so the user can't accidentally dismiss the

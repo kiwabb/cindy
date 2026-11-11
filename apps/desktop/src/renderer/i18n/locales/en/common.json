@@ -9902,7 +9902,10 @@
       "confirmAria": "Restart anyway and apply the update, interrupting the running task",
       "cancelAria": "Cancel update",
       "dismiss": "Later",
-      "dismissAria": "Dismiss update banner for now"
+      "dismissAria": "Dismiss update banner for now",
+      "manualTitle": "New version needs manual install",
+      "manualButton": "Download installer",
+      "manualAria": "Download the installer for {{version}}"
     },
     "notice": {
       "title": "What's New",

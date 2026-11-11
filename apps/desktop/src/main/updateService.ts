@@ -105,13 +105,15 @@ let cancelStartupBinaryUpdateCheck: (() => void) | undefined;
  * 并禁用,防止用户点了之后装上的是 a。下载成功 → `ready` (b);下载失败 → 静默回退
  * 到 `ready` (a),下一次轮询再试。
  */
-type UpdateStatus = 'idle' | 'checking' | 'downloading' | 'ready' | 'superseding' | 'error';
+type UpdateStatus = 'idle' | 'checking' | 'downloading' | 'ready' | 'superseding' | 'error' | 'manual';
 
 interface UpdateStatusPayload {
   status: UpdateStatus;
   version?: string;
   progress?: number;
   errorCode?: string;
+  /** `manual` only: release page of the installer the user must download and run by hand. */
+  downloadUrl?: string;
 }
 
 interface PatchInfo {
@@ -184,6 +186,8 @@ let downloadingVersion: string | undefined;
 let readyFilePath: string | undefined;
 /** 当前 staged 补丁对应的渠道代际。延迟清理用它区分「同路径上的新旧包」。 */
 let readyChannelEpoch: number | undefined;
+/** Personal channel: newer release that cannot be applied in place (status `manual`). Never an installable patch. */
+let manualUpdate: { version: string; downloadUrl: string } | undefined;
 /**
  * 更新渠道代际计数:用户在下载进行中关掉 beta(clearStagedPatch)时 +1,
  * 让 in-flight 的 checkForUpdate 在写回 patch-info / 恢复旧 patch 前察觉
@@ -1140,14 +1144,29 @@ async function doCheckPersonalUpdate(): Promise<CheckForUpdateResult> {
   syncObservedUpdateChannel();
   const channelEpochAtStart = updateChannelEpoch;
   try {
-    setStatus('checking');
-    const manifest = await checkPersonalManifest();
-    if (!manifest) {
+    // A pending manual install stays on screen during the 30-minute re-check; the result below replaces it.
+    if (currentStatus !== 'manual') setStatus('checking');
+    const check = await checkPersonalManifest();
+    manualUpdate = undefined;
+    if (!check) {
       readyFilePath = undefined;
       readyVersion = undefined;
       readyChannelEpoch = undefined;
       setStatus('idle');
       return 'idle';
+    }
+    const manifest = check.manifest;
+    if (check.kind === 'manual') {
+      readyFilePath = undefined;
+      readyVersion = undefined;
+      readyChannelEpoch = undefined;
+      manualUpdate = {
+        version: `personal-r${manifest.revision}`,
+        downloadUrl: `https://github.com/${context.policy.repository}/releases/tag/${context.policy.channel}-r${manifest.revision}`,
+      };
+      log.warn('Personal update needs a manual install', { code: 'PERSONAL_UPDATE_STORAGE_INCOMPATIBLE', version: manualUpdate.version });
+      setStatus('manual', manualUpdate);
+      return 'manual_download';
     }
     let prepared = readPreparedPersonalUpdate();
     if (!prepared || manifest.revision > prepared.identity.revision) {
@@ -1181,6 +1200,7 @@ async function doCheckPersonalUpdate(): Promise<CheckForUpdateResult> {
     log.warn('Personal update preparation stopped', { code: error instanceof Error ? error.message : 'PERSONAL_UPDATE_FAILED' });
     // Keep verified bytes on disk, but never turn an unavailable or rejected
     // manifest into authority to install a previously prepared target.
+    manualUpdate = undefined;
     readyFilePath = undefined;
     readyVersion = undefined;
     readyChannelEpoch = undefined;
@@ -2297,6 +2317,12 @@ export async function checkAppUpdateForAgent(): Promise<{
   if (currentStatus === 'ready' && readyVersion) {
     return { status: 'ready', currentVersion, targetVersion: readyVersion };
   }
+  if (currentStatus === 'manual' && manualUpdate) {
+    return {
+      status: 'manual_download', currentVersion, targetVersion: manualUpdate.version,
+      reason: AGENT_UPDATE_FAILURE_REASONS.manual_download,
+    };
+  }
   // An Agent check must not stage a patch: checkForUpdate() downloads it and
   // enables the existing auto-relaunch-on-idle path. Read only the manifest;
   // the user can download and install through the built-in update action.
@@ -2501,6 +2527,9 @@ export function initUpdateService(): void {
   );
 
   ipcMain.handle('update-get-status', () => {
+    if (currentStatus === 'manual' && manualUpdate) {
+      return { status: currentStatus, version: manualUpdate.version, downloadUrl: manualUpdate.downloadUrl };
+    }
     return { status: currentStatus, version: readyVersion, errorCode: lastErrorCode };
   });
 

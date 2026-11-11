@@ -949,9 +949,11 @@ interface UpdateStatusPayload {
    * 防止用户重启后装的是旧的。下载成功 → status 切回 'ready' + 新 version;
    * 失败 → 静默回到 'ready' + 旧 version,下次轮询再试。
    */
-  status: 'idle' | 'checking' | 'downloading' | 'ready' | 'superseding' | 'error';
+  status: 'idle' | 'checking' | 'downloading' | 'ready' | 'superseding' | 'error' | 'manual';
   version?: string;
   progress?: number;
+  /** `manual` only: release page to download the installer from. */
+  downloadUrl?: string;
   /** Machine-readable error subtype. `windows_vc_runtime_missing` keeps a
    *  staged patch ready while the renderer prompts for the updater's x64
    *  VC++ Runtime; `translocated` is the macOS read-only fallback. */
@@ -4088,7 +4090,7 @@ interface ElectronAPI {
   /** Register an update-status subscriber. Returns an unsubscribe function. */
   onUpdateStatus: (callback: (payload: UpdateStatusPayload) => void) => () => void;
   /** Query current update status (no network, returns in-memory state). */
-  getUpdateStatus: () => Promise<{ status: string; version?: string; errorCode?: string }>;
+  getUpdateStatus: () => Promise<{ status: string; version?: string; errorCode?: string; downloadUrl?: string }>;
   /** Query and update auto-apply settings for downloaded app updates. */
   getAutoUpdateSettings: () => Promise<AutoUpdateSettingsPayload>;
   setAutoUpdateSettings: (settings: {
