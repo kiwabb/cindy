@@ -19786,6 +19786,13 @@
     "details": "待辦詳情",
     "title": "標題",
     "notes": "備註（可略）",
+    "steps": {
+      "title": "步驟",
+      "add": "添一步",
+      "expand": "展步驟：{{title}}",
+      "collapse": "收步驟：{{title}}",
+      "remove": "刪步驟：{{title}}"
+    },
     "deadline": "截止日（可略）",
     "deadlineTime": "截止之時（可略）",
     "deferUntil": "恢復處理時刻",

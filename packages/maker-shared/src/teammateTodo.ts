@@ -33,6 +33,13 @@ export const TODO_REMINDERS = ['default', 'off', 'before-15m', 'before-1h', 'bef
 export type TodoReminder = (typeof TODO_REMINDERS)[number];
 /** Tag ids reference the owner's task-tag catalog on the same device; an unknown id reads as untagged. */
 export const TODO_MAX_TAGS = 16;
+/** A checklist step inside a todo: no deadline, priority or reminder of its own. */
+export interface TodoSubtask {
+  id: string;
+  title: string;
+  done: boolean;
+}
+export const TODO_MAX_SUBTASKS = 50;
 export interface TodoCompletion {
   summary: string;
   ref?: string;
@@ -71,6 +78,8 @@ export interface TeammateTodo {
   priority?: TodoPriority;
   tagIds?: string[];
   reminder?: TodoReminder;
+  /** Ordered checklist; absent on stored items means none. */
+  subtasks?: TodoSubtask[];
 }
 export interface TodoPatch {
   id?: string;
@@ -95,6 +104,8 @@ export interface TodoPatch {
   priority?: TodoPriority;
   tagIds?: string[];
   reminder?: TodoReminder;
+  /** Replaces the whole checklist (order included). */
+  subtasks?: TodoSubtask[];
 }
 export interface TodoState {
   version: 1;
@@ -142,6 +153,22 @@ export function normalizeTodoTagIds(value: unknown): string[] {
     if (!ids.includes(id)) ids.push(id);
   }
   return ids;
+}
+/** Ordered, bounded checklist with unique ids; throws INVALID_INPUT naming the offending field. */
+export function normalizeTodoSubtasks(value: unknown): TodoSubtask[] {
+  if (!Array.isArray(value) || value.length > TODO_MAX_SUBTASKS)
+    throw invalidInput(`subtasks must be an array of at most ${TODO_MAX_SUBTASKS} items`);
+  const ids = new Set<string>();
+  return value.map((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item))
+      throw invalidInput('subtasks[] must be objects');
+    const { id, title, done } = item as Record<string, unknown>;
+    if (typeof id !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(id) || ids.has(id))
+      throw invalidInput('subtasks[].id must be a unique id of 1-64 letters, digits, _ or -');
+    if (typeof done !== 'boolean') throw invalidInput('subtasks[].done must be a boolean');
+    ids.add(id);
+    return { id, title: text(title, 300, true, 'subtasks[].title'), done };
+  });
 }
 export function validateTodoTimestamp(s: unknown): string {
   if (
@@ -531,6 +558,7 @@ export function applyTodoPatch(
     t.priority = patch.priority;
   }
   if (patch.tagIds !== undefined) t.tagIds = normalizeTodoTagIds(patch.tagIds);
+  if (patch.subtasks !== undefined) t.subtasks = normalizeTodoSubtasks(patch.subtasks);
   if (patch.reminder !== undefined) {
     if (!validTodoReminder(patch.reminder))
       throw invalidInput(`reminder must be one of ${TODO_REMINDERS.join(', ')}`);

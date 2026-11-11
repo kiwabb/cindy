@@ -56,6 +56,7 @@ const UPDATE_KEYS = [
   'priority',
   'tagIds',
   'reminder',
+  'subtasks',
   'operation',
   'until',
 ] as const;
@@ -63,7 +64,7 @@ const UPDATE_KEYS = [
  * Advertised in the block data. The released desktop (r3) rejects unknown update fields, so a phone
  * sends `priority` / `tagIds` / `reminder` only when the host lists `organize` here.
  */
-export const PERSONAL_TODO_REMOTE_CAPABILITIES = { organize: 1 } as const;
+export const PERSONAL_TODO_REMOTE_CAPABILITIES = { organize: 1, subtasks: 1 } as const;
 const OPERATIONS = ['complete', 'reopen', 'delete', 'later', 'restore'];
 
 const resourceRef = { collectionId: PERSONAL_TODOS_COLLECTION, kind: KIND, id: RESOURCE_ID } as const;
@@ -149,6 +150,7 @@ export function personalTodoRemoteProjection(
     priority: todo.priority ?? 0,
     reminder: todo.reminder ?? 'default',
     tags: resolveTags(todo, catalog),
+    subtasks: (todo.subtasks ?? []).map((step) => ({ id: step.id, title: step.title, done: step.done })),
   };
 }
 
@@ -167,7 +169,7 @@ function resourceRevision(items: PersonalTodo[], catalog: Map<string, TaskTag>):
   const hash = createHash('sha256');
   // Resolved tag names and colors are part of the projection, so a catalog rename or delete is a new revision.
   for (const todo of items)
-    hash.update(`${todo.id}:${todo.revision}:${JSON.stringify(resolveTags(todo, catalog))};`);
+    hash.update(`${todo.id}:${todo.revision}:${JSON.stringify(resolveTags(todo, catalog))}:${JSON.stringify(todo.subtasks ?? [])};`);
   return hash.digest('hex').slice(0, 16);
 }
 
@@ -217,6 +219,26 @@ function parseUpdate(input: Record<string, unknown> | undefined): PersonalTodoUp
     if (!Array.isArray(input.tagIds) || input.tagIds.some((id) => typeof id !== 'string'))
       throw invalid('tagIds');
     out.tagIds = input.tagIds as string[];
+  }
+  if (input.subtasks !== undefined) {
+    if (
+      !Array.isArray(input.subtasks) ||
+      input.subtasks.some(
+        (step) =>
+          !step ||
+          typeof step !== 'object' ||
+          Array.isArray(step) ||
+          typeof step.title !== 'string' ||
+          (step.id !== undefined && typeof step.id !== 'string') ||
+          (step.done !== undefined && typeof step.done !== 'boolean'),
+      )
+    )
+      throw invalid('subtasks');
+    out.subtasks = (input.subtasks as Array<Record<string, unknown>>).map((step) => ({
+      ...(step.id !== undefined ? { id: step.id as string } : {}),
+      title: step.title as string,
+      ...(step.done !== undefined ? { done: step.done as boolean } : {}),
+    }));
   }
   if (input.deadline !== undefined) {
     const value = input.deadline as Record<string, unknown> | null;

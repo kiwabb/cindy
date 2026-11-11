@@ -83,4 +83,26 @@ describe('personal todo tools', () => {
     expect(await ids({ tagId: 't1' })).toEqual(['a']);
     expect(await ids({ tagId: 'other' })).toEqual([]);
   });
+
+  it('forwards a whole subtasks list and lists steps with progress', async () => {
+    const steps = [{ id: 's1', title: '订会议室', done: true }, { id: 's2', title: '发通知', done: false }];
+    const items = [
+      { id: 'a', revision: 3, title: 'A', notes: '', deadline: null, status: 'open', deferredUntil: null, subtasks: steps },
+      { id: 'b', revision: 1, title: 'B', notes: '', deadline: null, status: 'open', deferredUntil: null },
+    ];
+    const callback = vi.fn<PersonalTodoCallbacks>(async (operation) =>
+      operation === 'list' ? { ok: true as const, items } : { ok: true as const, todo: items[0] },
+    );
+    const reg = new XdtHelperToolRegistry();
+    registerPersonalTodoTools(reg, callback);
+    const patch = { id: 'a', expectedRevision: 3, subtasks: [{ id: 's1', title: '订会议室', done: true }, { title: '新步骤' }] };
+    expect(parse(await reg.call('update_personal_todo', patch)).ok).toBe(true);
+    expect(callback).toHaveBeenCalledWith('update', patch);
+    expect(parse(await reg.call('update_personal_todo', { id: 'a', subtasks: [{ title: '' }] })).ok).toBe(false);
+    const listed = parse(await reg.call('list_personal_todos', {}));
+    expect(listed.items).toMatchObject([
+      { id: 'a', subtasks: steps, subtasksDone: 1, subtasksTotal: 2 },
+      { id: 'b', subtasks: [], subtasksDone: 0, subtasksTotal: 0 },
+    ]);
+  });
 });

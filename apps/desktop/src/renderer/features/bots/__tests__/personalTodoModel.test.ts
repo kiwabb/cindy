@@ -11,6 +11,8 @@ import type { PersonalTodo } from '../../../../shared/personalTodo';
  * - Bug／规则依据：2026-11 个人待办改版（owner 批准的原型）第 1、3、4、6 条：分组与组内顺序、
  *   标签筛选只认目录里存在的标签、截止文字只补标题没说的、逾期「N 天」。
  * - 现有覆盖缺口：旧页面把个人事项转成伙伴待办再分组，没有优先级、标签、组内顺序，也没有截止文字的单测。
+ * - 步骤（子清单）：行上的进度文字与编辑时整表替换的列表（保留 id、顺序），写错会让别处已有的步骤丢失或错位。
+ * - 步骤（子清单）：行上的进度文字与编辑时整表替换的列表（保留 id、顺序），写错会让已有步骤丢失或错位。
  * - 最小失败输入：同优先级一条有截止一条没有；标签 id 不在目录里；今天凌晨的 instant 已过期但相差 0 天。
  * - tier：unit（纯函数，注入时钟）。
  */
@@ -19,6 +21,10 @@ import {
   personalDueText,
   personalSections,
   personalTagChips,
+  appendedSteps,
+  removedSteps,
+  stepsProgress,
+  toggledSteps,
   type PersonalListInput,
 } from '../personalTodoModel';
 
@@ -34,7 +40,7 @@ function todo(id: string, patch: Partial<PersonalTodo> = {}): PersonalTodo {
   return {
     id, revision: 1, title: id, notes: '', deadline: null, status: 'open', deferredUntil: null,
     createdAt: `2026-11-0${(seq % 9) + 1}T00:00:00Z`, updatedAt: '2026-11-10T00:00:00Z',
-    priority: 0, tagIds: [], reminder: 'default', ownership: 'self', source: 'manual', ...patch,
+    priority: 0, tagIds: [], reminder: 'default', subtasks: [], ownership: 'self', source: 'manual', ...patch,
   };
 }
 const tag = (id: string, name: string, order: number): TaskTag => ({
@@ -139,5 +145,31 @@ describe('personal due text', () => {
 
   it('adds the year only for a date in another year', () => {
     expect(text(day('2027-01-05'), 'en', 'later').text).toBe('Jan 5, 2027');
+  });
+});
+
+describe('personal todo steps', () => {
+  const steps = [
+    { id: 's1', title: 'Draft', done: true },
+    { id: 's2', title: 'Review', done: false },
+    { id: 's3', title: 'Send', done: false },
+  ];
+
+  it('reports done/total only for a todo that has steps', () => {
+    expect(stepsProgress([])).toBeNull();
+    expect(stepsProgress(steps)).toEqual({ done: 1, total: 3, text: '1/3' });
+  });
+
+  it('builds the whole replacement list with ids and order kept', () => {
+    expect(toggledSteps(steps, 's2')).toEqual([
+      { id: 's1', title: 'Draft', done: true },
+      { id: 's2', title: 'Review', done: true },
+      { id: 's3', title: 'Send', done: false },
+    ]);
+    expect(toggledSteps(steps, 's1')[0].done).toBe(false);
+    expect(removedSteps(steps, 's2').map((step) => step.id)).toEqual(['s1', 's3']);
+    // A new step has no id; blank titles add nothing.
+    expect(appendedSteps(steps, '  Archive  ')).toEqual([...steps, { title: 'Archive' }]);
+    expect(appendedSteps(steps, '   ')).toBeNull();
   });
 });

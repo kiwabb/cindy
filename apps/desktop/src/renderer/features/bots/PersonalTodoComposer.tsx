@@ -54,7 +54,7 @@ function tagCreateError(cause: unknown, t: (key: string) => string): string {
 }
 
 /** Enter and Esc for the composer's single-line fields; Enter is ignored while an IME composes. */
-function composing(event: KeyboardEvent): boolean {
+export function composing(event: KeyboardEvent): boolean {
   return event.nativeEvent.isComposing || event.keyCode === 229;
 }
 

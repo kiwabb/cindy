@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { TodoError, type TodoPatch } from '@cindy/maker-shared/teammate-todo';
 import {
@@ -6,6 +7,23 @@ import {
   type PersonalTodoUpdate,
 } from '../../shared/personalTodo.js';
 import { createBotTodoStore } from './botTodoStore.js';
+
+/**
+ * New checklist steps may arrive without an id (an Agent naming steps in prose); give each one here
+ * so the shared validator only ever sees complete steps. Malformed input is left for it to reject.
+ */
+function withSubtaskIds(subtasks: PersonalTodoUpdate['subtasks']): TodoPatch['subtasks'] {
+  if (!Array.isArray(subtasks)) return subtasks as TodoPatch['subtasks'];
+  return subtasks.map((step) =>
+    step && typeof step === 'object' && !Array.isArray(step)
+      ? {
+          ...step,
+          id: step.id ?? randomUUID().replaceAll('-', '').slice(0, 16),
+          done: step.done ?? false,
+        }
+      : step,
+  ) as TodoPatch['subtasks'];
+}
 
 /** Dedicated account file; no bot lookup, legacy import, model dispatch or remote projection. */
 export function createPersonalTodoStore(file: string, assertCurrent = () => {}) {
@@ -44,6 +62,7 @@ export function createPersonalTodoStore(file: string, assertCurrent = () => {}) 
         priority: input.priority,
         tagIds: input.tagIds,
         reminder: input.reminder,
+        subtasks: withSubtaskIds(input.subtasks),
         ...(input.deadline !== undefined ? { deadlineOverride: { value: input.deadline } } : {}),
         ...(!input.id ? { key, outcome: input.title } : {}),
         ...(input.operation === 'complete'
@@ -63,7 +82,15 @@ export function createPersonalTodoStore(file: string, assertCurrent = () => {}) 
         !isDeepStrictEqual(existing.deadlineOverride?.value ?? null, input.deadline ?? null) ||
         (existing.priority ?? 0) !== (input.priority ?? 0) ||
         !isDeepStrictEqual(existing.tagIds ?? [], input.tagIds ?? []) ||
-        (existing.reminder ?? 'default') !== (input.reminder ?? 'default')
+        (existing.reminder ?? 'default') !== (input.reminder ?? 'default') ||
+        // Retried new steps get fresh ids, so compare what the owner typed.
+        !isDeepStrictEqual(
+          (existing.subtasks ?? []).map(({ title, done }) => ({ title, done })),
+          (withSubtaskIds(input.subtasks) ?? []).map(({ title, done }) => ({
+            title: title.trim(),
+            done,
+          })),
+        )
       )
         throw new TodoError('CONFLICT');
       return projectPersonalTodo(existing);

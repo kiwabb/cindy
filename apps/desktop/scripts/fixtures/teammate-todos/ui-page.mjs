@@ -75,8 +75,16 @@ export default {
       await page.getByRole('button', { name: /生活|Life/ }).first().click();
       await ui.capture('tag-filtered');
       await page.getByRole('button', { name: new RegExp('^(' + (await ui.t('personalTodos.all')) + ')') }).first().click();
+      // A todo with steps: progress in the meta line and its steps expanded inline (a long step wraps).
+      const stepsRow = page.getByTestId('todo-board-row').filter({ hasText: '回复供应商报价邮件' });
+      await stepsRow.getByText('1/3').waitFor();
+      await stepsRow.getByRole('button', { name: await ui.t('personalTodos.steps.expand', { title: '回复供应商报价邮件' }), exact: true }).click();
+      await stepsRow.getByRole('checkbox', { name: '确认交期' }).waitFor();
+      await ui.capture('steps-inline');
+
       await page.getByRole('button', { name: '准备周会材料', exact: true }).click();
       await page.getByRole('complementary').waitFor();
+      await page.getByRole('complementary').getByRole('checkbox', { name: '打印会议材料' }).waitFor();
       // The reminder control must fit the panel in every language (long labels would otherwise scroll).
       const reminder = page.getByRole('radiogroup', { name: await ui.t('personalTodos.reminder.label') });
       assert.equal(await reminder.evaluate((element) => element.scrollWidth <= element.clientWidth), true, 'reminder options fit the panel');

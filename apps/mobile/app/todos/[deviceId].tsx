@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { Check, ChevronDown, ChevronUp, Circle } from 'lucide-react-native';
+import { Check, ChevronDown, ChevronUp, Circle, ListChecks } from 'lucide-react-native';
 import { todoLocalDate } from '@cindy/maker-shared/teammate-todo';
 import { useAuth } from '@/auth/AuthContext';
 import { Text, TextInput } from '@/components/AppText';
@@ -75,6 +75,8 @@ function PersonalTodosContent({ deviceId, deviceName }: { deviceId: string; devi
     // A done row drops the priority color; a tag the catalog no longer has is already absent from `tags`.
     const ring = todo.status === 'open' ? priorityRingColor(todo.priority, colors) : null;
     const tag = todo.tags[0];
+    const stepsTotal = todo.subtasks.length;
+    const stepsDone = todo.subtasks.filter(step => step.done).length;
     return <View key={todo.id} style={styles.row}>
       <Pressable accessibilityRole="button" accessibilityLabel={todo.status === 'open' ? tr('complete') : tr('reopen')}
         hitSlop={8} onPress={() => void toggle(todo)} style={styles.check} testID="personalTodos.toggle">
@@ -87,9 +89,13 @@ function PersonalTodosContent({ deviceId, deviceName }: { deviceId: string; devi
       <Pressable accessibilityRole="button" onPress={() => { setError(null); setEditing({ kind: 'edit', id: todo.id }); }}
         style={({ pressed }) => [styles.rowBody, pressed && styles.pressed]} testID="personalTodos.row">
         <Text numberOfLines={2} style={[styles.rowTitle, todo.status === 'done' && styles.rowTitleDone]}>{todo.title}</Text>
-        {todo.deadline || tag ? <View style={styles.meta}>
+        {todo.deadline || tag || stepsTotal > 0 ? <View style={styles.meta}>
           {due ? <View style={styles.dueDot} /> : null}
           {todo.deadline ? <Text style={styles.rowMeta}>{todo.deadline.date}</Text> : null}
+          {stepsTotal > 0 ? <View style={styles.steps} testID="personalTodos.steps">
+            <ListChecks size={iconSize.sm} strokeWidth={iconStroke.regular} color={colors.textTertiary} />
+            <Text style={styles.rowMeta}>{`${stepsDone}/${stepsTotal}`}</Text>
+          </View> : null}
           {tag ? <View testID="personalTodos.tagDot" accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
             style={[styles.tagDot, { backgroundColor: personalTodoTagColor(tag.color, colors) }]} /> : null}
           {tag ? <Text numberOfLines={1} style={[styles.rowMeta, styles.tagName]} testID="personalTodos.tagName">{personalTodoTagLabel(tag, t)}</Text> : null}
@@ -218,6 +224,7 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   rowTitle: { color: colors.textPrimary, fontSize: typeScale.body, lineHeight: lineHeight.body, fontWeight: fontWeight.medium },
   rowTitleDone: { color: colors.textSecondary, fontWeight: fontWeight.regular },
   meta: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs + 2 },
+  steps: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   rowMeta: { color: colors.textTertiary, fontSize: typeScale.caption, lineHeight: lineHeight.caption, fontWeight: fontWeight.regular },
   tagDot: { width: 8, height: 8, borderRadius: radius.pill, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   tagName: { flexShrink: 1 },

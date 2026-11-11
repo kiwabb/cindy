@@ -31,7 +31,7 @@ function mine(id: string, title: string, patch: Partial<PersonalTodo> = {}): Per
   return {
     id, revision: 1, title, notes: '', deadline: null, status: 'open', deferredUntil: null,
     createdAt: `2026-11-0${Number(id.replace(/\D/g, '')) % 9 + 1}T08:00:00Z`, updatedAt: '2026-11-10T08:00:00Z',
-    priority: 0, tagIds: [], reminder: 'default', ownership: 'self', source: 'manual', ...patch,
+    priority: 0, tagIds: [], reminder: 'default', subtasks: [], ownership: 'self', source: 'manual', ...patch,
   };
 }
 function personal(caseName: string): PersonalTodo[] {
@@ -40,8 +40,17 @@ function personal(caseName: string): PersonalTodo[] {
   if (caseName === 'empty') return [];
   return [
     mine('p1', '提交季度报销单', { priority: 3, tagIds: ['work'], deadline: deadline(-1) }),
-    mine('p2', '准备周会材料', { priority: 3, tagIds: ['work'], deadline: instant(0, 17, 30), notes: '数据截止到周三，附两张对比图' }),
-    mine('p3', '回复供应商报价邮件', { priority: 2, tagIds: ['work'], deadline: instant(0, 14) }),
+    mine('p2', '准备周会材料', { priority: 3, tagIds: ['work'], deadline: instant(0, 17, 30), notes: '数据截止到周三，附两张对比图', subtasks: [
+      { id: 'a1', title: '汇总各部门数据', done: true },
+      { id: 'a2', title: '制作两张对比图', done: true },
+      { id: 'a3', title: '和负责人确认结论后再发给全体参会人员，并把最终版本放进共享目录', done: false },
+      { id: 'a4', title: '打印会议材料', done: false },
+    ] }),
+    mine('p3', '回复供应商报价邮件', { priority: 2, tagIds: ['work'], deadline: instant(0, 14), subtasks: [
+      { id: 'b1', title: '核对报价单', done: true },
+      { id: 'b2', title: '确认交期', done: false },
+      { id: 'b3', title: '回复邮件', done: false },
+    ] }),
     mine('p4', '预约体检', { priority: 1, tagIds: ['life'], deadline: deadline(0) }),
     mine('p5', '整理第三季度客户反馈', { deadline: deadline(Math.max(1, daysToSunday)) }),
     mine('p6', '续费个人域名', { priority: 2, tagIds: ['life'], deadline: deadline(1) }),

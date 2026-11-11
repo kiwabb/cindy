@@ -19786,6 +19786,13 @@
     "details": "待办详情",
     "title": "标题",
     "notes": "备注（选填）",
+    "steps": {
+      "title": "步骤",
+      "add": "添加步骤",
+      "expand": "展开步骤：{{title}}",
+      "collapse": "收起步骤：{{title}}",
+      "remove": "删除步骤：{{title}}"
+    },
     "deadline": "截止日期（选填）",
     "deadlineTime": "截止时间（选填）",
     "deferUntil": "恢复处理时间",

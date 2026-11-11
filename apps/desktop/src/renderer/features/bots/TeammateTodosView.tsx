@@ -97,6 +97,11 @@ function TodoBoard() {
   };
   const updateRow = async (input: PersonalTodoUpdate) =>
     saved(await personal.update(input), input.operation);
+  // A step ticked on a row saves quietly: no notice, and the open panel (if it is this todo) follows.
+  const [stepsSaved, setStepsSaved] = useState<PersonalTodo | undefined>(undefined);
+  const updateSteps = async (input: PersonalTodoUpdate) => {
+    setStepsSaved(await personal.update(input));
+  };
   // A todo added from the composer stays visible: a filter that would hide it is cleared.
   const created = (todo: PersonalTodo) => {
     if (!matchesTagFilter(todo, catalog, effectiveTagFilter(tagFilter, catalog)))
@@ -116,6 +121,9 @@ function TodoBoard() {
   });
   const chips = personalTagChips(personal.items, catalog, effectiveFilter, now);
   const showTag = personal.grouping !== 'tag' && effectiveFilter.kind === 'all';
+  const listHasSteps = sections.some((section) =>
+    section.items.some((todo) => todo.subtasks.length > 0),
+  );
 
   const empty = (text: string) => (
     <div
@@ -159,6 +167,8 @@ function TodoBoard() {
               // Opening the row that is already open closes it again.
               onOpen={(next) => setEditor((open) => (open?.id === next.id ? undefined : next))}
               onUpdate={updateRow}
+              onSteps={updateSteps}
+              reserveStepsToggle={listHasSteps}
             />
           ))}
         </Section>
@@ -249,6 +259,7 @@ function TodoBoard() {
                 initial={editor}
                 tags={catalog}
                 update={personal.update}
+                stepsSaved={stepsSaved}
                 onClose={() => setEditor(undefined)}
                 onSaved={saved}
               />

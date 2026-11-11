@@ -3,6 +3,7 @@ import type {
   TodoDeadline,
   TodoPriority,
   TodoReminder,
+  TodoSubtask,
 } from '@cindy/maker-shared/teammate-todo';
 
 /** Personal ownership is established by the account store, never by teammate origin. */
@@ -23,6 +24,8 @@ export interface PersonalTodo {
   /** Ids in this device's task-tag catalog; an id missing from the catalog reads as untagged. */
   tagIds: string[];
   reminder: TodoReminder;
+  /** Ordered checklist steps; each has only a title and a done state. */
+  subtasks: TodoSubtask[];
   ownership: 'self';
   source: 'manual';
 }
@@ -36,6 +39,11 @@ export interface PersonalTodoUpdate {
   priority?: TodoPriority;
   tagIds?: string[];
   reminder?: TodoReminder;
+  /**
+   * Replaces the whole checklist in this order, guarded by expectedRevision like every edit.
+   * Keep the ids of existing steps; a new step may omit its id and `done` (false).
+   */
+  subtasks?: Array<{ id?: string; title: string; done?: boolean }>;
   operation?: 'complete' | 'reopen' | 'delete' | 'later' | 'restore';
   until?: string;
 }
@@ -49,6 +57,7 @@ export const PERSONAL_TODO_UPDATE_KEYS = [
   'priority',
   'tagIds',
   'reminder',
+  'subtasks',
   'operation',
   'until',
 ] as const satisfies ReadonlyArray<keyof PersonalTodoUpdate>;
@@ -68,6 +77,7 @@ export function projectPersonalTodo(todo: TeammateTodo): PersonalTodo {
     priority: todo.priority ?? 0,
     tagIds: todo.tagIds ?? [],
     reminder: todo.reminder ?? 'default',
+    subtasks: todo.subtasks ?? [],
     ownership: 'self',
     source: 'manual',
   };

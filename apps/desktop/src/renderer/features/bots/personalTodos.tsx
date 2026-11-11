@@ -7,7 +7,7 @@ import {
 } from './personalTodoCache';
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Trash2, X } from 'lucide-react';
+import { Plus, Trash2, X } from 'lucide-react';
 import { useOptionalDataOwnerGeneration } from '@/contexts/AuthContext';
 import {
   getDataOwnerGeneration,
@@ -15,6 +15,7 @@ import {
   isDataOwnerIdCurrent,
 } from '@/contexts/dataOwnerGeneration';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input, Textarea } from '@/components/ui/input';
 import { FormField } from '@/components/ui/form-field';
 import { SegmentedControl } from '@/components/ui/segmented-control';
@@ -22,17 +23,27 @@ import { Tip } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { extractIpcError } from '@/utils/ipcError';
 import type { TaskTag } from '@cindy/maker-shared';
-import type { TodoPriority, TodoReminder } from '@cindy/maker-shared/teammate-todo';
+import {
+  TODO_MAX_SUBTASKS,
+  type TodoPriority,
+  type TodoReminder,
+} from '@cindy/maker-shared/teammate-todo';
 import type { PersonalTodo, PersonalTodoUpdate } from '../../../shared/personalTodo';
+import { composing } from './PersonalTodoComposer';
 import {
   DEFAULT_PERSONAL_GROUPING,
   DEFAULT_PERSONAL_ORDER,
   PERSONAL_GROUPINGS,
   PERSONAL_ORDERS,
   PERSONAL_PRIORITIES,
+  appendedSteps,
+  removedSteps,
   resolvePersonalTag,
+  stepsProgress,
+  toggledSteps,
   type PersonalGrouping,
   type PersonalOrder,
+  type PersonalStepsInput,
 } from './personalTodoModel';
 import {
   PRIORITY_KEY,
@@ -144,10 +155,17 @@ export function PersonalTodoEditor({
   initial,
   tags,
   update,
+  stepsSaved,
   onClose,
   onSaved,
 }: {
   initial: PersonalTodo;
+  /**
+   * The latest checklist save made outside the panel (a step ticked on the row). The panel follows
+   * it only when it is the very next revision of what the panel holds; anything else is someone
+   * else's change and stays a conflict.
+   */
+  stepsSaved?: PersonalTodo;
   /** This device's task-tag catalog; ids missing from it read as untagged. */
   tags: readonly TaskTag[];
   update: (input: PersonalTodoUpdate) => Promise<PersonalTodo>;
@@ -162,6 +180,11 @@ export function PersonalTodoEditor({
   const [time, setTime] = useState(() => instantTime(initial.deadline));
   const [until, setUntil] = useState('');
   const [current, setCurrent] = useState(initial);
+  const [stepDraft, setStepDraft] = useState('');
+  useEffect(() => {
+    if (stepsSaved && stepsSaved.id === current.id && stepsSaved.revision === current.revision + 1)
+      setCurrent(stepsSaved);
+  }, [stepsSaved]);
   const [priority, setPriority] = useState<TodoPriority>(initial.priority ?? 0);
   const [tagId, setTagId] = useState<string | null>(
     () => resolvePersonalTag(initial, tags)?.id ?? null,
@@ -241,6 +264,42 @@ export function PersonalTodoEditor({
       setBusy(false);
     }
   };
+
+  /**
+   * The checklist saves on its own, like the row: the panel stays open, the drafts in the other
+   * fields stay as typed, and the base revision follows the saved todo.
+   */
+  const saveSteps = async (subtasks: PersonalStepsInput | null): Promise<boolean> => {
+    if (!subtasks || busy || !isDataOwnerIdCurrent(owner)) return false;
+    const attemptOwner = getDataOwnerGeneration();
+    setBusy(true);
+    setError('');
+    setConflict(false);
+    try {
+      const saved = await update({
+        id: current.id,
+        expectedRevision: current.revision,
+        subtasks,
+      });
+      if (!isDataOwnerGenerationCurrent(attemptOwner)) return false;
+      setCurrent(saved);
+      return true;
+    } catch (cause) {
+      const conflicted = extractIpcError(cause)?.code === 'ALREADY_EXISTS';
+      setConflict(conflicted);
+      setError(t(conflicted ? 'personalTodos.conflict' : 'personalTodos.saveFailed'));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
+  const addStep = async () => {
+    const submitted = stepDraft;
+    if (await saveSteps(appendedSteps(current.subtasks, submitted)))
+      setStepDraft((draft) => (draft === submitted ? '' : draft));
+  };
+  const steps = current.subtasks;
+  const progress = stepsProgress(steps);
 
   const reloadLatest = async () => {
     setBusy(true);
@@ -347,6 +406,77 @@ export function PersonalTodoEditor({
               />
             )}
           </FormField>
+          <div className="flex min-w-0 flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <span className="flex-1 text-13 font-medium text-[var(--settings-section-title)]">
+                {t('personalTodos.steps.title')}
+              </span>
+              {progress ? (
+                <span className="text-12 tabular-nums text-[var(--text-tertiary)]">
+                  {progress.text}
+                </span>
+              ) : null}
+            </div>
+            {steps.length ? (
+              <ul className="flex flex-col">
+                {steps.map((step) => (
+                  <li
+                    key={step.id}
+                    className="group flex min-h-8 items-start gap-1 rounded-lg px-1.5 py-1 hover:bg-[var(--surface-hover)]"
+                  >
+                    <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-2.5 py-0.5">
+                      <Checkbox
+                        className="mt-0.5"
+                        checked={step.done}
+                        disabled={busy}
+                        onChange={() => void saveSteps(toggledSteps(steps, step.id))}
+                      />
+                      <span
+                        className={cn(
+                          'min-w-0 flex-1 break-words text-13 leading-5',
+                          step.done
+                            ? 'text-[var(--text-tertiary)] line-through'
+                            : 'text-[var(--text-primary)]',
+                        )}
+                      >
+                        {step.title}
+                      </span>
+                    </label>
+                    <Tip text={t('personalTodos.steps.remove', { title: step.title })}>
+                      <button
+                        type="button"
+                        aria-label={t('personalTodos.steps.remove', { title: step.title })}
+                        disabled={busy}
+                        onClick={() => void saveSteps(removedSteps(steps, step.id))}
+                        className="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-[var(--text-secondary)] opacity-0 outline-none transition-opacity hover:bg-[var(--surface-hover)] focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] group-focus-within:opacity-100 group-hover:opacity-100 disabled:opacity-60"
+                      >
+                        <X size={12} aria-hidden />
+                      </button>
+                    </Tip>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <div className="flex items-center gap-2 px-1.5 pt-1">
+              <Plus size={14} aria-hidden className="shrink-0 text-[var(--text-tertiary)]" />
+              <Input
+                size="sm"
+                className="min-w-0 flex-1"
+                aria-label={t('personalTodos.steps.add')}
+                placeholder={t('personalTodos.steps.add')}
+                maxLength={300}
+                value={stepDraft}
+                onChange={setStepDraft}
+                disabled={steps.length >= TODO_MAX_SUBTASKS}
+                // Enter adds the step instead of submitting the form; an IME keeps its own Enter.
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter' || composing(event)) return;
+                  event.preventDefault();
+                  void addStep();
+                }}
+              />
+            </div>
+          </div>
           <Row label={t('personalTodos.priority.label')}>
             <div
               role="radiogroup"

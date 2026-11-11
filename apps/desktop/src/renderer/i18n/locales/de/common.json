@@ -19858,6 +19858,13 @@
     "details": "To-do-Details",
     "title": "Titel",
     "notes": "Notizen (optional)",
+    "steps": {
+      "title": "Schritte",
+      "add": "Schritt hinzufügen",
+      "expand": "Schritte anzeigen: {{title}}",
+      "collapse": "Schritte ausblenden: {{title}}",
+      "remove": "Schritt entfernen: {{title}}"
+    },
     "deadline": "Fällig am (optional)",
     "deadlineTime": "Uhrzeit (optional)",
     "deferUntil": "Fortsetzen am",

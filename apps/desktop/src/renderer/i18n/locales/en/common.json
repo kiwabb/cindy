@@ -19858,6 +19858,13 @@
     "details": "Todo details",
     "title": "Title",
     "notes": "Notes (optional)",
+    "steps": {
+      "title": "Steps",
+      "add": "Add a step",
+      "expand": "Show steps: {{title}}",
+      "collapse": "Hide steps: {{title}}",
+      "remove": "Remove step: {{title}}"
+    },
     "deadline": "Due date (optional)",
     "deadlineTime": "Due time (optional)",
     "deferUntil": "Resume at",

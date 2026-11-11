@@ -20045,6 +20045,13 @@
     "details": "Détails",
     "title": "Titre",
     "notes": "Notes (facultatif)",
+    "steps": {
+      "title": "Étapes",
+      "add": "Ajouter une étape",
+      "expand": "Afficher les étapes : {{title}}",
+      "collapse": "Masquer les étapes : {{title}}",
+      "remove": "Supprimer l’étape : {{title}}"
+    },
     "deadline": "Échéance (facultatif)",
     "deadlineTime": "Heure (facultatif)",
     "deferUntil": "Reprendre le",
