@@ -1,40 +1,25 @@
 import assert from 'node:assert/strict';
 
-const named = (text) => new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}( \\d+)?$`);
-
-/** 待办页（docs/product-rules/cindy-bots-runtime.md §6.3.6「桌面待办页」）。 */
+/** 待办页（只列当前账号的个人待办）。 */
 export default {
   name: 'teammate-todos',
   entry: './todos-fixture.tsx',
   viewport: { width: 1180, height: 820 },
-  real: 'TeammateTodosView (my todos: priority rings, tags, deadline text, grouping menu, tag chips, inline composer with date phrase recognition, details panel; teammate todos: deadline sections, teammate/type/status filters, offline notes, due dots), botGlanceTodos reading over local host and device-link resources, the shared task-tag cache, SegmentedControl, DropdownMenu, Popover, Tip, theme and translations',
+  real: 'TeammateTodosView (personal todos: priority rings, tags, deadline text, grouping menu, tag chips, inline composer with date phrase recognition, details panel), the personal todo read over the local host resource, the shared task-tag cache, SegmentedControl, DropdownMenu, Tip, theme and translations',
   notCovered:
-    'Saving anything (personal writes are forbidden here), creating a tag, the sidebar entry and its count, live pushes and foreground refresh, a teammate going offline after its todos were read, cloud companions, opening the teammate conversation',
+    'Saving anything (personal writes are forbidden here), creating a tag, the sidebar entry and its count, live pushes and foreground refresh',
   stubs: {
     'src/renderer/contexts/AuthContext': { partial: `export const useOptionalDataOwnerGeneration=()=>0;` },
-    'src/renderer/features/bots/botStore': {
-      partial: `export const useBotProfiles=()=>[{id:'cindy-default',name:'Cindy',avatar:'cindy://avatar/preset/cindy',avatarColor:'violet',status:'active'}];`,
-    },
-    'src/renderer/features/bots/useRemoteBots': `export const useRemoteCindyIds=()=>new Set(); export const useRemoteBots=()=>[
-      {id:'dev',name:'开发管家',deviceId:'mini',deviceName:'Mac mini',online:true,avatar:'',avatarColor:'blue'},
-      {id:'life',name:'栖物生活',deviceId:'home',deviceName:'家里的 Mac mini',online:false,connectionKnown:true,avatar:'',avatarColor:'green'}];`,
-    'src/renderer/features/bots/companionCloudStore': {
-      partial: `export const useCompanionCloud=()=>({enabled:false,selfDeviceId:null,actors:[],demotedBotIds:[]});`,
-    },
   },
   cases: {
     'personal-row': { about: 'UNIT FIXTURE: one personal row, checkbox/opener siblings and keyboard focus. No model, account, writes, or simulated save results.' },
-    personal: { about: 'My todos with priorities, tags, overdue/today/week/later, a snoozed and finished items; composer with a recognised date phrase, grouping menu, details panel. Fixture data only; saving is forbidden' },
-    default: { about: 'Three teammates, one offline: every deadline section, a decision to make, suggested date, filter popover' },
-    empty: { about: 'No todos anywhere: one sentence and a way into a teammate chat' },
+    default: { about: 'Personal todos with priorities, tags, overdue/today/week/later, a snoozed and finished items; composer with a recognised date phrase, grouping menu, details panel. Fixture data only; saving is forbidden' },
+    empty: { about: 'No todos: one sentence and the composer' },
   },
   async ready(page) {
     await page.getByTestId('todo-board').waitFor();
   },
   async check(page, ui) {
-    const mine = await ui.t('personalTodos.mine');
-    const teammates = await ui.t('personalTodos.teammates');
-    const view = async (key) => page.getByRole('radio', { name: named(await ui.t(key)) });
     if (ui.case === 'personal-row') {
       const row = page.getByTestId('todo-board-row');
       await row.waitFor();
@@ -47,9 +32,8 @@ export default {
       await ui.capture('personal-existing-details-unit-fixture');
       return;
     }
-    if (ui.case === 'personal') {
+    if (ui.case === 'default') {
       await page.getByTestId('todo-board-row').first().waitFor();
-      assert.equal(await page.getByRole('radio', { name: named(mine) }).getAttribute('aria-checked'), 'true');
       assert.equal(await page.getByTestId('todo-board-row').count(), 9, 'open personal todos, snoozed and finished ones kept out');
       await ui.capture('personal-list');
 
@@ -99,25 +83,7 @@ export default {
       await ui.capture('details');
       return;
     }
-    await ui.capture('personal-empty');
-    await page.getByRole('radio', { name: named(teammates) }).click();
-    if (ui.case === 'empty') {
-      await page.getByTestId('todo-board-empty').waitFor();
-      return;
-    }
-    await page.getByTestId('todo-board-row').first().waitFor();
-    assert.equal(await page.getByTestId('todo-board-row').count(), 6, 'open todos of the local and online remote teammate');
-    assert.equal(await page.getByTestId('todo-board-notes').count(), 1, 'offline teammate is called out');
-    await ui.capture('open');
-    await page.getByRole('button', { name: await ui.t('bots.todoBoard.filter') }).click();
-    await page.getByRole('radio', { name: await ui.t('bots.todoBoard.origin.discovered'), exact: true }).waitFor();
-    await ui.capture('filter-popover');
-    await page.keyboard.press('Escape');
-    await (await view('bots.todoBoard.view.done')).click();
-    await ui.capture('done');
-    await (await view('bots.todoBoard.view.open')).click();
-    await page.getByTestId('todo-board-row').first().hover();
-    await page.getByRole('tooltip').first().waitFor();
-    await ui.capture('hover');
+    await page.getByTestId('todo-board-empty').waitFor();
+    await ui.capture('empty');
   },
 };

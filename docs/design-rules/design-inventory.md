@@ -18,7 +18,7 @@
 | `desktop.auth.add-account` | desktop | 添加账号 | hash `/add-account`（ProtectedRoute → AddAccountLoginPage） |
 | `desktop.auth.legacy-migration` | desktop | 首登数据迁移弹窗 | App 顶层挂载 LegacyMigrationDialog（仅主窗；main 检测到旧版 userData 经 `legacy-migration:state` 驱动） |
 | `desktop.auth.login` | desktop | 登录页 | hash `/login`（GuestRoute → LoginPage） |
-| `desktop.bots` | desktop | 伙伴（列表 / 个人与伙伴待办 / 对话 / 设置 / 历史 / 伙伴私聊 / 群聊） | hash `/bots`、`/bots/list`、`/bots/:botId`、`/bots/roster`、`/bots/todos`（个人与伙伴待办）及伙伴当前/历史任务、伙伴私聊、伙伴群聊路由（BotsFeatureLayout） |
+| `desktop.bots` | desktop | 伙伴（列表 / 个人待办 / 对话 / 设置 / 历史 / 伙伴私聊 / 群聊） | hash `/bots`、`/bots/list`、`/bots/:botId`、`/bots/roster`、`/bots/todos`（个人待办）及伙伴当前/历史任务、伙伴私聊、伙伴群聊路由（BotsFeatureLayout） |
 | `desktop.chat.files` | desktop | 工作目录文件浏览 | hash `/cc-agent/files/:sessionId`（WorkdirBrowseRoute） |
 | `desktop.chat.new-draft` | desktop | 新建任务草稿页 | hash `/cc-agent/new`（NewMakerDraftRoute） |
 | `desktop.chat.orca-workflow` | desktop | Orca 协同工作台 | hash `/cc-agent/orca/:sessionId`（OrcaWorkflowRoute） |
@@ -73,7 +73,7 @@
 | `mobile.relay-join` | mobile | 扫码加入自建中转 | app/relay-join.tsx |
 | `mobile.remote-desktop` | mobile | 远程桌面 | app/devices/desktop/[deviceId].tsx |
 | `mobile.resources` | mobile | 远程资源列表与详情 | app/resources/[collectionId].tsx / app/resources/[collectionId]/[resourceId].tsx |
-| `mobile.settings` | mobile | 设置（含调试与日志上传可见入口） | app/settings.tsx / app/settings/developer.tsx / app/settings/device-name.tsx / app/settings/user-bubble.tsx / app/settings/voice-dictionary.tsx / app/settings/voice-speaker-filter.tsx |
+| `mobile.settings` | mobile | 设置（含调试与日志上传可见入口） | app/settings.tsx / app/settings/developer.tsx / app/settings/device-name.tsx / app/settings/handheld.tsx / app/settings/user-bubble.tsx / app/settings/voice-dictionary.tsx / app/settings/voice-speaker-filter.tsx |
 
 ### 生产路由覆盖
 
@@ -158,6 +158,7 @@
 | apps/mobile/app/sessions/new.tsx | NewRemoteSessionScreen | `mobile.chat.new` |
 | apps/mobile/app/settings/developer.tsx | DeveloperSettingsScreen | `mobile.settings` |
 | apps/mobile/app/settings/device-name.tsx | RenameSelfDeviceScreen | `mobile.settings` |
+| apps/mobile/app/settings/handheld.tsx | HandheldSettingsScreen | `mobile.settings` |
 | apps/mobile/app/settings/user-bubble.tsx | UserBubblePage | `mobile.settings` |
 | apps/mobile/app/settings/voice-dictionary.tsx | VoiceDictionaryScreen | `mobile.settings` |
 | apps/mobile/app/settings/voice-speaker-filter.tsx | VoiceSpeakerFilterRoute | `mobile.settings` |
@@ -172,6 +173,7 @@
 | apps/mobile/app/+native-intent.ts | native intent routing; no screen |
 | apps/mobile/app/_layout.tsx | layout; visible mounted feedback is a separate overlay surface |
 | apps/mobile/app/automations/[deviceId].tsx | legacy automation link redirect; no screen |
+| apps/mobile/app/group-execution-preview.tsx | MOBILE_VISUAL_MOCK_ENABLED group execution fixture; not production UI |
 | apps/mobile/app/listperf.tsx | __DEV__ list performance harness; not production UI |
 | apps/mobile/app/plugin-management-preview.tsx | gated plugin settings visual fixture; not production UI |
 | apps/mobile/app/splash-preview.tsx | MOBILE_VISUAL_MOCK_ENABLED preview; not production UI |

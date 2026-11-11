@@ -9,7 +9,7 @@ import { createBotTodoStore } from './botTodoStore.js';
 
 /** Dedicated account file; no bot lookup, legacy import, model dispatch or remote projection. */
 export function createPersonalTodoStore(file: string, assertCurrent = () => {}) {
-  const store = createBotTodoStore(file, async () => ({}), assertCurrent);
+  const store = createBotTodoStore(file, assertCurrent);
   return {
     async list() {
       const state = await store.read();

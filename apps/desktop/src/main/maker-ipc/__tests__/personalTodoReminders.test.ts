@@ -14,7 +14,7 @@ vi.mock('electron', () => ({
 }));
 vi.mock('../../appSessionState.js', () => ({}));
 vi.mock('../../deepLink.js', () => ({ openMainWindowTodos: () => undefined }));
-vi.mock('../../i18n.js', () => ({ t: (key: string) => key }));
+vi.mock('../../i18n.desktop.js', () => ({ t: (key: string) => key }));
 vi.mock('../../logger.js', () => ({
   createLogger: () => ({ debug() {}, info() {}, warn() {}, error() {} }),
 }));

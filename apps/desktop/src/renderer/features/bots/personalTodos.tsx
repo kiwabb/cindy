@@ -42,9 +42,6 @@ import {
 } from './personalTodoVisuals';
 import { quickDate } from './todoDates';
 
-export type TodoOwnershipView = 'mine' | 'teammates';
-const SCOPES: readonly TodoOwnershipView[] = ['mine', 'teammates'];
-
 /** A per-account preference kept in localStorage; storage that cannot be read or written only costs the memory. */
 function useStoredChoice<T extends string>(
   name: string,
@@ -83,8 +80,6 @@ export function usePersonalTodos() {
     getPersonalTodoSnapshot,
   );
   useEffect(ensurePersonalTodos, [dataOwnerId, ownerGeneration]);
-  // A stored 'all' (the retired mixed list) or anything unknown falls back to 我的待办.
-  const [scope, selectScope] = useStoredChoice('personal-todo-view', dataOwnerId, SCOPES, 'mine');
   const [grouping, selectGrouping] = useStoredChoice<PersonalGrouping>(
     'personal-todo-grouping',
     dataOwnerId,
@@ -101,8 +96,6 @@ export function usePersonalTodos() {
     ...snapshot,
     refresh: refreshPersonalTodos,
     update: updatePersonalTodo,
-    scope,
-    selectScope,
     grouping,
     selectGrouping,
     order,

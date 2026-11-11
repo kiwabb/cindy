@@ -7,16 +7,14 @@ import userEvent from '@testing-library/user-event';
 
 /**
  * 测试价值
- * - 生产入口与可观察结果：「待办」页（TeammateTodosView，路由 /bots/todos）。主人看到的分段与顺序、
- *   稍后再说与已完成不混进进行中、伙伴与状态筛选、点一条打开那位伙伴的对话；离线电脑上的伙伴不去读，
- *   读到过的置灰保留，读失败给重试；「我的待办」与「伙伴待办」两份清单不混排，我的待办在行内新增、
- *   按分组展示，并在详情面板里改优先级、标签与提醒。
- * - Bug／规则依据：2026-11-06 主人确认的待办面板原型（单列表按截止分段、只读、离线整行置灰）；
- *   2026-11 个人待办改版（owner 批准的原型）第 1–9 条；docs/product-rules/cindy-bots-runtime.md §6.3.6。
- * - 现有覆盖缺口：新页面；近况测试只覆盖单个伙伴、且只列 7 天内到期的。
- * - 最小失败输入：本机伙伴 + 在线远程伙伴 + 离线远程伙伴，各段各一条，外加一条稍后再说与一条已完成；
- *   存档里的旧范围「all」；输入法组字时按回车；标签 id 不在目录里。
- * - tier：unit（jsdom 渲染真实页面与真实读取路径，宿主与 device-link 用内存 fake）。
+ * - 生产入口与可观察结果：「待办」页（TeammateTodosView，路由 /bots/todos）只列当前账号的个人待办。主人看到的分段与顺序、
+ *   稍后再说与已完成不混进进行中、在行内新增、按分组与标签筛选展示，并在详情面板里改优先级、标签与提醒，
+ *   保存／完成／重开／稍后再说／删除后落到看得见的位置，侧栏数与列表同步。
+ * - Bug／规则依据：2026-11-06 主人确认的待办面板原型（单列表按截止分段）；2026-11 个人待办改版（owner 批准的原型）
+ *   第 1–9 条；上游移除伙伴待办后本页不再有伙伴清单（个人归属不由伙伴 origin 字段推断）。
+ * - 现有覆盖缺口：个人待办的存取与冲突恢复在主进程 store 测试里，页面的分段、落点、分组与重试没有别的覆盖。
+ * - 最小失败输入：每段各一条个人待办，外加一条稍后再说与一条已完成；输入法组字时按回车；标签 id 不在目录里。
+ * - tier：unit（jsdom 渲染真实页面，主进程 IPC 用内存 fake；恢复用例接真实 store 与临时目录）。
  */
 import { refreshPersonalTodos, updatePersonalTodo, personalTodoCacheTesting } from '../personalTodoCache';
 import { useTodoBoardOpenCount } from '../useTeammateTodoBoard';
@@ -25,22 +23,11 @@ import { setDataOwnerGeneration } from '@/contexts/dataOwnerGeneration';
 import { resetTaskTagCatalogCache } from '@/features/task-tags/taskTagEvents';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  queryTodoItems,
-  todoLocalDate,
-  validateTodoDeadline,
-  type TeammateTodo,
-  type TodoListQuery,
-} from '@cindy/maker-shared/teammate-todo';
+import { todoLocalDate, validateTodoDeadline } from '@cindy/maker-shared/teammate-todo';
 import { TASK_TAG_COLORS, type TaskTag } from '@cindy/maker-shared';
 import type { PersonalTodo } from '../../../../shared/personalTodo';
 
-const h = vi.hoisted(() => ({
-  generation: 1,
-  navigate: vi.fn(),
-  local: [] as Array<Record<string, unknown>>,
-  remote: [] as Array<Record<string, unknown>>,
-}));
+const h = vi.hoisted(() => ({ generation: 1 }));
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -50,14 +37,6 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 vi.mock('@/contexts/AuthContext', () => ({ useOptionalDataOwnerGeneration: () => h.generation }));
-vi.mock('react-router-dom', () => ({ useNavigate: () => h.navigate }));
-vi.mock('../BotAvatar', () => ({ BotAvatar: () => <span data-testid="bot-avatar" /> }));
-vi.mock('../BotGlancePopover', () => ({ TodoDueDot: () => <span data-testid="due-dot" /> }));
-vi.mock('../botStore', () => ({ useBotProfiles: () => h.local }));
-vi.mock('../useRemoteBots', () => ({ useRemoteBots: () => h.remote }));
-vi.mock('../companionCloudStore', () => ({
-  useCompanionCloud: () => ({ enabled: false, selfDeviceId: null, actors: [], demotedBotIds: [] }),
-}));
 // Menus and popovers render their content inline so the choices can be exercised without pointer
 // plumbing; the real components keep their own tests.
 vi.mock('@/components/ui/dropdown-menu', async () => {
@@ -102,24 +81,9 @@ vi.mock('@/components/ui/dropdown-menu', async () => {
     },
   };
 });
-vi.mock('@/components/ui/popover', () => ({
-  Popover: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  PopoverTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  PopoverContent: ({ children }: { children: React.ReactNode }) => <div role="dialog">{children}</div>,
-}));
 
 const { TeammateTodosView } = await import('../TeammateTodosView');
-const { __testing } = await import('../teammateTodoBoard');
 
-function todo(id: string, patch: Partial<TeammateTodo> = {}): TeammateTodo {
-  return {
-    id, revision: 1, key: id, origin: 'assigned', title: id, progress: '', outcome: '', value: '',
-    next: null, sources: [{ kind: 'conversation', id: `c:${id}`, label: '' }], associations: [], status: 'open',
-    createdAt: '2026-10-28T00:00:00Z', updatedAt: '2026-11-01T00:00:00Z', sourceDeadline: null,
-    deadlineCandidate: null, suggestedDate: null, decision: null, history: [], action: null, ...patch,
-  };
-}
-const date = (value: string) => ({ kind: 'date' as const, date: value, timeZone: 'UTC' });
 const mine = (id: string, patch: Partial<PersonalTodo> = {}): PersonalTodo => ({
   id, revision: 1, title: id, notes: '', deadline: null, status: 'open', deferredUntil: null,
   createdAt: '2026-11-01T00:00:00Z', updatedAt: '2026-11-01T00:00:00Z', priority: 0, tagIds: [],
@@ -129,14 +93,7 @@ const tag = (id: string, name: string, sortOrder: number): TaskTag => ({
   id, name, color: 'blue', favoriteOrder: null, sortOrder, revision: 1,
 });
 
-let localItems: TeammateTodo[] = [];
-let remoteItems: TeammateTodo[] = [];
-let remoteFails = false;
 let catalog: TaskTag[] = [];
-const invoke = vi.fn(async (_deviceId: string, _channel: string, [request]: [{ query: string }]) => {
-  if (remoteFails) throw new Error('offline');
-  return { blocks: [{ primitive: 'teammate-todos', data: queryTodoItems(remoteItems, JSON.parse(request.query) as TodoListQuery) }] };
-});
 const tagExecute = vi.fn();
 
 beforeEach(() => {
@@ -145,41 +102,19 @@ beforeEach(() => {
   vi.setSystemTime(new Date('2026-11-06T02:30:00Z'));
   h.generation = 1;
   setDataOwnerGeneration('test-owner', 1);
-  __testing.reset();
   personalTodoCacheTesting.reset();
   resetTaskTagCatalogCache();
   localStorage.clear();
-  localStorage.setItem('personal-todo-view:test-owner', 'teammates');
-  remoteFails = false;
   catalog = [tag('t-work', 'Work', 0), tag('t-life', 'Life', 1)];
   tagExecute.mockReset();
   tagExecute.mockImplementation(async () => ({ tags: catalog, sessions: [], supportedColors: [...TASK_TAG_COLORS] }));
-  h.local = [{ id: 'cindy', name: 'Cindy', avatar: '', avatarColor: 'violet' }];
-  h.remote = [
-    { id: 'dev', name: '开发管家', deviceId: 'mini', deviceName: 'Mac mini', online: true, avatar: '', avatarColor: 'blue' },
-    { id: 'life', name: '栖物生活', deviceId: 'home', deviceName: '家里的 Mac mini', online: false, avatar: '', avatarColor: 'green' },
-  ];
-  localItems = [
-    todo('交报销单', { sourceDeadline: date('2026-11-04'), next: { kind: 'decide', label: '先交哪些', instruction: '' } }),
-    todo('回复张雯', { origin: 'discovered', sourceDeadline: { kind: 'instant', date: '2026-11-06', timeZone: 'UTC', at: '2026-11-06T09:00:00Z' } }),
-    todo('预约牙医', { suggestedDate: '2026-11-10' }),
-    todo('换办公椅', { decision: { kind: 'later', until: '2026-11-15T01:00:00Z' } }),
-    todo('不再提示的', { decision: { kind: 'muted' } }),
-    todo('交 OKR 自评', { status: 'done', history: [{ summary: '已提交', at: '2026-11-04T08:00:00Z' }] }),
-  ];
-  remoteItems = [
-    todo('审阅合并请求', { origin: 'discovered', sourceDeadline: date('2026-11-08') }),
-    todo('升级 Electron', { sourceDeadline: date('2026-11-14') }),
-  ];
   (window as unknown as { electronAPI: unknown }).electronAPI = {
     localDb: {
       personalTodos: { list: vi.fn(async () => []), update: vi.fn() },
       taskTags: { execute: tagExecute, onChanged: () => () => undefined },
-      bots: { todos: { list: async () => ({ items: localItems, version: 1 }), dailyCheck: vi.fn() } },
     },
     maker: { onBotWorkbenchChanged: () => () => undefined },
     routines: { onChanged: () => () => undefined },
-    deviceLink: { invoke, onRemotePush: () => () => undefined },
   };
 });
 afterEach(() => {
@@ -195,7 +130,6 @@ const radio = (name: string) =>
   screen.getByRole('radio', { name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}( \\d+)?$`) });
 const api = () => window.electronAPI.localDb.personalTodos;
 const update = () => vi.mocked(api().update);
-const showMine = () => localStorage.setItem('personal-todo-view:test-owner', 'mine');
 const editorPanel = () => within(screen.getByLabelText('personalTodos.details'));
 const openComposer = () => fireEvent.click(screen.getByRole('button', { name: 'personalTodos.add' }));
 const typeTitle = (value: string) =>
@@ -203,123 +137,28 @@ const typeTitle = (value: string) =>
 const submitComposer = () => fireEvent.click(screen.getByRole('button', { name: 'personalTodos.composer.add' }));
 
 describe('TeammateTodosView', () => {
-  it('merges every teammate into one deadline-ordered list and keeps snoozed, muted and done out of it', async () => {
-    render(<TeammateTodosView />);
-    await waitFor(() => expect(rowTitles()).toHaveLength(5));
-    const sections = [...document.querySelectorAll('section')].map((section) => ({
-      label: section.querySelector('h3')?.textContent,
-      rows: rowTitles(section),
-    }));
-    expect(sections).toEqual([
-      { label: 'bots.todoBoard.bucket.overdue', rows: ['交报销单'] },
-      { label: 'bots.todoBoard.bucket.today', rows: ['回复张雯'] },
-      { label: 'bots.todoBoard.bucket.week', rows: ['审阅合并请求'] },
-      { label: 'bots.todoBoard.bucket.later', rows: ['升级 Electron'] },
-      // 只有建议日期的不制造紧迫感，归「无截止」，但仍标出建议日期。
-      { label: 'bots.todoBoard.bucket.none', rows: ['预约牙医'] },
-    ]);
-    expect(screen.getByText(/^bots\.todoBoard\.suggested:/)).toBeTruthy();
-    // 离线电脑上的伙伴不去读，并说明看不到它的待办。
-    expect(invoke.mock.calls.every(([deviceId]) => deviceId === 'mini')).toBe(true);
-    expect(screen.getByTestId('todo-board-notes').textContent).toContain('bots.todoBoard.offlineUnknown:栖物生活|家里的 Mac mini');
-    // 标签筛选与分组菜单只属于「我的待办」。
-    expect(screen.queryByRole('menuitemradio', { name: 'personalTodos.group.due' })).toBeNull();
-    expect(screen.queryByRole('group', { name: 'taskTags.title' })).toBeNull();
-
-    // 已完成只在「已完成」里，不再折叠在进行中底部。
-    expect(screen.queryByText('交 OKR 自评')).toBeNull();
-    fireEvent.click(radio('bots.todoBoard.view.done'));
-    expect(rowTitles()).toEqual(['交 OKR 自评']);
-
-    // 稍后再说单独一档，带再提醒的日期；不再提示的哪里都不出现。
-    fireEvent.click(radio('bots.todoBoard.view.later'));
-    expect(rowTitles()).toEqual(['换办公椅']);
-    expect(screen.getByText(/^bots\.todoBoard\.laterUntil:/)).toBeTruthy();
-    expect(screen.queryByText('不再提示的')).toBeNull();
-
-    // 按伙伴筛选，点一条打开那位伙伴在它电脑上的对话。
-    fireEvent.click(radio('bots.todoBoard.view.open'));
-    fireEvent.click(screen.getByRole('button', { name: '开发管家', pressed: false }));
-    expect(rowTitles()).toEqual(['审阅合并请求', '升级 Electron']);
-    fireEvent.click(screen.getAllByTestId('todo-board-row')[0]);
-    expect(h.navigate).toHaveBeenCalledWith('/bots/remote/mini/dev');
-
-    // 类型筛选：只看伙伴发现的。
-    fireEvent.click(screen.getByRole('button', { name: 'bots.todoBoard.origin.all', pressed: false }));
-    fireEvent.click(screen.getByRole('radio', { name: 'bots.todoBoard.origin.discovered' }));
-    expect(rowTitles()).toEqual(['回复张雯', '审阅合并请求']);
-  });
-
-  it('keeps the last todos of a teammate whose computer went offline, and retries a failed read', async () => {
-    h.local = [];
-    const view = render(<TeammateTodosView />);
-    await waitFor(() => expect(rowTitles()).toEqual(['审阅合并请求', '升级 Electron']));
-
-    h.remote = h.remote.map((bot) => (bot.id === 'dev' ? { ...bot, online: false } : bot));
-    view.rerender(<TeammateTodosView />);
-    expect(rowTitles()).toEqual(['审阅合并请求', '升级 Electron']);
-    expect(screen.getByTestId('todo-board-notes').textContent).toContain('bots.todoBoard.offlineCached:开发管家|Mac mini');
-
-    // 换成在线但读不到：说明读不到，点重试再读一次。
-    h.generation = 1;
-    setDataOwnerGeneration('test-owner', 1);
-    __testing.reset();
-    personalTodoCacheTesting.reset();
-    localStorage.setItem('personal-todo-view:test-owner', 'teammates');
-    remoteFails = true;
-    h.remote = h.remote.map((bot) => (bot.id === 'dev' ? { ...bot, online: true } : bot));
-    view.unmount();
-    render(<TeammateTodosView />);
-    await screen.findByText('bots.todoBoard.loadFailed:开发管家');
-    expect(rowTitles()).toEqual([]);
-    remoteFails = false;
-    fireEvent.click(screen.getByText('commonUi.retry'));
-    await waitFor(() => expect(rowTitles()).toEqual(['审阅合并请求', '升级 Electron']));
-    expect(screen.queryByText('bots.todoBoard.loadFailed:开发管家')).toBeNull();
-  });
-});
-
-describe('personal and teammate lists', () => {
-  // The retired mixed list ('all') and anything unknown must open on 我的待办, never on a mixed list.
-  it.each([null, 'all', 'bogus'])('opens on my todos with the stored scope %s and does not mix in teammate todos', async (stored) => {
+  // A scope stored by the retired 我的/伙伴 switch must not change what the page lists.
+  it.each([null, 'all', 'teammates'])('lists only my todos whatever scope %s an older version stored', async (stored) => {
     localStorage.removeItem('personal-todo-view:test-owner');
     if (stored) localStorage.setItem('personal-todo-view:test-owner', stored);
-    h.local = [];
     vi.mocked(api().list).mockResolvedValue([mine('Mine only')]);
     render(<TeammateTodosView />);
     await waitFor(() => expect(rowTitles()).toEqual(['Mine only']));
-    expect(radio('personalTodos.mine').getAttribute('aria-checked')).toBe('true');
-    expect(screen.queryByRole('radio', { name: /personalTodos\.all/ })).toBeNull();
-    // Both counts are open items of their own list; the teammate side finishes loading on its own.
-    await waitFor(() => expect(radio('personalTodos.teammates').getAttribute('aria-label')).toBe('personalTodos.teammates 2'));
-    expect(radio('personalTodos.mine').getAttribute('aria-label')).toBe('personalTodos.mine 1');
+    expect(screen.queryByRole('radio', { name: /personalTodos\.(mine|teammates|all)/ })).toBeNull();
     expect(radio('bots.todoBoard.view.open').getAttribute('aria-label')).toBe('bots.todoBoard.view.open 1');
-
-    fireEvent.click(radio('personalTodos.teammates'));
-    await waitFor(() => expect(rowTitles()).toEqual(['审阅合并请求', '升级 Electron']));
-    expect(radio('bots.todoBoard.view.open').getAttribute('aria-label')).toBe('bots.todoBoard.view.open 2');
-    expect(localStorage.getItem('personal-todo-view:test-owner')).toBe('teammates');
   });
 
-  it('shows the composer only under my todos and open', async () => {
-    showMine();
-    h.local = []; h.remote = [];
+  it('shows the composer only under open', async () => {
     vi.mocked(api().list).mockResolvedValue([mine('Snoozed', { deferredUntil: '2026-11-20T00:00:00Z' })]);
     render(<TeammateTodosView />);
     expect(screen.getByRole('button', { name: 'personalTodos.add' })).toBeTruthy();
     fireEvent.click(radio('bots.todoBoard.view.later'));
     await screen.findByRole('button', { name: 'Snoozed' });
     expect(screen.queryByRole('button', { name: 'personalTodos.add' })).toBeNull();
-    fireEvent.click(radio('personalTodos.teammates'));
-    expect(screen.queryByRole('button', { name: 'personalTodos.add' })).toBeNull();
   });
 });
 
 describe('personal todo composer', () => {
-  beforeEach(() => {
-    showMine();
-    h.local = []; h.remote = [];
-  });
 
   // Existing page unit tier: fixture IPC only, no real account writes/model calls.
   // New coverage: title-only inline add, rejection retaining input, successful retry on the same request id,
@@ -468,7 +307,6 @@ describe('personal todo composer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'personalTodos.overwrite' }));
     await waitFor(() => expect(rowTitles()).toEqual(['Retained draft']));
     expect(update().mock.lastCall?.[0]).toMatchObject({ id: item.id, expectedRevision: 2, title: 'Retained draft', notes: '' });
-    expect(radio('personalTodos.mine').getAttribute('aria-checked')).toBe('true');
   });
 
   // A: delayed first snapshot is a unit fixture; writes must overlay it, not cancel completeness.
@@ -532,10 +370,6 @@ describe('personal todo composer', () => {
 });
 
 describe('personal todo list', () => {
-  beforeEach(() => {
-    showMine();
-    h.local = []; h.remote = [];
-  });
 
   it('groups by deadline by default, remembers the chosen grouping per account, and shows the tag only when it adds something', async () => {
     vi.mocked(api().list).mockResolvedValue([
@@ -598,10 +432,6 @@ describe('personal todo list', () => {
 });
 
 describe('personal todo details', () => {
-  beforeEach(() => {
-    showMine();
-    h.local = []; h.remote = [];
-  });
 
   // Store contract (INVALID_PARAMS for past deferral; instant needs at on the local date): validated/built in the editor.
   it('sends a time-of-day deadline as an instant and rejects a deferral that is not in the future before saving', async () => {
@@ -707,8 +537,6 @@ function PersonalCount() { return <output data-testid="personal-count">{useTodoB
 describe('personal todo toggles and the shared count', () => {
   // Unit fixtures only: the sidebar count shares one read and observes completion/reopening without polling.
   it('creates from the composer, shares inline updates with the badge and retries a failed toggle', async () => {
-    showMine();
-    h.local = []; h.remote = [];
     const item = mine('visible-unit', { title: 'Visible unit todo', updatedAt: '2026-11-06T00:00:00Z' });
     update().mockResolvedValueOnce(item);
     render(<><PersonalCount /><TeammateTodosView /></>);
@@ -718,7 +546,6 @@ describe('personal todo toggles and the shared count', () => {
     submitComposer();
     await waitFor(() => expect(rowTitles()).toEqual([item.title]));
     expect(screen.getByTestId('personal-count').textContent).toBe('1');
-    expect(radio('personalTodos.mine').getAttribute('aria-checked')).toBe('true');
     expect(radio('bots.todoBoard.view.open').getAttribute('aria-checked')).toBe('true');
     expect(api().list).toHaveBeenCalledTimes(1);
     update().mockRejectedValueOnce(new Error('Unit write failed'));
@@ -740,7 +567,6 @@ describe('personal todo toggles and the shared count', () => {
   // Unit cache lifecycle: one mounted badge observes local mutations and the real deadline timer.
   // Fake clock, fixture IPC; no polling, network or real account data.
   it('updates the shared count for deferral expiry, restore and deletion and clears it on owner change', async () => {
-    h.local = []; h.remote = [];
     const item = mine('count-unit', { title: 'Count unit' });
     vi.mocked(api().list).mockResolvedValue([item]);
     const component = render(<PersonalCount />);
