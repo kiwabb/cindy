@@ -27,6 +27,8 @@ The feed is `https://github.com/kiwabb/cindy/releases/download/personal-macos-ar
 
 A failed personal update check defers installation and retains verified cached bytes until a successful check confirms the same revision, source and storage identity.
 
+A newer revision whose storage identity differs from the installed one is never downloaded or applied in place. The check compares the revision first, then reports status `manual` with the release page URL (`https://github.com/<repository>/releases/tag/<channel>-r<revision>`), and the sidebar offers that page so the user installs it by hand; the manual check returns `manual_download`. `manual` is not an installable patch, so relaunch and idle auto-relaunch ignore it.
+
 The manifest records `schemaVersion`, `repository`, `channel`, `revision`, `sourceCommit`, `platform`, `arch`, `region`, `bundleIdentifier`, `storageIdentity` and `asset` (`url`, `sha256`, `size`). The signed app's `cindy-source.json.personalUpdate` carries the same identity without the self-referential ZIP asset. `build-info.json.personalUpdate` mirrors that identity. A source commit alone cannot describe uncommitted feature files, which is why personal-channel builds require clean committed source.
 
 ## Windows personal channel
