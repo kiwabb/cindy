@@ -21,7 +21,6 @@ import type { PersonalTodo, PersonalTodoUpdate } from '../../../shared/personalT
 import type { TodoBoardItem, TodoBoardView } from './teammateTodoBoard';
 import { emptyTodoState, applyTodoPatch } from '@cindy/maker-shared/teammate-todo';
 
-export type TodoOwnershipView = 'mine' | 'teammates' | 'all';
 export function usePersonalTodos() {
   const ownerGeneration = useOptionalDataOwnerGeneration();
   const { dataOwnerId } = getDataOwnerGeneration();
@@ -31,39 +30,18 @@ export function usePersonalTodos() {
     getPersonalTodoSnapshot,
   );
   useEffect(ensurePersonalTodos, [dataOwnerId, ownerGeneration]);
-  const [scope, setScope] = useState<TodoOwnershipView>('all');
-  const key = `personal-todo-view:${dataOwnerId ?? 'local'}`;
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(key);
-      setScope(saved === 'mine' || saved === 'teammates' ? saved : 'all');
-    } catch {
-      setScope('all');
-    }
-  }, [key]);
-  const selectScope = (value: TodoOwnershipView) => {
-    setScope(value);
-    try {
-      localStorage.setItem(key, value);
-    } catch {
-      /* Viewing still works without preference storage. */
-    }
-  };
   return {
     ...snapshot,
     refresh: refreshPersonalTodos,
     update: updatePersonalTodo,
-    scope,
-    selectScope,
     dataOwnerId,
   };
 }
 
-/** Adapt dates to the existing board grouping only; this is never a teammate record. */
+/** Adapt dates to the existing board grouping only. */
 export function personalBoardItems(
   items: PersonalTodo[],
   view: TodoBoardView,
-  label: string,
 ): TodoBoardItem[] {
   return items
     .filter((t) => {
@@ -103,7 +81,6 @@ export function personalBoardItems(
       return {
         todo,
         personal,
-        teammate: { key: 'personal', botId: '', name: label, offline: false, route: '' },
       };
     });
 }

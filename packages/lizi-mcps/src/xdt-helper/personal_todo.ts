@@ -5,7 +5,7 @@ import type { ControlResult } from '../types.js';
 import { errorPayload, okPayload } from './_payload.js';
 
 /**
- * 个人待办(2026-11-10):用户自己的清单,和伙伴待办(teammate_todo)是两份数据。
+ * 个人待办(2026-11-10):用户自己的清单。
  * 数据在运行 Cindy 的这台电脑上、当前登录账号名下;宿主用同一个账号存储写入,
  * 桌面与手机界面随后刷新。工具不接受 botId、账号或设备参数。
  */
@@ -59,7 +59,7 @@ export function registerPersonalTodoTools(
     name: 'list_personal_todos',
     category: 'todos',
     description:
-      '列出用户本人的个人待办(仅本机、当前登录账号,不含伙伴待办)。返回 id、revision、标题、备注、期限、状态、稍后到期时间;修改前用它取最新 revision。view:open=未完成且未稍后、later=稍后中、done=已完成、all=全部;默认未完成含稍后。',
+      '列出用户本人的个人待办(仅本机、当前登录账号)。返回 id、revision、标题、备注、期限、状态、稍后到期时间;修改前用它取最新 revision。view:open=未完成且未稍后、later=稍后中、done=已完成、all=全部;默认未完成含稍后。',
     inputShape: {
       view: z.enum(['open', 'later', 'done', 'all']).optional(),
     },
@@ -82,7 +82,7 @@ export function registerPersonalTodoTools(
     name: 'update_personal_todo',
     category: 'todos',
     description:
-      '新建或修改用户本人的个人待办(仅本机、当前登录账号,与伙伴待办分开)。新建:不传 id,传 title 和 creationRequestId(1-80 位字母数字、_ 或 -);重试同一次新建必须复用同一个 creationRequestId 才不会重复,内容改了就换新 id。修改:传 id 与最近一次 list_personal_todos 的 expectedRevision,可改 title、notes、deadline(null 清除),或用 operation 完成(complete)、重开(reopen)、稍后(later,需 until=未来的 ISO 时间)、恢复稍后(restore)、删除(delete)。冲突时先重新列出再基于最新内容重试。',
+      '新建或修改用户本人的个人待办(仅本机、当前登录账号)。新建:不传 id,传 title 和 creationRequestId(1-80 位字母数字、_ 或 -);重试同一次新建必须复用同一个 creationRequestId 才不会重复,内容改了就换新 id。修改:传 id 与最近一次 list_personal_todos 的 expectedRevision,可改 title、notes、deadline(null 清除),或用 operation 完成(complete)、重开(reopen)、稍后(later,需 until=未来的 ISO 时间)、恢复稍后(restore)、删除(delete)。冲突时先重新列出再基于最新内容重试。',
     inputShape: {
       id: z.string().max(128).optional(),
       creationRequestId: z.string().regex(/^[A-Za-z0-9_-]{1,80}$/).optional(),

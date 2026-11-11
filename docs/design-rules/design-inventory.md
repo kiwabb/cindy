@@ -11,14 +11,14 @@
 
 可达组件、样式来源与 Token / 裸颜色 / 裸圆角统计不入库：需要时运行 `pnpm design:inventory:report`，输出到 `tmp/design-inventory-report.md`；要看某次提交时的数字，在该提交上重跑。
 
-登记 surface 数：59。平台包含 Desktop 与 Mobile；静态入口发现不表示已迁移或已实机验证。
+登记 surface 数：60。平台包含 Desktop 与 Mobile；静态入口发现不表示已迁移或已实机验证。
 
 | ID | 平台 | 标题 | 生产入口 |
 | --- | --- | --- | --- |
 | `desktop.auth.add-account` | desktop | 添加账号 | hash `/add-account`（ProtectedRoute → AddAccountLoginPage） |
 | `desktop.auth.legacy-migration` | desktop | 首登数据迁移弹窗 | App 顶层挂载 LegacyMigrationDialog（仅主窗；main 检测到旧版 userData 经 `legacy-migration:state` 驱动） |
 | `desktop.auth.login` | desktop | 登录页 | hash `/login`（GuestRoute → LoginPage） |
-| `desktop.bots` | desktop | 伙伴（列表 / 个人与伙伴待办 / 对话 / 设置 / 历史 / 伙伴私聊 / 群聊） | hash `/bots`、`/bots/list`、`/bots/:botId`、`/bots/roster`、`/bots/todos`（个人与伙伴待办）及伙伴当前/历史任务、伙伴私聊、伙伴群聊路由（BotsFeatureLayout） |
+| `desktop.bots` | desktop | 伙伴（列表 / 个人待办 / 对话 / 设置 / 历史 / 伙伴私聊 / 群聊） | hash `/bots`、`/bots/list`、`/bots/:botId`、`/bots/roster`、`/bots/todos`（个人待办）及伙伴当前/历史任务、伙伴私聊、伙伴群聊路由（BotsFeatureLayout） |
 | `desktop.chat.files` | desktop | 工作目录文件浏览 | hash `/cc-agent/files/:sessionId`（WorkdirBrowseRoute） |
 | `desktop.chat.new-draft` | desktop | 新建任务草稿页 | hash `/cc-agent/new`（NewMakerDraftRoute） |
 | `desktop.chat.orca-workflow` | desktop | Orca 协同工作台 | hash `/cc-agent/orca/:sessionId`（OrcaWorkflowRoute） |
@@ -73,7 +73,8 @@
 | `mobile.relay-join` | mobile | 扫码加入自建中转 | app/relay-join.tsx |
 | `mobile.remote-desktop` | mobile | 远程桌面 | app/devices/desktop/[deviceId].tsx |
 | `mobile.resources` | mobile | 远程资源列表与详情 | app/resources/[collectionId].tsx / app/resources/[collectionId]/[resourceId].tsx |
-| `mobile.settings` | mobile | 设置（含调试与日志上传可见入口） | app/settings.tsx / app/settings/developer.tsx / app/settings/device-name.tsx / app/settings/user-bubble.tsx / app/settings/voice-dictionary.tsx / app/settings/voice-speaker-filter.tsx |
+| `mobile.settings` | mobile | 设置（含调试与日志上传可见入口） | app/settings.tsx / app/settings/developer.tsx / app/settings/device-name.tsx / app/settings/handheld.tsx / app/settings/user-bubble.tsx / app/settings/voice-dictionary.tsx / app/settings/voice-speaker-filter.tsx |
+| `mobile.todos` | mobile | 个人待办 | app/todos/[deviceId].tsx |
 
 ### 生产路由覆盖
 
@@ -158,11 +159,13 @@
 | apps/mobile/app/sessions/new.tsx | NewRemoteSessionScreen | `mobile.chat.new` |
 | apps/mobile/app/settings/developer.tsx | DeveloperSettingsScreen | `mobile.settings` |
 | apps/mobile/app/settings/device-name.tsx | RenameSelfDeviceScreen | `mobile.settings` |
+| apps/mobile/app/settings/handheld.tsx | HandheldSettingsScreen | `mobile.settings` |
 | apps/mobile/app/settings/user-bubble.tsx | UserBubblePage | `mobile.settings` |
 | apps/mobile/app/settings/voice-dictionary.tsx | VoiceDictionaryScreen | `mobile.settings` |
 | apps/mobile/app/settings/voice-speaker-filter.tsx | VoiceSpeakerFilterRoute | `mobile.settings` |
 | apps/mobile/app/settings.tsx | SettingsScreen | `mobile.settings` |
 | apps/mobile/app/shared-session.tsx | SharedSessionScreen | `mobile.chat.sharing` |
+| apps/mobile/app/todos/[deviceId].tsx | PersonalTodosScreen | `mobile.todos` |
 
 ### Mobile 布局 / 开发入口排除
 
@@ -171,6 +174,7 @@
 | apps/mobile/app/+native-intent.ts | native intent routing; no screen |
 | apps/mobile/app/_layout.tsx | layout; visible mounted feedback is a separate overlay surface |
 | apps/mobile/app/automations/[deviceId].tsx | legacy automation link redirect; no screen |
+| apps/mobile/app/group-execution-preview.tsx | MOBILE_VISUAL_MOCK_ENABLED group execution fixture; not production UI |
 | apps/mobile/app/listperf.tsx | __DEV__ list performance harness; not production UI |
 | apps/mobile/app/plugin-management-preview.tsx | gated plugin settings visual fixture; not production UI |
 | apps/mobile/app/splash-preview.tsx | MOBILE_VISUAL_MOCK_ENABLED preview; not production UI |
@@ -257,6 +261,7 @@ Mobile 已由 DS-7 纳入同一台账（2026-09-10 静态入口发现），保�
 | `mobile.remote-desktop` | kirozeng 协调 / Codex 发现维护；页面 owner 待认领 | legacy | — | DS-7 已发现入口；Mobile 独立阶段接管，未迁移 | 2026-09-17 复查入口变化和页面 owner；动态内容、平台实际呈现留 Mobile 独立阶段验证 |
 | `mobile.resources` | kirozeng 协调 / Codex 发现维护；页面 owner 待认领 | legacy | — | DS-7 已发现入口；Mobile 独立阶段接管，未迁移 | 2026-09-17 复查入口变化和页面 owner；动态内容、平台实际呈现留 Mobile 独立阶段验证 |
 | `mobile.settings` | kirozeng 协调 / Codex 发现维护；页面 owner 待认领 | legacy | — | DS-7 已发现入口；Mobile 独立阶段接管，未迁移 | 2026-09-17 复查入口变化和页面 owner；动态内容、平台实际呈现留 Mobile 独立阶段验证 |
+| `mobile.todos` | unassigned | legacy | — | DS-7 发现入口，Mobile 独立阶段接管；未迁移 | 保持现状；发现问题记下一动作，本张不修视觉 |
 
 ### Usage History category colors (2026-09-09)
 

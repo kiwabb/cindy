@@ -5,7 +5,7 @@ import { Notification, powerMonitor } from 'electron';
 import { effectiveTodoDeadline, type TeammateTodo, type TodoDeadline } from '@cindy/maker-shared/teammate-todo';
 import { activeOwnerScopeKey, getActiveAppSession, isAppSessionBoundaryPending, ownerScopedUserDataPath } from '../appSessionState.js';
 import { openMainWindowTodos } from '../deepLink.js';
-import { t } from '../i18n.js';
+import { t } from '../i18n.desktop.js';
 import { createLogger } from '../logger.js';
 import { getDesktopNotificationsEnabled } from '../notificationService.js';
 import { createBotTodoStore } from './botTodoStore.js';
@@ -259,7 +259,7 @@ export function startPersonalTodoReminders() {
   // The account file pinned to the current owner; reads and purges fail once the account moves.
   const botStore = () => {
     const { assertCurrent } = openPersonalTodoStore();
-    return createBotTodoStore(path.join(ownerScopedUserDataPath(), PERSONAL_TODO_FILE), async () => ({}), assertCurrent);
+    return createBotTodoStore(path.join(ownerScopedUserDataPath(), PERSONAL_TODO_FILE), assertCurrent);
   };
   const stateFile = () => path.join(ownerScopedUserDataPath(), REMINDER_STATE_FILE);
   const runtime = createPersonalTodoReminderRuntime({

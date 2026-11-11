@@ -31,8 +31,8 @@ describe('host Todo persistence', () => {
   // Unit regression: a new automatic observation must not become a user assignment.
   it('attributes automatic discoveries in the locked write and preserves existing assignments', async () => {
     const { file } = await fixture();
-    const owner = createBotTodoStore(file, async () => ({}));
-    const automatic = createBotTodoStore(file, async () => ({}), () => {}, () => false);
+    const owner = createBotTodoStore(file);
+    const automatic = createBotTodoStore(file, () => {}, () => false);
     const discovered = await automatic.patch({ ...p, origin: 'assigned' });
     expect(discovered.origin).toBe('discovered');
     const assigned = await owner.patch({ ...p, key: 'owner-task' });
@@ -44,8 +44,8 @@ describe('host Todo persistence', () => {
 
   it('preserves fields after partial writes across independent store instances', async () => {
     const { file } = await fixture(),
-      a = createBotTodoStore(file, async () => ({})),
-      b = createBotTodoStore(file, async () => ({}));
+      a = createBotTodoStore(file),
+      b = createBotTodoStore(file);
     const t = await a.patch(p);
     await b.patch({ id: t.id, expectedRevision: t.revision, progress: '草稿已准备' });
     const result = (await a.read()).items[0];
@@ -60,7 +60,7 @@ describe('host Todo persistence', () => {
   });
   it('acknowledges only successful events, merges the same key, and suppresses cross-source repeats', async () => {
     const { file } = await fixture(),
-      s = createBotTodoStore(file, async () => ({}));
+      s = createBotTodoStore(file);
     await expect(
       s.ingest({ source: 'mail', sequence: 1, patch: { key: 'bad' } }),
     ).rejects.toThrow();
@@ -96,7 +96,7 @@ describe('host Todo persistence', () => {
   });
   it('records receipts without dispatch replay, and ignores a stale receipt after the next step changes', async () => {
     const { file } = await fixture(),
-      s = createBotTodoStore(file, async () => ({})),
+      s = createBotTodoStore(file),
       t = await s.patch(p);
     expect((await s.prepareAction(t.id, t.revision, 'request-1')).dispatch).toBe(true);
     expect((await s.prepareAction(t.id, t.revision, 'request-2')).dispatch).toBe(false);
@@ -113,14 +113,13 @@ describe('host Todo persistence', () => {
   it('fails closed on corruption and rejects owner changes without writing', async () => {
     const { file } = await fixture();
     await writeFile(file, '{invalid');
-    const s = createBotTodoStore(file, async () => ({}));
+    const s = createBotTodoStore(file);
     await expect(s.patch(p)).rejects.toThrow();
     expect(await readFile(file, 'utf8')).toBe('{invalid');
     const f = await fixture();
     let current = true;
     const scoped = createBotTodoStore(
       f.file,
-      async () => ({}),
       () => {
         if (!current) throw new Error('OWNER_SCOPE_CHANGED');
       },
@@ -129,37 +128,12 @@ describe('host Todo persistence', () => {
     await expect(scoped.patch(p)).rejects.toThrow('OWNER_SCOPE_CHANGED');
     await expect(readFile(f.file)).rejects.toMatchObject({ code: 'ENOENT' });
   });
-  it('imports old affairs with stable IDs, but never duplicates ordinary Session judgments', async () => {
-    const { file } = await fixture();
-    const j = {
-      project: '/cindy',
-      title: '旧承诺',
-      verdict: 'unfinished' as const,
-      next: '继续验收',
-      ref: 'https://example.test/old',
-      updatedAt: '2026-10-01T00:00:00Z',
-    };
-    const legacy = async () => ({
-      'pr:makecindy/cindy#12': j,
-      'idea:foo': j,
-      'ordinary-session': j,
-    });
-    const a = createBotTodoStore(file, legacy),
-      b = createBotTodoStore(file, legacy);
-    expect((await a.read()).items).toHaveLength(2);
-    expect((await a.read()).items.map((t) => t.id)).toEqual(
-      (await b.read()).items.map((t) => t.id),
-    );
-    const t = (await a.read()).items[0];
-    await a.patch({ id: t.id, expectedRevision: t.revision, progress: '最新进展' });
-    expect((await b.read()).items).toHaveLength(2);
-  });
   it('keeps two owners and two teammates isolated in separate homes', async () => {
     const one = await fixture(),
       two = await fixture();
-    const a = createBotTodoStore(path.join(one.root, 'a.json'), async () => ({})),
-      b = createBotTodoStore(path.join(one.root, 'b.json'), async () => ({})),
-      other = createBotTodoStore(two.file, async () => ({}));
+    const a = createBotTodoStore(path.join(one.root, 'a.json')),
+      b = createBotTodoStore(path.join(one.root, 'b.json')),
+      other = createBotTodoStore(two.file);
     await a.patch(p);
     expect((await b.read()).items).toEqual([]);
     expect((await other.read()).items).toEqual([]);
@@ -168,7 +142,7 @@ describe('host Todo persistence', () => {
 
 it('accepts only a matching attempt receipt and never turns it into affair completion', async () => {
   const { file } = await fixture(),
-    s = createBotTodoStore(file, async () => ({})),
+    s = createBotTodoStore(file),
     t = await s.patch(p);
   await s.prepareAction(t.id, 1, 'attempt-one');
   await s.settleAction(t.id, 'attempt-one', { ok: true });
@@ -196,7 +170,7 @@ it('accepts only a matching attempt receipt and never turns it into affair compl
 
 it('expired deferral allows advancing the same next step without altering its real deadline', async () => {
   const { file } = await fixture(),
-    s = createBotTodoStore(file, async () => ({}));
+    s = createBotTodoStore(file);
   const t = await s.patch({
     ...p,
     sourceDeadline: { kind: 'date', date: '2026-10-10', timeZone: 'UTC' },
@@ -215,77 +189,9 @@ it('expired deferral allows advancing the same next step without altering its re
   expect((await s.read()).items[0].sourceDeadline?.date).toBe('2026-10-10');
 });
 
-it('reconciles later legacy writes into the same record after new-format persistence, preserving dates and rejection', async () => {
-  const { file } = await fixture();
-  let legacy: Record<string, import('../botWorkbenchLegacy.js').LegacyWorkbenchJudgment> = {};
-  const s = createBotTodoStore(file, async () => legacy);
-  await s.patch(p);
-  const j = {
-    project: '/cindy',
-    title: '旧工具创建',
-    verdict: 'unfinished' as const,
-    next: '准备草稿',
-    ref: 'https://example.test/legacy',
-    updatedAt: '2026-10-01T00:00:00Z',
-  };
-  legacy = { 'idea:later': j };
-  let t = (await s.read()).items.find((t) => t.legacyId === 'idea:later')!;
-  t = await s.patch({
-    id: t.id,
-    expectedRevision: t.revision,
-    deadlineOverride: { value: { kind: 'date', date: '2026-10-11', timeZone: 'UTC' } },
-    operation: 'mute',
-  });
-  legacy = {
-    'idea:later': {
-      ...j,
-      title: '旧工具最新进展',
-      next: '报价草稿已准备',
-      ref: null,
-      updatedAt: '2026-10-02T00:00:00Z',
-    },
-  };
-  const changed = (await s.read()).items.find((x) => x.id === t.id)!;
-  expect(changed.title).toBe('旧工具最新进展');
-  expect(changed.progress).toBe('报价草稿已准备');
-  expect(changed.deadlineOverride).toEqual(t.deadlineOverride);
-  expect(changed.decision?.kind).toBe('muted');
-  expect(changed.sources[0].ref).toBe(j.ref);
-  expect((await s.read()).items).toHaveLength(2);
-  await s.patch({ id: changed.id, expectedRevision: changed.revision, operation: 'restore' });
-  expect((await s.read()).items.find((x) => x.id === changed.id)?.revision).toBe(
-    changed.revision + 1,
-  );
-});
-
-it('keeps a user-reopened legacy completion open when only its old description changes', async () => {
-  const { file } = await fixture();
-  let j = {
-    project: '/cindy',
-    title: '原约定',
-    verdict: 'done' as const,
-    next: '原依据',
-    ref: null,
-    updatedAt: '2026-10-01T00:00:00Z',
-  };
-  const s = createBotTodoStore(file, async () => ({ 'idea:reopened': j }));
-  const initial = (await s.read()).items[0];
-  const reopened = await s.patch({
-    id: initial.id,
-    expectedRevision: initial.revision,
-    operation: 'reopen',
-    next: { label: '验收', instruction: '确认约定', kind: 'decide' },
-  });
-  j = { ...j, title: '旧工具补充标题', updatedAt: '2026-10-02T00:00:00Z' };
-  const changed = (await s.read()).items[0];
-  expect(changed.status).toBe('open');
-  expect(changed.next).toEqual(reopened.next);
-  expect(changed.history).toEqual(reopened.history);
-});
-
 it('rejects valid JSON with corrupt or overlong text without rewriting the file', async () => {
   const { file } = await fixture();
-  const s = createBotTodoStore(file, async () => ({}));
+  const s = createBotTodoStore(file);
   const t = await s.patch(p);
   const clean = await s.read();
   for (const fields of [
@@ -343,9 +249,9 @@ it('rejects valid JSON with corrupt or overlong text without rewriting the file'
   }
 });
 
-it('preserves valid suggested dates and local legacy evidence while rejecting invalid optional write fields', async () => {
+it('preserves valid suggested dates and local evidence while rejecting invalid optional write fields', async () => {
   const { file } = await fixture();
-  const store = createBotTodoStore(file, async () => ({}));
+  const store = createBotTodoStore(file);
   const t = await store.patch({ ...p, suggestedDate: '2026-10-13' });
   await store.patch({
     id: t.id,
@@ -371,7 +277,7 @@ it('preserves valid suggested dates and local legacy evidence while rejecting in
 describe('todos moving with the companion', () => {
   it('replaces items by id and removes tombstoned ones, keeping this computer\'s cursors', async () => {
     const { file } = await fixture();
-    const store = createBotTodoStore(file, async () => ({}));
+    const store = createBotTodoStore(file);
     const keep = await store.patch({ ...p, key: 'keep' });
     const gone = await store.patch({ ...p, key: 'gone' });
     await store.ingest({ source: 'plugin:mail', sequence: 3, items: [] } as never).catch(() => undefined);
@@ -387,7 +293,7 @@ describe('todos moving with the companion', () => {
 
   it('gives another companion\'s todo with a taken key a stable key of its own', async () => {
     const { file } = await fixture();
-    const store = createBotTodoStore(file, async () => ({}));
+    const store = createBotTodoStore(file);
     const mine = await store.patch({ ...p, key: 'quote:1' });
     const theirs = { ...mine, id: 'todo:theirs', title: '另一个 Cindy 的' };
     await store.importItems([theirs], []);
@@ -399,23 +305,6 @@ describe('todos moving with the companion', () => {
     expect(items.find((item) => item.id === mine.id)!.key).toBe('quote:1');
     // Still a valid store for the next write.
     await store.patch({ id: mine.id, expectedRevision: mine.revision, progress: '继续' });
-  });
-
-  it('links a travelled legacy todo back to its workbench entry instead of adding a twin', async () => {
-    const { file } = await fixture();
-    const j = { project: '/cindy', title: '旧工具创建', verdict: 'unfinished' as const, next: '准备草稿',
-      ref: 'https://example.test/legacy', updatedAt: '2026-10-01T00:00:00Z' };
-    // On the old computer: the legacy entry became a todo, which travels without its link.
-    const old = createBotTodoStore((await fixture()).file, async () => ({ 'idea:later': j }));
-    const original = (await old.read()).items[0]!;
-    const { legacyId: _id, legacyFingerprint: _fp, legacyVerdict: _v, ...travelled } = original;
-    const store = createBotTodoStore(file, async () => ({ 'idea:later': j }));
-    await store.importItems([{ ...travelled, title: '新电脑上看到的标题' } as typeof original], []);
-    const items = (await store.read()).items;
-    expect(items).toHaveLength(1);
-    expect(items[0]).toMatchObject({ id: original.id, legacyId: 'idea:later', title: '新电脑上看到的标题' });
-    await store.patch({ id: items[0]!.id, expectedRevision: items[0]!.revision, progress: '继续' });
-    expect((await store.read()).items).toHaveLength(1);
   });
 });
 
@@ -480,7 +369,7 @@ it('recovers a committed personal creation after a lost reply without creating a
 it('purges old deleted personal tombstones with their receipts and keeps teammate and recent ones', async () => {
   const { file } = await fixture();
   const store = createPersonalTodoStore(file);
-  const bot = createBotTodoStore(file, async () => ({}));
+  const bot = createBotTodoStore(file);
   const day = 86_400_000;
   const deleteTodo = async (request: string) => {
     const created = await store.update({ creationRequestId: request, title: request });

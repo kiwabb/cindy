@@ -66,6 +66,7 @@ export interface XdtHelperToolResult {
 
 export type XdtHelperToolHandler<T = Record<string, unknown>> = (
   args: T,
+  signal?: AbortSignal,
 ) => Promise<XdtHelperToolResult>;
 
 export interface XdtHelperToolDef {
@@ -141,7 +142,7 @@ export class XdtHelperToolRegistry {
     return Array.from(set);
   }
 
-  async call(name: string, rawArgs: unknown): Promise<XdtHelperToolResult> {
+  async call(name: string, rawArgs: unknown, signal?: AbortSignal): Promise<XdtHelperToolResult> {
     const def = this.get(name);
     if (!def) {
       return {
@@ -200,6 +201,6 @@ export class XdtHelperToolRegistry {
       };
     }
 
-    return def.handler(parsed.data as Record<string, unknown>);
+    return def.handler(parsed.data as Record<string, unknown>, signal);
   }
 }

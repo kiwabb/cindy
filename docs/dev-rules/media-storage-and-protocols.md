@@ -81,7 +81,7 @@
   自动清理只接受该命名空间独占且仍为 `isCache` 的字节；扫描和条件删除都检查其他
   引用与 pin，不能清理聊天附件或其他集成的共享字节。其他媒体清理维持原手动流程。
   普通 HTML 等非媒体仍走 `remote-file-cache`。完整身份、复验与平台清理策略见
-  [`protocol-compatibility.md`](protocol-compatibility.md)「远程文件连接复用与版本缓存」。
+  [`protocol-compatibility/image-delivery-and-missing-source.md`](protocol-compatibility/image-delivery-and-missing-source.md#远程文件连接复用与版本缓存)「远程文件连接复用与版本缓存」。
 - 桌面聊天的不可变远程图片通过 `device-link/remoteMediaPersistentCache.ts` 复用媒体总仓，
   `remote-media` 索引包含账号、来源设备和原始地址。先查内存、再查磁盘，缓存命中不取件；
   重启和断连不清理，不增加自动到期或容量淘汰。设置中的「远程图片缓存」复用账本扫描和
@@ -320,7 +320,9 @@ Windows 使用 CF_HDROP，macOS 使用文件 URL 剪贴板，视频／GIF 均按
   不另建透明生图流程，也不在通用透传层替上游追加背景或格式默认。
 - `size` 表示生成像素尺寸，`resolution` 表示供应商的分辨率档，`quality` 是原生质量。
   不把不同来源的枚举互相套用，不强制 `medium` 或 `1k`。明确参数优先，省略时由上游决定。
-  已知 GPT Image 尺寸约束在付费提交前检查；不合法时保留 prepared 调用供更正。
+  Gateway/Guide 驱动的图像调用以服务端 Guide 和实际模型为准，客户端不再按型号代际预检
+  `size`/`quality`；不合法参数由上游拒绝，调用按已提交失败处理，不保留 prepared 供更正。
+  直连供应商通道仍由 `imageParameters.ts` 在付费提交前校验其已知约束，不合法时保留 prepared。
   目标成品尺寸不满足模型约束时，由 Agent 选择合法生成尺寸并单独完成成品缩放，不能谎报
   请求尺寸就是实际输出尺寸。没有自动缩放或偷偷裁切。
 - Codex SSE 的 partial image 仅为预览，不能在失败、未完成或只有预览的断流中当成成品。
