@@ -173,6 +173,8 @@ function writeReloginFlag(targetVersion: string): void {
 
 const FIRST_CHECK_DELAY_MS = 10_000;         // first background check delay
 const POLL_INTERVAL_MS = 30 * 60 * 1000; // 30min polling
+// Personal channel: one ~1 KB feed file on GitHub Releases (no API quota), so check more often.
+const PERSONAL_POLL_INTERVAL_MS = 5 * 60 * 1000;
 const AUTO_RELAUNCH_POLL_INTERVAL_MS = 30_000;
 // 启动态 manifest 短超时（#26）：probe 最坏 1.5s + external CDN P99 < 5s，8s 留足余量
 const STARTUP_MANIFEST_TIMEOUT_MS = 8_000;
@@ -1144,8 +1146,9 @@ async function doCheckPersonalUpdate(): Promise<CheckForUpdateResult> {
   syncObservedUpdateChannel();
   const channelEpochAtStart = updateChannelEpoch;
   try {
-    // A pending manual install stays on screen during the 30-minute re-check; the result below replaces it.
-    if (currentStatus !== 'manual') setStatus('checking');
+    // A ready patch or pending manual install stays on screen during the periodic re-check;
+    // the result below replaces it.
+    if (currentStatus !== 'manual' && currentStatus !== 'ready') setStatus('checking');
     const check = await checkPersonalManifest();
     manualUpdate = undefined;
     if (!check) {
@@ -2891,6 +2894,7 @@ export function initUpdateService(): void {
   powerMonitor.on('unlock-screen', handlePowerMonitorActivity);
   powerMonitor.on('user-did-become-active', handlePowerMonitorActivity);
 
+  const pollIntervalMs = personalUpdateContext() ? PERSONAL_POLL_INTERVAL_MS : POLL_INTERVAL_MS;
   firstCheckTimer = setTimeout(() => {
     firstCheckTimer = null;
     log.info('First background check fires');
@@ -2903,11 +2907,11 @@ export function initUpdateService(): void {
       checkForUpdate().catch((err) => {
         log.error('Poll check threw:', err);
       });
-    }, POLL_INTERVAL_MS);
+    }, pollIntervalMs);
   }, FIRST_CHECK_DELAY_MS);
 
   observedEnableBeta = readObservedEnableBetaFromDisk();
-  log.info('Initialized — first check in 10s, polling every 30min');
+  log.info(`Initialized — first check in 10s, polling every ${pollIntervalMs / 60_000}min`);
 }
 
 /**

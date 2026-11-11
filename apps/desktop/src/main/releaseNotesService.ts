@@ -194,6 +194,9 @@ async function fetchCdnJson<T>(url: string): Promise<T | null> {
  * Returns null on 404 / network error / parse error (silent — caller decides UX).
  */
 export async function fetchReleaseNotes(version: string): Promise<RawReleaseNotes | null> {
+  // Personal-channel builds (`personal-r<revision>`) never have notes on the official CDN;
+  // asking would only produce a 404 on every update check.
+  if (version.startsWith('personal-r')) return null;
   const hit = cache.get(version);
   if (hit) return hit;
 
