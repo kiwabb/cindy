@@ -11,7 +11,14 @@
  */
 import { createHash } from 'node:crypto';
 import { REMOTE_RESOURCE_CHANGED_CHANNEL } from '@cindy/device-link';
-import { TodoError, type TodoDeadline } from '@cindy/maker-shared/teammate-todo';
+import type { TaskTag } from '@cindy/maker-shared';
+import {
+  TODO_REMINDERS,
+  TodoError,
+  type TodoDeadline,
+  type TodoPriority,
+  type TodoReminder,
+} from '@cindy/maker-shared/teammate-todo';
 import type { PersonalTodo, PersonalTodoUpdate } from '../../../shared/personalTodo.js';
 import {
   captureDataOwnerBroadcastScope,
@@ -28,6 +35,7 @@ import {
   notifyPersonalTodosChanged,
   onPersonalTodosChanged,
   openPersonalTodoStore,
+  listPersonalTodoTagCatalog,
   PersonalTodoOwnerChangedError,
 } from '../../maker-ipc/personalTodoAccess.js';
 
@@ -44,9 +52,17 @@ const UPDATE_KEYS = [
   'title',
   'notes',
   'deadline',
+  'priority',
+  'tagIds',
+  'reminder',
   'operation',
   'until',
 ] as const;
+/**
+ * Advertised in the block data. The released desktop (r3) rejects unknown update fields, so a phone
+ * sends `priority` / `tagIds` / `reminder` only when the host lists `organize` here.
+ */
+export const PERSONAL_TODO_REMOTE_CAPABILITIES = { organize: 1 } as const;
 const OPERATIONS = ['complete', 'reopen', 'delete', 'later', 'restore'];
 
 const resourceRef = { collectionId: PERSONAL_TODOS_COLLECTION, kind: KIND, id: RESOURCE_ID } as const;
@@ -69,8 +85,47 @@ const title = {
 
 const changedAccount = () => new RemoteResourceRegistryError('NOT_FOUND', 'Account changed');
 
-/** Explicit allowlist: new PersonalTodo fields stay on the host until they are added here on purpose. */
-export function personalTodoRemoteProjection(todo: PersonalTodo) {
+/** Tag as the phone sees it: catalog-resolved, `nameCustomized` only when true so presets localize on the phone. */
+export interface PersonalTodoRemoteTag {
+  id: string;
+  name: string;
+  color: TaskTag['color'];
+  nameCustomized?: true;
+}
+
+/** A catalog read failure must not fail the todo read: every item then reads as untagged. */
+async function readTagCatalog(): Promise<Map<string, TaskTag>> {
+  try {
+    return new Map((await listPersonalTodoTagCatalog()).map((tag) => [tag.id, tag]));
+  } catch {
+    return new Map();
+  }
+}
+
+function resolveTags(todo: PersonalTodo, catalog: Map<string, TaskTag>): PersonalTodoRemoteTag[] {
+  const tags: PersonalTodoRemoteTag[] = [];
+  for (const id of todo.tagIds ?? []) {
+    const tag = catalog.get(id);
+    if (!tag) continue;
+    tags.push({
+      id: tag.id,
+      name: tag.name,
+      color: tag.color,
+      ...(tag.nameCustomized ? { nameCustomized: true as const } : {}),
+    });
+  }
+  return tags;
+}
+
+/**
+ * Explicit allowlist: new PersonalTodo fields stay on the host until they are added here on purpose.
+ * `tagIds` stays off the wire: the phone only needs the resolved tags, and an id the catalog no longer
+ * has must read as untagged there too.
+ */
+export function personalTodoRemoteProjection(
+  todo: PersonalTodo,
+  catalog: Map<string, TaskTag> = new Map(),
+) {
   const deadline: TodoDeadline | null = todo.deadline;
   return {
     id: todo.id,
@@ -90,6 +145,9 @@ export function personalTodoRemoteProjection(todo: PersonalTodo) {
     createdAt: todo.createdAt,
     updatedAt: todo.updatedAt,
     completedAt: todo.completedAt ?? null,
+    priority: todo.priority ?? 0,
+    reminder: todo.reminder ?? 'default',
+    tags: resolveTags(todo, catalog),
   };
 }
 
@@ -142,6 +200,20 @@ function parseUpdate(input: Record<string, unknown> | undefined): PersonalTodoUp
     if (typeof input.operation !== 'string' || !OPERATIONS.includes(input.operation))
       throw invalid('operation');
     out.operation = input.operation as PersonalTodoUpdate['operation'];
+  }
+  if (input.priority !== undefined) {
+    if (!Number.isInteger(input.priority) || (input.priority as number) < 0 || (input.priority as number) > 3)
+      throw invalid('priority');
+    out.priority = input.priority as TodoPriority;
+  }
+  if (input.reminder !== undefined) {
+    if (!(TODO_REMINDERS as readonly unknown[]).includes(input.reminder)) throw invalid('reminder');
+    out.reminder = input.reminder as TodoReminder;
+  }
+  if (input.tagIds !== undefined) {
+    if (!Array.isArray(input.tagIds) || input.tagIds.some((id) => typeof id !== 'string'))
+      throw invalid('tagIds');
+    out.tagIds = input.tagIds as string[];
   }
   if (input.deadline !== undefined) {
     const value = input.deadline as Record<string, unknown> | null;
@@ -199,6 +271,9 @@ export function createPersonalTodoRemoteProvider(): RemoteResourceProvider {
         assertCurrent();
         if (!isDataOwnerBroadcastScopeCurrent(scope)) throw changedAccount();
         const items = capItems(all);
+        const catalog = await readTagCatalog();
+        // The catalog read yields to the event loop: re-check the account before returning anything.
+        if (!isDataOwnerBroadcastScopeCurrent(scope)) throw changedAccount();
         return {
           ref: resourceRef,
           revision: resourceRevision(items),
@@ -213,7 +288,11 @@ export function createPersonalTodoRemoteProvider(): RemoteResourceProvider {
                 .map((todo) => `- ${todo.title}`)
                 .join('\n')
                 .slice(0, MAX_FALLBACK_CHARS),
-              data: { items: items.map(personalTodoRemoteProjection), total: all.length },
+              data: {
+                items: items.map((todo) => personalTodoRemoteProjection(todo, catalog)),
+                total: all.length,
+                capabilities: PERSONAL_TODO_REMOTE_CAPABILITIES,
+              },
             },
           ],
         };
@@ -235,7 +314,10 @@ export function createPersonalTodoRemoteProvider(): RemoteResourceProvider {
         // The write is durable; the changed push must not report a different account's write.
         if (!isDataOwnerBroadcastScopeCurrent(scope)) throw changedAccount();
         notifyPersonalTodosChanged(scope);
-        return { result: { todo: personalTodoRemoteProjection(todo) }, effects: [] };
+        return {
+          result: { todo: personalTodoRemoteProjection(todo, await readTagCatalog()) },
+          effects: [],
+        };
       } catch (error) {
         return mapError(error);
       }

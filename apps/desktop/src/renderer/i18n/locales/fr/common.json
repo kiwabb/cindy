@@ -10184,8 +10184,6 @@
       "todos": "À faire",
       "showMore": "Afficher plus",
       "showLess": "Afficher moins",
-      "doneCount_one": "{{count}} terminée",
-      "doneCount_other": "{{count}} terminées",
       "delete": "Supprimer",
       "deleted": "Supprimée. Elle ne sera plus ajoutée.",
       "undo": "Annuler",
@@ -10213,8 +10211,7 @@
         "community": "Depuis la communauté",
         "task": "Depuis une tâche"
       },
-      "offlineCount_many": "{{count}} hors ligne",
-      "doneCount_many": "{{count}} terminées"
+      "offlineCount_many": "{{count}} hors ligne"
     },
     "autonomy": {
       "title": "Suivre mes sessions",
@@ -11866,6 +11863,7 @@
     "todoBoard": {
       "title": "À faire",
       "filterTeammates": "Filtrer par coéquipier",
+      "filter": "Filtrer",
       "discovered": "Trouvé par le coéquipier",
       "suggested": "Suggéré {{date}}",
       "laterUntil": "De retour le {{date}}",
@@ -19740,7 +19738,63 @@
     "reminder": {
       "due": "Tâche à échéance",
       "resumed": "Il est temps de la reprendre",
-      "summary": "{{count}} tâches à échéance"
+      "summary": "{{count}} tâches à échéance",
+      "label": "Rappel",
+      "onTime": "À l’heure",
+      "before15m": "15 min avant",
+      "before1h": "1 h avant",
+      "dayOf": "Jour même, 9:00",
+      "dayBefore": "Veille, 9:00",
+      "off": "Aucun",
+      "dueSoon": "Échéance proche",
+      "dueTomorrow": "Échéance demain"
+    },
+    "untagged": "Sans étiquette",
+    "noTag": "Aucune",
+    "newTag": "Nouvelle étiquette…",
+    "tagLimit": "Limite d’étiquettes atteinte",
+    "deferTonight": "Ce soir",
+    "group": {
+      "label": "Regrouper",
+      "due": "Par échéance",
+      "priority": "Par priorité",
+      "tag": "Par étiquette",
+      "none": "Sans regroupement"
+    },
+    "order": {
+      "label": "Ordre dans le groupe",
+      "priority": "Priorité la plus haute d’abord",
+      "due": "Échéance la plus proche d’abord",
+      "created": "Ajoutées récemment d’abord"
+    },
+    "priority": {
+      "label": "Priorité",
+      "high": "Priorité haute",
+      "medium": "Priorité moyenne",
+      "low": "Priorité basse",
+      "none": "Sans priorité",
+      "short": {
+        "high": "Haute",
+        "medium": "Moyenne",
+        "low": "Basse"
+      }
+    },
+    "due": {
+      "label": "Échéance",
+      "today": "Aujourd’hui",
+      "tomorrow": "Demain",
+      "nextMonday": "Lundi prochain",
+      "none": "Sans date",
+      "pick": "Choisir une date…",
+      "overdueToday": "En retard",
+      "overdue_one": "{{count}} jour de retard",
+      "overdue_many": "{{count}} de jours de retard",
+      "overdue_other": "{{count}} jours de retard"
+    },
+    "composer": {
+      "add": "Ajouter",
+      "cancel": "Annuler",
+      "dismissRecognition": "Ne pas reconnaître « {{phrase}} »"
     }
   }
 }

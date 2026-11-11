@@ -23,6 +23,16 @@ export interface TodoNext {
   instruction: string;
   kind: 'advance' | 'view' | 'decide';
 }
+/** 0 none, 1 low, 2 medium, 3 high. Absent on stored items means 0. */
+export type TodoPriority = 0 | 1 | 2 | 3;
+/**
+ * When the owner is reminded about a deadline. `default` is the deadline instant, or 09:00 in the
+ * deadline's zone for a date-only deadline; `before-*` subtracts from that moment. Absent means `default`.
+ */
+export const TODO_REMINDERS = ['default', 'off', 'before-15m', 'before-1h', 'before-1d'] as const;
+export type TodoReminder = (typeof TODO_REMINDERS)[number];
+/** Tag ids reference the owner's task-tag catalog on the same device; an unknown id reads as untagged. */
+export const TODO_MAX_TAGS = 16;
 export interface TodoCompletion {
   summary: string;
   ref?: string;
@@ -58,6 +68,9 @@ export interface TeammateTodo {
   legacyId?: string;
   legacyFingerprint?: string;
   legacyVerdict?: 'unfinished' | 'idea' | 'done';
+  priority?: TodoPriority;
+  tagIds?: string[];
+  reminder?: TodoReminder;
 }
 export interface TodoPatch {
   id?: string;
@@ -79,6 +92,9 @@ export interface TodoPatch {
   until?: string;
   completion?: { summary: string; ref?: string };
   resolvedActionRequestId?: string;
+  priority?: TodoPriority;
+  tagIds?: string[];
+  reminder?: TodoReminder;
 }
 export interface TodoState {
   version: 1;
@@ -109,6 +125,24 @@ const text = (s: unknown, max: number, required: boolean, field: string): string
   if (s.length > max) throw invalidInput(`${field} must be at most ${max} characters`);
   return s.trim();
 };
+export function validTodoPriority(value: unknown): value is TodoPriority {
+  return value === 0 || value === 1 || value === 2 || value === 3;
+}
+export function validTodoReminder(value: unknown): value is TodoReminder {
+  return (TODO_REMINDERS as readonly unknown[]).includes(value);
+}
+/** Deduplicated, bounded tag ids; throws INVALID_INPUT with the offending field. */
+export function normalizeTodoTagIds(value: unknown): string[] {
+  if (!Array.isArray(value) || value.length > TODO_MAX_TAGS)
+    throw invalidInput(`tagIds must be an array of at most ${TODO_MAX_TAGS} tag ids`);
+  const ids: string[] = [];
+  for (const id of value) {
+    if (typeof id !== 'string' || !id.trim() || id.length > 128)
+      throw invalidInput('tagIds[] must be non-empty strings of at most 128 characters');
+    if (!ids.includes(id)) ids.push(id);
+  }
+  return ids;
+}
 export function validateTodoTimestamp(s: unknown): string {
   if (
     typeof s !== 'string' ||
@@ -491,6 +525,16 @@ export function applyTodoPatch(
         timeZone: 'UTC',
       });
     t.suggestedDate = patch.suggestedDate;
+  }
+  if (patch.priority !== undefined) {
+    if (!validTodoPriority(patch.priority)) throw invalidInput('priority must be 0, 1, 2 or 3');
+    t.priority = patch.priority;
+  }
+  if (patch.tagIds !== undefined) t.tagIds = normalizeTodoTagIds(patch.tagIds);
+  if (patch.reminder !== undefined) {
+    if (!validTodoReminder(patch.reminder))
+      throw invalidInput(`reminder must be one of ${TODO_REMINDERS.join(', ')}`);
+    t.reminder = patch.reminder;
   }
   if (patch.resolvedActionRequestId !== undefined) {
     if (!old?.action || old.action.requestId !== patch.resolvedActionRequestId)

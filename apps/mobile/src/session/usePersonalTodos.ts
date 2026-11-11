@@ -8,7 +8,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { todoLocalDate } from '@cindy/maker-shared/teammate-todo';
+import type { TaskTag, TaskTagColor } from '@cindy/maker-shared';
+import { TODO_REMINDERS, todoLocalDate, type TodoPriority, type TodoReminder } from '@cindy/maker-shared/teammate-todo';
 import { useAuth } from '@/auth/AuthContext';
 import { useDeviceLink } from '@/device-link/DeviceLinkContext';
 import {
@@ -20,6 +21,9 @@ import {
 export const PERSONAL_TODOS_COLLECTION = 'personal-todos';
 const PRIMITIVE = 'personal-todos';
 const REF = { collectionId: PERSONAL_TODOS_COLLECTION, kind: 'personal-todos', id: 'todos:me' } as const;
+
+/** Host-resolved tag; `nameCustomized` is only present when true so preset names localize on the phone. */
+export type PersonalTodoTag = Pick<TaskTag, 'id' | 'name' | 'nameCustomized'> & { color: TaskTagColor };
 
 /** Mirrors the host projection (desktop `personalTodoRemoteProjection`). */
 export interface PersonalTodoItem {
@@ -33,6 +37,11 @@ export interface PersonalTodoItem {
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
+  /** 0 none, 1 low, 2 medium, 3 high. Absent on an older host. */
+  priority: TodoPriority;
+  reminder: TodoReminder;
+  /** Resolved against the host's tag catalog; unknown ids are already dropped. Empty on an older host. */
+  tags: PersonalTodoTag[];
 }
 
 export interface PersonalTodoUpdateInput {
@@ -42,23 +51,41 @@ export interface PersonalTodoUpdateInput {
   title?: string;
   notes?: string;
   deadline?: PersonalTodoItem['deadline'];
+  priority?: TodoPriority;
+  tagIds?: string[];
+  reminder?: TodoReminder;
   operation?: 'complete' | 'reopen' | 'delete' | 'later' | 'restore';
   until?: string;
 }
 
+/** Fields only a host advertising `capabilities.organize` accepts (the released desktop rejects unknown fields). */
+const ORGANIZE_KEYS = ['priority', 'tagIds', 'reminder'] as const;
+
 interface Snapshot {
   available: boolean | null;
+  /** The host advertised `capabilities.organize`: it accepts priority / tagIds / reminder updates. */
+  organize: boolean;
   items: PersonalTodoItem[];
   loaded: boolean;
   failed: boolean;
 }
 
-const INITIAL: Snapshot = { available: null, items: [], loaded: false, failed: false };
+const INITIAL: Snapshot = { available: null, organize: false, items: [], loaded: false, failed: false };
 /** Last good projection per account and computer, so an offline computer keeps its list and entry. */
 const lastGood = new Map<string, Snapshot>();
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value);
+
+function parseTags(value: unknown): PersonalTodoTag[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap(tag => {
+    if (!isRecord(tag) || typeof tag.id !== 'string' || typeof tag.name !== 'string') return [];
+    // An unknown color from a newer host is kept as text; the screen falls back to the neutral dot.
+    const color = (typeof tag.color === 'string' ? tag.color : 'none') as TaskTagColor;
+    return [{ id: tag.id, name: tag.name, color, ...(tag.nameCustomized === true ? { nameCustomized: true as const } : {}) }];
+  });
+}
 
 function parseItem(value: unknown): PersonalTodoItem | null {
   if (!isRecord(value)) return null;
@@ -81,7 +108,24 @@ function parseItem(value: unknown): PersonalTodoItem | null {
     createdAt: typeof value.createdAt === 'string' ? value.createdAt : '',
     updatedAt: typeof value.updatedAt === 'string' ? value.updatedAt : '',
     completedAt: typeof value.completedAt === 'string' ? value.completedAt : null,
+    priority: value.priority === 1 || value.priority === 2 || value.priority === 3 ? value.priority : 0,
+    reminder: (TODO_REMINDERS as readonly unknown[]).includes(value.reminder) ? value.reminder as TodoReminder : 'default',
+    tags: parseTags(value.tags),
   };
+}
+
+/** A host that does not advertise `organize` (older desktop) must never receive the new update fields. */
+export function parsePersonalTodosOrganize(resource: { blocks?: Array<{ primitive: string; data?: unknown }> }): boolean {
+  const data = resource.blocks?.find(block => block.primitive === PRIMITIVE)?.data;
+  return isRecord(data) && isRecord(data.capabilities) && typeof data.capabilities.organize === 'number' && data.capabilities.organize >= 1;
+}
+
+/** Drops priority / tagIds / reminder when the host has not advertised support. */
+export function personalTodoUpdateForHost(input: PersonalTodoUpdateInput, organize: boolean): PersonalTodoUpdateInput {
+  if (organize) return input;
+  const out = { ...input };
+  for (const key of ORGANIZE_KEYS) delete out[key];
+  return out;
 }
 
 export function parsePersonalTodos(resource: { blocks?: Array<{ primitive: string; data?: unknown }> }): PersonalTodoItem[] {
@@ -153,12 +197,12 @@ export function usePersonalTodos({ deviceId, deviceName, enabled }: { deviceId: 
       const manifest = await loadRemoteResourceManifest(invoke, target, i18n.language);
       if (mine !== epoch.current) return;
       if (!manifest?.collections.some(c => c.id === PERSONAL_TODOS_COLLECTION && c.resourceKind === REF.kind)) {
-        commit({ available: false, items: [], loaded: true, failed: false });
+        commit({ available: false, organize: false, items: [], loaded: true, failed: false });
         return;
       }
       const resource = await getRemoteResource(invoke, target, REF, i18n.language, [PRIMITIVE]);
       if (mine !== epoch.current) return;
-      commit({ available: true, items: parsePersonalTodos(resource), loaded: true, failed: false });
+      commit({ available: true, organize: parsePersonalTodosOrganize(resource), items: parsePersonalTodos(resource), loaded: true, failed: false });
     } catch {
       if (mine === epoch.current) setState(previous => ({ ...previous, loaded: true, failed: true }));
     }
@@ -184,7 +228,7 @@ export function usePersonalTodos({ deviceId, deviceName, enabled }: { deviceId: 
       await openLink(deviceId);
       const response = await invokeRemoteResourceAction(invoke, { deviceId, deviceName }, {
         collectionId: PERSONAL_TODOS_COLLECTION, resourceRef: REF, actionId: 'update',
-        input: input as unknown as Record<string, unknown>,
+        input: personalTodoUpdateForHost(input, state.organize) as unknown as Record<string, unknown>,
       }, i18n.language);
       void refresh();
       return isRecord(response.result) ? parseItem(response.result.todo) : null;
@@ -192,7 +236,7 @@ export function usePersonalTodos({ deviceId, deviceName, enabled }: { deviceId: 
       if (personalTodoErrorKind(error) !== 'failed') void refresh();
       throw error;
     }
-  }, [deviceId, deviceName, i18n.language, invoke, openLink, refresh]);
+  }, [deviceId, deviceName, i18n.language, invoke, openLink, refresh, state.organize]);
 
   return { ...state, refresh, update };
 }

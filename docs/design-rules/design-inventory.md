@@ -64,7 +64,7 @@
 | `mobile.companions.direct` | mobile | 伙伴私聊回看 | app/companions/direct/[threadId].tsx |
 | `mobile.companions.groups` | mobile | 伙伴群聊与分工 | app/companions/groups/[groupId].tsx |
 | `mobile.device-management` | mobile | 设备管理 | app/devices/manage.tsx / app/devices/manage/[deviceId].tsx |
-| `mobile.devices` | mobile | 主机详情 | app/devices/[deviceId].tsx |
+| `mobile.devices` | mobile | 主机详情与该电脑的个人待办 | app/devices/[deviceId].tsx / app/todos/[deviceId].tsx |
 | `mobile.files` | mobile | 任务文件与预览 | app/files/[sessionId].tsx / app/files/preview/[sessionId].tsx |
 | `mobile.home` | mobile | 主机与资源首页 | app/index.tsx / app/devices/index.tsx |
 | `mobile.mail` | mobile | 邮件阅读与附件预览 | app/mail-preview.tsx |
@@ -163,6 +163,7 @@
 | apps/mobile/app/settings/voice-speaker-filter.tsx | VoiceSpeakerFilterRoute | `mobile.settings` |
 | apps/mobile/app/settings.tsx | SettingsScreen | `mobile.settings` |
 | apps/mobile/app/shared-session.tsx | SharedSessionScreen | `mobile.chat.sharing` |
+| apps/mobile/app/todos/[deviceId].tsx | PersonalTodosScreen | `mobile.devices` |
 
 ### Mobile 布局 / 开发入口排除
 

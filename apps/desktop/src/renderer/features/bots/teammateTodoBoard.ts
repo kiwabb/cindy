@@ -8,8 +8,8 @@ import {
   createTodoDueComparator,
   effectiveTodoDeadline,
   todoLocalDate,
-  todoOverdue,
   type TeammateTodo,
+  type TodoDeadline,
 } from '@cindy/maker-shared/teammate-todo';
 
 import { getDataOwnerGeneration, isDataOwnerGenerationCurrent, type DataOwnerGeneration } from '@/contexts/dataOwnerGeneration';
@@ -38,28 +38,38 @@ export type TodoBoardBucket = 'overdue' | 'today' | 'week' | 'later' | 'none';
 export const TODO_BOARD_BUCKETS: readonly TodoBoardBucket[] = ['overdue', 'today', 'week', 'later', 'none'];
 
 /** 本周最后一天（周日）；周一为一周第一天。 */
-function weekEnd(localDate: string): string {
+export function weekEnd(localDate: string): string {
   const date = new Date(localDate + 'T00:00:00Z');
   const toSunday = (7 - date.getUTCDay()) % 7;
   date.setUTCDate(date.getUTCDate() + toSunday);
   return date.toISOString().slice(0, 10);
 }
 
-/**
- * 按自己的截止分段，日期都按截止所在时区算。只有建议日期或待确认期限的事项归「无截止」：
- * 建议不制造紧迫感（与近况口径一致）。
- */
-export function todoBoardBucket(todo: TeammateTodo, now = new Date()): TodoBoardBucket {
-  const deadline = effectiveTodoDeadline(todo);
+/** 截止已过：时刻在现在之前，或日期早于截止所在时区的今天。 */
+export function deadlineOverdue(deadline: TodoDeadline, now = new Date()): boolean {
+  return deadline.kind === 'instant'
+    ? Date.parse(deadline.at!) < now.getTime()
+    : deadline.date < todoLocalDate(now, deadline.timeZone);
+}
+
+/** 截止分段本身，伙伴待办与个人待办共用；日期都按截止所在时区算。 */
+export function deadlineBucket(deadline: TodoDeadline | null, now = new Date()): TodoBoardBucket {
   if (!deadline) return 'none';
-  if (todoOverdue(todo, now)) return 'overdue';
+  if (deadlineOverdue(deadline, now)) return 'overdue';
   const today = todoLocalDate(now, deadline.timeZone);
   if (deadline.date === today) return 'today';
   return deadline.date <= weekEnd(today) ? 'week' : 'later';
 }
 
+/**
+ * 按自己的截止分段。只有建议日期或待确认期限的事项归「无截止」：
+ * 建议不制造紧迫感（与近况口径一致）。
+ */
+export function todoBoardBucket(todo: TeammateTodo, now = new Date()): TodoBoardBucket {
+  return deadlineBucket(effectiveTodoDeadline(todo), now);
+}
+
 export interface TodoBoardItem {
-  personal?: import('../../../shared/personalTodo').PersonalTodo;
   todo: TeammateTodo;
   teammate: TodoBoardTeammate;
 }

@@ -1,6 +1,8 @@
 import { AppFrame, forbid, mountPage, subscription } from '../../ui-page/harness';
 import { TeammateTodosView } from '../../../src/renderer/features/bots/TeammateTodosView';
 import { queryTodoItems, todoLocalDate, type TeammateTodo, type TodoListQuery } from '@cindy/maker-shared/teammate-todo';
+import { TASK_TAG_COLORS, type TaskTag } from '@cindy/maker-shared';
+import type { PersonalTodo } from '../../../src/shared/personalTodo';
 
 // Roster and cloud hooks are replaced at build time (ui-page.mjs `stubs`); the page, the local and
 // device-link todo reads, filters, tooltips, theme and translations are the production code.
@@ -59,17 +61,58 @@ function remote(caseName: string): TeammateTodo[] {
   ];
 }
 
+// Personal todos are fixture data only: no account, no writes (`update` is forbidden below).
+const tag = (id: string, name: string, color: TaskTag['color'], sortOrder: number): TaskTag => ({
+  id, name, color, favoriteOrder: null, sortOrder, revision: 1, nameCustomized: true,
+});
+const TAGS = [tag('work', '工作', 'blue', 0), tag('life', '生活', 'green', 1), tag('study', '学习', 'purple', 2)];
+const instant = (offset: number, hour: number, minute = 0) => {
+  const date = day(offset);
+  const at = new Date(`${date}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`);
+  return { kind: 'instant' as const, date, at: at.toISOString(), timeZone: zone };
+};
+function mine(id: string, title: string, patch: Partial<PersonalTodo> = {}): PersonalTodo {
+  return {
+    id, revision: 1, title, notes: '', deadline: null, status: 'open', deferredUntil: null,
+    createdAt: `2026-11-0${Number(id.replace(/\D/g, '')) % 9 + 1}T08:00:00Z`, updatedAt: '2026-11-10T08:00:00Z',
+    priority: 0, tagIds: [], reminder: 'default', ownership: 'self', source: 'manual', ...patch,
+  };
+}
+function personal(caseName: string): PersonalTodo[] {
+  if (caseName === 'personal-row')
+    return [mine('unit-personal-row', '[fixture] Personal row — layout only', { notes: 'Unit fixture, no account data or writes.' })];
+  if (caseName !== 'personal') return [];
+  return [
+    mine('p1', '提交季度报销单', { priority: 3, tagIds: ['work'], deadline: deadline(-1) }),
+    mine('p2', '准备周会材料', { priority: 3, tagIds: ['work'], deadline: instant(0, 17, 30), notes: '数据截止到周三，附两张对比图' }),
+    mine('p3', '回复供应商报价邮件', { priority: 2, tagIds: ['work'], deadline: instant(0, 14) }),
+    mine('p4', '预约体检', { priority: 1, tagIds: ['life'], deadline: deadline(0) }),
+    mine('p5', '整理第三季度客户反馈', { deadline: deadline(Math.max(1, daysToSunday)) }),
+    mine('p6', '续费个人域名', { priority: 2, tagIds: ['life'], deadline: deadline(1) }),
+    mine('p7', '读完架构笔记第 3 章', { priority: 1, tagIds: ['study'], deadline: deadline(9) }),
+    mine('p8', '买咖啡豆', { tagIds: ['life'] }),
+    mine('p9', '整理桌面文件', { tagIds: ['gone'] }),
+    mine('p10', '更换护照', { priority: 1, tagIds: ['life'], deferredUntil: new Date(Date.now() + 14 * 86_400_000).toISOString() }),
+    mine('p11', '更新简历', { status: 'done', completedAt: new Date(Date.now() - 3_600_000).toISOString() }),
+    mine('p12', '寄回样品', { status: 'done', completedAt: new Date(Date.now() - 86_400_000).toISOString() }),
+  ];
+}
+
 mountPage({
   route: '/bots/todos',
   host: (ctx) => ({
-    localDb: { personalTodos: { list: async () => ctx.case === 'personal-row' ? [{
-      id: 'unit-personal-row', revision: 1, title: '[fixture] Personal row — layout only', notes: 'Unit fixture, no account data or writes.',
-      deadline: null, status: 'open', deferredUntil: null, createdAt: '2026-11-01T00:00:00Z', updatedAt: '2026-11-01T00:00:00Z', ownership: 'self', source: 'manual',
-    }] : [], update: forbid('personalTodos.update') }, bots: { todos: {
-      list: async () => ({ items: local(ctx.case), version: 1 }),
-      update: forbid('todos.update'),
-      dailyCheck: forbid('todos.dailyCheck'),
-    } } },
+    localDb: {
+      personalTodos: { list: async () => personal(ctx.case), update: forbid('personalTodos.update'), onChanged: subscription('personalTodos') },
+      taskTags: {
+        execute: async () => ({ tags: TAGS, sessions: [], supportedColors: [...TASK_TAG_COLORS] }),
+        onChanged: subscription('taskTags'),
+      },
+      bots: { todos: {
+        list: async () => ({ items: local(ctx.case), version: 1 }),
+        update: forbid('todos.update'),
+        dailyCheck: forbid('todos.dailyCheck'),
+      } },
+    },
     maker: { onBotWorkbenchChanged: subscription('todos') },
     routines: { onChanged: subscription('routines') },
     deviceLink: {

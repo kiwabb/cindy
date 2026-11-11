@@ -10061,7 +10061,6 @@
       "todos": "Todo",
       "showMore": "さらに表示",
       "showLess": "閉じる",
-      "doneCount_other": "完了 {{count}}",
       "delete": "削除",
       "deleted": "削除しました。同じ件は今後記録しません",
       "undo": "元に戻す",
@@ -11723,6 +11722,7 @@
     "todoBoard": {
       "title": "Todo",
       "filterTeammates": "仲間で絞り込む",
+      "filter": "絞り込み",
       "discovered": "仲間が見つけた",
       "suggested": "提案 {{date}}",
       "laterUntil": "{{date}} に再通知",
@@ -19482,7 +19482,61 @@
     "reminder": {
       "due": "Todo の期限です",
       "resumed": "再開する時間です",
-      "summary": "{{count}} 件の Todo が期限です"
+      "summary": "{{count}} 件の Todo が期限です",
+      "label": "リマインダー",
+      "onTime": "期限時刻",
+      "before15m": "15分前",
+      "before1h": "1時間前",
+      "dayOf": "当日 9:00",
+      "dayBefore": "前日 9:00",
+      "off": "通知しない",
+      "dueSoon": "まもなく期限",
+      "dueTomorrow": "明日が期限"
+    },
+    "untagged": "タグなし",
+    "noTag": "なし",
+    "newTag": "新しいタグ…",
+    "tagLimit": "タグの数が上限に達しました",
+    "deferTonight": "今夜",
+    "group": {
+      "label": "グループ",
+      "due": "期限別",
+      "priority": "優先度別",
+      "tag": "タグ別",
+      "none": "グループなし"
+    },
+    "order": {
+      "label": "グループ内の順序",
+      "priority": "優先度が高い順",
+      "due": "期限が早い順",
+      "created": "追加が新しい順"
+    },
+    "priority": {
+      "label": "優先度",
+      "high": "高優先度",
+      "medium": "中優先度",
+      "low": "低優先度",
+      "none": "優先度なし",
+      "short": {
+        "high": "高",
+        "medium": "中",
+        "low": "低"
+      }
+    },
+    "due": {
+      "label": "期限",
+      "today": "今日",
+      "tomorrow": "明日",
+      "nextMonday": "来週月曜",
+      "none": "日付なし",
+      "pick": "日付を選択…",
+      "overdueToday": "期限切れ",
+      "overdue_other": "期限切れ {{count}} 日"
+    },
+    "composer": {
+      "add": "追加",
+      "cancel": "キャンセル",
+      "dismissRecognition": "「{{phrase}}」を認識しない"
     }
   }
 }

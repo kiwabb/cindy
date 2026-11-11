@@ -15,6 +15,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const h = vi.hoisted(() => ({
   collections: [] as Array<{ id: string; resourceKind: string }>,
   items: [] as unknown[],
+  capabilities: undefined as unknown,
   readFails: false,
   invokeError: null as unknown,
   reads: 0,
@@ -30,7 +31,7 @@ vi.mock('@/device-link/remoteResources', () => ({
   getRemoteResource: async () => {
     h.reads++;
     if (h.readFails) throw new Error('DEVICE_OFFLINE');
-    return { blocks: [{ primitive: 'personal-todos', data: { items: h.items, total: h.items.length } }] };
+    return { blocks: [{ primitive: 'personal-todos', data: { items: h.items, total: h.items.length, ...(h.capabilities ? { capabilities: h.capabilities } : {}) } }] };
   },
   invokeRemoteResourceAction: async (_i: unknown, _t: unknown, request: Record<string, unknown>) => {
     h.invokes.push(request);
@@ -39,6 +40,8 @@ vi.mock('@/device-link/remoteResources', () => ({
   },
 }));
 
+const { darkColors, lightColors } = await import('@/theme/tokens');
+const { personalTodoTagColor, personalTodoTagLabel, priorityRingColor } = await import('@/session/personalTodoVisuals');
 const { usePersonalTodos, groupPersonalTodos, personalTodoDue, personalTodoErrorKind } = await import('@/session/usePersonalTodos');
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
@@ -58,7 +61,7 @@ const item = (id: string, extra: Record<string, unknown> = {}) => ({
 });
 beforeEach(() => {
   h.collections = [{ id: 'personal-todos', resourceKind: 'personal-todos' }];
-  h.items = []; h.readFails = false; h.invokeError = null; h.reads = 0; h.invokes = [];
+  h.items = []; h.capabilities = undefined; h.readFails = false; h.invokeError = null; h.reads = 0; h.invokes = [];
   root = createRoot(document.createElement('div'));
 });
 afterEach(() => act(() => root.unmount()));
@@ -116,4 +119,50 @@ it('re-reads the latest on a revision conflict and classifies the host error cod
   expect(personalTodoErrorKind(h.invokeError)).toBe('conflict');
   expect(personalTodoErrorKind({ code: 'NOT_FOUND' })).toBe('gone');
   expect(personalTodoErrorKind(new Error('boom'))).toBe('failed');
+});
+
+it('reads priority, reminder and resolved tags, tolerating an older host that sends none', async () => {
+  h.capabilities = { organize: 1 };
+  h.items = [
+    item('hi', { priority: 3, reminder: 'before-1h', tags: [{ id: 'preset:work', name: 'Work', color: 'indigo' }, { id: 'x' }, { id: 't', name: '客户', color: 'red', nameCustomized: true }] }),
+    item('legacy'),
+    item('odd', { priority: 9, reminder: 'soon', tags: 'nope' }),
+  ];
+  await mount('pc-organize');
+  const [hi, legacy, odd] = latest.items;
+  expect(hi).toMatchObject({ priority: 3, reminder: 'before-1h' });
+  expect(hi.tags).toEqual([{ id: 'preset:work', name: 'Work', color: 'indigo' }, { id: 't', name: '客户', color: 'red', nameCustomized: true }]);
+  expect(legacy).toMatchObject({ priority: 0, reminder: 'default', tags: [] });
+  expect(odd).toMatchObject({ priority: 0, reminder: 'default', tags: [] });
+});
+
+it('maps priority to the taskTag ring color in Light and Dark and localizes only unrenamed presets', () => {
+  for (const colors of [lightColors, darkColors]) {
+    expect(priorityRingColor(3, colors)).toBe(colors.taskTagRed);
+    expect(priorityRingColor(2, colors)).toBe(colors.taskTagOrange);
+    expect(priorityRingColor(1, colors)).toBe(colors.taskTagBlue);
+    expect(priorityRingColor(0, colors)).toBeNull();
+    expect(personalTodoTagColor('indigo', colors)).toBe(colors.taskTagIndigo);
+    expect(personalTodoTagColor('white', colors)).toBe(colors.taskTagWhite);
+    expect(personalTodoTagColor('future-color' as never, colors)).toBe(colors.taskTagGray);
+  }
+  const t = (key: string) => `T:${key}`;
+  expect(personalTodoTagLabel({ id: 'preset:work', name: 'Work', color: 'indigo' }, t)).toBe('T:taskTags.presetWork');
+  expect(personalTodoTagLabel({ id: 'preset:work', name: 'Work', color: 'indigo', nameCustomized: true }, t)).toBe('Work');
+  expect(personalTodoTagLabel({ id: 'tag-1', name: '客户', color: 'red' }, t)).toBe('客户');
+});
+
+it('sends priority / tagIds / reminder only to a host that advertises organize, and never on a title edit', async () => {
+  h.items = [item('a', { priority: 2 })];
+  await mount('old-host');
+  await act(async () => { await latest.update({ id: 'a', expectedRevision: 1, title: 'x', priority: 3, tagIds: ['t'], reminder: 'off' }); });
+  expect(h.invokes[0].input).toEqual({ id: 'a', expectedRevision: 1, title: 'x' });
+
+  h.capabilities = { organize: 1 };
+  await mount('new-host');
+  await act(async () => { await latest.update({ id: 'a', expectedRevision: 1, priority: 3, tagIds: ['t'], reminder: 'off' }); });
+  expect(h.invokes[1].input).toEqual({ id: 'a', expectedRevision: 1, priority: 3, tagIds: ['t'], reminder: 'off' });
+  // The existing editor sends title / notes / deadline only: a todo's priority, tags and reminder stay untouched.
+  await act(async () => { await latest.update({ id: 'a', expectedRevision: 1, title: 'y', notes: '' }); });
+  expect(h.invokes[2].input).toEqual({ id: 'a', expectedRevision: 1, title: 'y', notes: '' });
 });

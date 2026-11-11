@@ -10184,8 +10184,6 @@
       "todos": "Afazeres",
       "showMore": "Mostrar mais",
       "showLess": "Mostrar menos",
-      "doneCount_one": "{{count}} concluídos",
-      "doneCount_other": "{{count}} concluídos",
       "delete": "Eliminar",
       "deleted": "Eliminado. Não voltará a ser adicionado.",
       "undo": "Desfazer",
@@ -10213,8 +10211,7 @@
         "community": "Da comunidade",
         "task": "De uma tarefa"
       },
-      "offlineCount_many": "{{count}} offline",
-      "doneCount_many": "{{count}} concluídos"
+      "offlineCount_many": "{{count}} offline"
     },
     "autonomy": {
       "title": "Acompanhar as minhas sessões",
@@ -11866,6 +11863,7 @@
     "todoBoard": {
       "title": "Afazeres",
       "filterTeammates": "Filtrar por colega",
+      "filter": "Filtrar",
       "discovered": "Encontrado pelo colega",
       "suggested": "Sugerido {{date}}",
       "laterUntil": "Volta a {{date}}",
@@ -19740,7 +19738,63 @@
     "reminder": {
       "due": "Tarefa a vencer",
       "resumed": "Hora de retomar",
-      "summary": "{{count}} tarefas a vencer"
+      "summary": "{{count}} tarefas a vencer",
+      "label": "Lembrete",
+      "onTime": "À hora",
+      "before15m": "15 min antes",
+      "before1h": "1 h antes",
+      "dayOf": "No dia, 9:00",
+      "dayBefore": "Véspera, 9:00",
+      "off": "Nenhum",
+      "dueSoon": "A vencer em breve",
+      "dueTomorrow": "Vence amanhã"
+    },
+    "untagged": "Sem etiqueta",
+    "noTag": "Nenhuma",
+    "newTag": "Nova etiqueta…",
+    "tagLimit": "Limite de etiquetas atingido",
+    "deferTonight": "Esta noite",
+    "group": {
+      "label": "Agrupar",
+      "due": "Por prazo",
+      "priority": "Por prioridade",
+      "tag": "Por etiqueta",
+      "none": "Sem agrupamento"
+    },
+    "order": {
+      "label": "Ordem no grupo",
+      "priority": "Maior prioridade primeiro",
+      "due": "Prazo mais próximo primeiro",
+      "created": "Adicionadas recentemente primeiro"
+    },
+    "priority": {
+      "label": "Prioridade",
+      "high": "Prioridade alta",
+      "medium": "Prioridade média",
+      "low": "Prioridade baixa",
+      "none": "Sem prioridade",
+      "short": {
+        "high": "Alta",
+        "medium": "Média",
+        "low": "Baixa"
+      }
+    },
+    "due": {
+      "label": "Prazo",
+      "today": "Hoje",
+      "tomorrow": "Amanhã",
+      "nextMonday": "Próxima segunda-feira",
+      "none": "Sem data",
+      "pick": "Escolher data…",
+      "overdueToday": "Em atraso",
+      "overdue_one": "{{count}} dia de atraso",
+      "overdue_many": "{{count}} de dias de atraso",
+      "overdue_other": "{{count}} dias de atraso"
+    },
+    "composer": {
+      "add": "Adicionar",
+      "cancel": "Cancelar",
+      "dismissRecognition": "Não reconhecer «{{phrase}}»"
     }
   }
 }
