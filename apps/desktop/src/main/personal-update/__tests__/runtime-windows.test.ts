@@ -3,10 +3,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const fixture = vi.hoisted(() => ({ root: '' }));
+const fixture = vi.hoisted(() => ({ root: '', fetch: vi.fn() }));
 vi.mock('electron', () => ({ app: { isPackaged: true, getPath: (name: string) => name === 'exe'
-  ? path.join(fixture.root, 'install', 'Cindy.exe') : path.join(fixture.root, 'user-data') }, net: {}, utilityProcess: {} }));
-import { personalUpdateContext, readPreparedPersonalUpdate, notePersonalRendererCommitted, notePersonalStorageOpened,
+  ? path.join(fixture.root, 'install', 'Cindy.exe') : path.join(fixture.root, 'user-data') }, net: { fetch: fixture.fetch }, utilityProcess: {} }));
+import { checkPersonalManifest, personalUpdateContext, readPreparedPersonalUpdate, notePersonalRendererCommitted, notePersonalStorageOpened,
   reconcileWindowsPersonalUpdate } from '../runtime';
 
 const originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform')!;
@@ -59,6 +59,28 @@ describe('Windows personal update context', () => {
     expect(readPreparedPersonalUpdate()).toEqual(prepared);
     touch('ready.json', JSON.stringify({ ...prepared, teamId: 'ABCDEFGHIJ' }));
     expect(readPreparedPersonalUpdate()).toBeNull();
+  });
+});
+
+describe('Windows personal update feed check', () => {
+  const feed = (revision: number, storageIdentity: string) => JSON.stringify({ ...identity, revision, storageIdentity,
+    asset: { url: `https://github.com/kiwabb/cindy/releases/download/personal-windows-x64-r${revision}/app.zip`, sha256: 'c'.repeat(64), size: 100 } });
+  const serve = (text: string) => fixture.fetch.mockResolvedValueOnce({ ok: true, text: async () => text });
+
+  it('offers a manual install for a newer release with another storage identity, and nothing for an older or failed one', async () => {
+    fs.writeFileSync(optIn(), '{"enabled":true}');
+    serve(feed(43, identity.storageIdentity));
+    await expect(checkPersonalManifest()).resolves.toMatchObject({ kind: 'install', manifest: { revision: 43 } });
+    serve(feed(43, 'd'.repeat(64)));
+    await expect(checkPersonalManifest()).resolves.toMatchObject({ kind: 'manual', manifest: { revision: 43 } });
+    // The revision test comes first: an equal or older release is no update whatever its storage identity.
+    serve(feed(42, 'd'.repeat(64)));
+    await expect(checkPersonalManifest()).resolves.toBeNull();
+    serve(feed(41, 'd'.repeat(64)));
+    await expect(checkPersonalManifest()).resolves.toBeNull();
+    touch('failed-43.json');
+    serve(feed(43, 'd'.repeat(64)));
+    await expect(checkPersonalManifest()).resolves.toBeNull();
   });
 });
 

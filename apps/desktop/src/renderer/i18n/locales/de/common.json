@@ -9902,7 +9902,10 @@
       "confirmAria": "Trotzdem neu starten und das Update anwenden; die laufende Aufgabe wird unterbrochen",
       "cancelAria": "Update abbrechen",
       "dismiss": "Später",
-      "dismissAria": "Update-Banner vorerst ausblenden"
+      "dismissAria": "Update-Banner vorerst ausblenden",
+      "manualTitle": "Neue Version erfordert manuelle Installation",
+      "manualButton": "Installer herunterladen",
+      "manualAria": "Installer für {{version}} herunterladen"
     },
     "notice": {
       "title": "Neuigkeiten",

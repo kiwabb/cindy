@@ -216,11 +216,14 @@ function personalUpdateFixture() {
   const zip = path.join(root, 'personal-42.zip');
   fs.writeFileSync(zip, 'prepared-fixture');
   const identity = { revision: 42, sourceCommit: 'a'.repeat(40), storageIdentity: 'same-storage' };
-  const context = { root, identity: { ...identity, revision: 41, sourceCommit: 'b'.repeat(40) } };
+  const context = {
+    root, identity: { ...identity, revision: 41, sourceCommit: 'b'.repeat(40) },
+    policy: { repository: 'kiwabb/cindy', channel: 'personal-windows-x64' },
+  };
   const prepared = { path: zip, sha256: 'c'.repeat(64), teamId: 'ABCDEFGHIJ', identity };
   personalContext.mockReturnValue(context);
   personalPrepared.mockReturnValue(prepared);
-  personalManifest.mockResolvedValue(identity);
+  personalManifest.mockResolvedValue({ kind: 'install', manifest: identity });
   return { context, prepared, zip, identity };
 }
 
@@ -1583,7 +1586,43 @@ describe('app update forward-only policy', () => {
     } finally { exitSpy.mockRestore(); service.stopUpdateService(); }
   });
 
-  it.each(['PERSONAL_UPDATE_STORAGE_INCOMPATIBLE', 'Invalid personal update policy',
+  it('reports a storage-incompatible personal release as a manual install and drops the cached patch', async () => {
+    readAutoUpdateSettings.mockReturnValue({ autoRelaunchOnIdle: false });
+    const { zip, identity } = personalUpdateFixture();
+    const sends: Array<{ channel: string; payload: unknown }> = [];
+    browserWindowGetAllWindows.mockReturnValue([{
+      isDestroyed: () => false,
+      webContents: { send: (channel: string, payload: unknown) => { sends.push({ channel, payload }); } },
+    } as never]);
+    const service = await freshUpdateService('darwin');
+    service.initUpdateService();
+    try {
+      await expect(service.checkForUpdate()).resolves.toBe('ready');
+      download.mockClear();
+      personalManifest.mockResolvedValueOnce({
+        kind: 'manual', manifest: { ...identity, revision: 43, storageIdentity: 'different-storage' },
+      });
+      await expect(service.checkForUpdate()).resolves.toBe('manual_download');
+      const expected = {
+        status: 'manual', version: 'personal-r43',
+        downloadUrl: 'https://github.com/kiwabb/cindy/releases/tag/personal-windows-x64-r43',
+      };
+      expect(service.getUpdateStatus()).toBe('manual');
+      expect(sends.filter(s => s.channel === 'update-status').at(-1)?.payload).toEqual(expected);
+      expect(await ipcHandlers.get('update-get-status')?.({})).toMatchObject(expected);
+      expect(download).not.toHaveBeenCalled();
+      // The manual state is never an installable patch.
+      expect(await service.checkAppUpdateForAgent()).toMatchObject({
+        status: 'manual_download', targetVersion: 'personal-r43', reason: '当前安装需要手动下载新版本。',
+      });
+      ipcListeners.get('update-relaunch')?.({}, 'dark');
+      await vi.waitFor(() => expect(logError).toHaveBeenCalledWith('No ready update file to apply'));
+      expect(personalApply).not.toHaveBeenCalled();
+      expect(fs.existsSync(zip)).toBe(true);
+    } finally { service.stopUpdateService(); }
+  });
+
+  it.each(['Invalid personal update policy',
     'Invalid personal update identity', 'PERSONAL_UPDATE_FEED_UNAVAILABLE'])
   ('defers a cached personal update after a rejected check (%s)', async error => {
     readAutoUpdateSettings.mockReturnValue({ autoRelaunchOnIdle: false });
@@ -1652,12 +1691,12 @@ describe('app update forward-only policy', () => {
     const service = await freshUpdateService('darwin');
     for (const manifest of [null, { ...identity, sourceCommit: 'f'.repeat(40) },
       { ...identity, storageIdentity: 'different-storage' }, { ...identity, revision: 40 }]) {
-      personalManifest.mockResolvedValueOnce(manifest);
+      personalManifest.mockResolvedValueOnce(manifest && { kind: 'install', manifest });
       await expect(service.checkForUpdate()).resolves.toBe('idle');
       expect(service.getUpdateStatus()).toBe('idle');
       expect(fs.existsSync(zip)).toBe(true);
     }
-    personalManifest.mockResolvedValueOnce(identity);
+    personalManifest.mockResolvedValueOnce({ kind: 'install', manifest: identity });
     await expect(service.checkForUpdate()).resolves.toBe('ready');
   });
 

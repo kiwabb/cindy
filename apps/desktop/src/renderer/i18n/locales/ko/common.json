@@ -9859,7 +9859,10 @@
       "confirmAria": "그래도 재시작하여 업데이트를 적용하고 실행 중인 작업을 중단",
       "cancelAria": "업데이트 취소",
       "dismiss": "나중에",
-      "dismissAria": "업데이트 알림 일시 숨김"
+      "dismissAria": "업데이트 알림 일시 숨김",
+      "manualTitle": "새 버전은 수동 설치가 필요합니다",
+      "manualButton": "설치 파일 다운로드",
+      "manualAria": "{{version}} 설치 파일 다운로드"
     },
     "notice": {
       "title": "업데이트 소식",

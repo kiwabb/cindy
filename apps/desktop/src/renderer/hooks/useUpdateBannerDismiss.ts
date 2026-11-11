@@ -175,11 +175,14 @@ export function isUpdateBannerPinnedFor(currentVersion: string | null): boolean 
  *
  * Guards against transient 'idle': useUpdateStatus() starts at 'idle' before
  * getUpdateStatus() resolves on remount, so we must not treat idle/error as a
- * new-update signal — only 'ready' and 'superseding' represent active updates.
+ * new-update signal — only 'ready', 'superseding' and 'manual' (a newer release
+ * that must be installed by hand) represent active updates. The background poll
+ * goes 'manual' → 'checking' → 'manual' with the same version, which compares
+ * equal to the dismissed snapshot and so stays dismissed.
  */
 export function isNewUpdateAfterDismiss(currentStatus: string, currentVersion: string | null): boolean {
   if (!state.dismissed) return false;
-  if (currentStatus !== 'ready' && currentStatus !== 'superseding') return false;
+  if (currentStatus !== 'ready' && currentStatus !== 'superseding' && currentStatus !== 'manual') return false;
   return currentStatus !== state.dismissedStatus || currentVersion !== state.dismissedVersion;
 }
 

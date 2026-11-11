@@ -38,6 +38,7 @@ const updateStatus = vi.hoisted(() => ({
     status: string;
     version?: string;
     errorCode: string | null;
+    downloadUrl?: string;
   },
 }));
 
@@ -49,9 +50,10 @@ vi.mock('@/components/ui/tooltip', () => ({
   Tip: ({ children }: { children: React.ReactNode }) => children,
 }));
 
-const { anyActivityBlockingRelaunch, relaunchToUpdate } = vi.hoisted(() => ({
+const { anyActivityBlockingRelaunch, relaunchToUpdate, openExternal } = vi.hoisted(() => ({
   anyActivityBlockingRelaunch: vi.fn<() => Promise<boolean>>(),
   relaunchToUpdate: vi.fn(),
+  openExternal: vi.fn(),
 }));
 
 const EXPANDED = 'update.banner.ariaExpanded';
@@ -69,12 +71,14 @@ beforeEach(() => {
   resetUpdateBannerDismissStoreForTests();
   anyActivityBlockingRelaunch.mockReset();
   relaunchToUpdate.mockReset();
+  openExternal.mockReset();
   updateStatus.current = { status: 'ready', version: '1.2.3', errorCode: null };
   Object.defineProperty(window, 'electronAPI', {
     configurable: true,
     value: {
       anyActivityBlockingRelaunch,
       relaunchToUpdate,
+      openExternal,
       clientEndpoints: { websiteUrl: 'https://cindy.ai' },
     } as unknown as Window['electronAPI'],
   });
@@ -334,5 +338,41 @@ describe('UpdateBanner busy defer', () => {
     expect(screen.queryByRole('button', { name: EXPANDED })).toBeNull();
     expect(getUpdateBannerDismissState().pinnedByUser).toBe(false);
     expect(getUpdateBannerDismissState().dismissedVersion).toBe('2.0.0');
+  });
+});
+
+describe('update banner for a release that needs a manual install', () => {
+  const URL_R1 = 'https://github.com/kiwabb/cindy/releases/tag/personal-windows-x64-r1';
+  const manual = (version: string, downloadUrl = URL_R1) => ({
+    status: 'manual', version, errorCode: null, downloadUrl,
+  });
+
+  it('opens the release page, never probes or restarts, and stays dismissed across polls of the same version', async () => {
+    updateStatus.current = manual('personal-r1');
+    const { rerender } = render(<UpdateBanner isCollapsed={false} />);
+    expect(screen.getByText('update.banner.manualTitle')).toBeTruthy();
+    expect(screen.getByText('personal-r1')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'update.banner.manualAria' }));
+    expect(openExternal).toHaveBeenCalledWith(URL_R1);
+    expect(anyActivityBlockingRelaunch).not.toHaveBeenCalled();
+    expect(relaunchToUpdate).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'update.banner.dismissAria' }));
+    expect(screen.queryByText('update.banner.manualTitle')).toBeNull();
+
+    // The 30-minute poll: manual -> checking -> manual with the same version.
+    updateStatus.current = { status: 'checking', version: 'personal-r1', errorCode: null };
+    rerender(<UpdateBanner isCollapsed={false} />);
+    updateStatus.current = manual('personal-r1');
+    rerender(<UpdateBanner isCollapsed={false} />);
+    expect(screen.queryByText('update.banner.manualTitle')).toBeNull();
+
+    // A newer release shows again, and the collapsed form opens the same page.
+    const URL_R2 = URL_R1.replace('-r1', '-r2');
+    updateStatus.current = manual('personal-r2', URL_R2);
+    rerender(<UpdateBanner isCollapsed />);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'update.banner.manualAria' })).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: 'update.banner.manualAria' }));
+    expect(openExternal).toHaveBeenLastCalledWith(URL_R2);
   });
 });

@@ -9859,7 +9859,10 @@
       "confirmAria": "仍要重啟並應用更新，會中斷執行中的任務",
       "cancelAria": "取消更新",
       "dismiss": "稍後再說",
-      "dismissAria": "關閉更新提示，稍後再決定"
+      "dismissAria": "關閉更新提示，稍後再決定",
+      "manualTitle": "新版本需手動安裝",
+      "manualButton": "下載安裝包",
+      "manualAria": "下載 {{version}} 安裝包"
     },
     "notice": {
       "title": "更新公告",

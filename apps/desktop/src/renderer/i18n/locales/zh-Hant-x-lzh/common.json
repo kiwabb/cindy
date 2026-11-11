@@ -9859,7 +9859,10 @@
       "confirmAria": "仍要重啟以用更新，將斷方行之差事",
       "cancelAria": "罷更新",
       "dismiss": "容後再議",
-      "dismissAria": "闔更新之告，容後再定"
+      "dismissAria": "闔更新之告，容後再定",
+      "manualTitle": "新版須手裝",
+      "manualButton": "取安裝包",
+      "manualAria": "取 {{version}} 安裝包"
     },
     "notice": {
       "title": "新版之告",

@@ -9859,7 +9859,10 @@
       "confirmAria": "それでも再起動して更新を適用（実行中のタスクは中断されます）",
       "cancelAria": "更新をキャンセル",
       "dismiss": "後で",
-      "dismissAria": "更新通知を一時的に閉じる"
+      "dismissAria": "更新通知を一時的に閉じる",
+      "manualTitle": "新バージョンは手動インストールが必要です",
+      "manualButton": "インストーラーをダウンロード",
+      "manualAria": "{{version}} のインストーラーをダウンロード"
     },
     "notice": {
       "title": "更新情報",
