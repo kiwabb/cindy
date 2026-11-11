@@ -9261,8 +9261,7 @@
       "downloading": "Baixando nova versão, aguarde…",
       "ready": "Nova versão pronta — clique na barra lateral para aplicar",
       "manifestFailed": "Falha ao verificar atualizações. Verifique sua conexão",
-      "downloadFailed": "Falha ao baixar a nova versão. Tente novamente mais tarde",
-      "manualDownload": "Baixe no aplicativo e depois escolha quando reiniciar. Apenas instalações .deb do sistema exigem uma senha do sistema."
+      "downloadFailed": "Falha ao baixar a nova versão. Tente novamente mais tarde"
     },
     "closeConfirm": {
       "title": "Confirmar saída?",

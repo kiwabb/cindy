@@ -9261,8 +9261,7 @@
       "downloading": "Téléchargement de la nouvelle version, veuillez patienter…",
       "ready": "Nouvelle version prête : cliquez dans la barre latérale pour l'appliquer",
       "manifestFailed": "Échec de la recherche de mises à jour, vérifiez votre réseau",
-      "downloadFailed": "Échec du téléchargement de la nouvelle version, réessayez plus tard",
-      "manualDownload": "Téléchargez dans l'application, puis choisissez quand redémarrer. Seules les installations système .deb nécessitent un mot de passe système."
+      "downloadFailed": "Échec du téléchargement de la nouvelle version, réessayez plus tard"
     },
     "closeConfirm": {
       "title": "Confirmer la fermeture ?",

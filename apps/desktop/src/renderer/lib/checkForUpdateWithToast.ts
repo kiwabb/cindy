@@ -21,7 +21,8 @@ export async function checkForUpdateWithToast(t: Translate): Promise<void> {
       toast.error(t('titleBar.updateCheckToast.downloadFailed'));
       break;
     case 'manual_download':
-      toast.warning(t('titleBar.updateCheckToast.manualDownload'));
+      // Only the personal channel reports this (newer release, incompatible storage); same label as the banner.
+      toast.warning(t('update.banner.manualTitle'));
       break;
   }
 }

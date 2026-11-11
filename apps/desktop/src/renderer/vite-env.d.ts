@@ -4143,7 +4143,7 @@ interface ElectronAPI {
    *   - 'ready'            → 新版本已就绪,等待重启
    *   - 'manifest_failed'  → 拉清单失败(网络问题)
    *   - 'download_failed'  → 找到了新版本但下载失败
-   *   - 'manual_download'  → 保留给仍走手动安装的旧路径；现行 Linux 已应用内下 .deb
+   *   - 'manual_download'  → 个人更新通道：更新版本的数据格式不兼容，需下载安装包手动安装
    */
   checkForUpdate: () => Promise<{
     result:
