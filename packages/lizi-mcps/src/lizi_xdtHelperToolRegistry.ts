@@ -51,6 +51,7 @@ export type XdtHelperToolCategory =
   | 'app_update'
   | 'bots'
   | 'github'
+  | 'todos'
   | 'settings';
 
 export type XdtHelperToolContentBlock =

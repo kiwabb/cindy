@@ -19447,17 +19447,16 @@
   },
   "personalTodos": {
     "mine": "我的待辦",
-    "assistant": "助手跟進",
+    "teammates": "夥伴待辦",
     "all": "全部",
     "scope": "待辦負責人",
     "add": "新增待辦",
     "details": "待辦詳情",
-    "ownerSource": "負責人：我 · 由我建立 · 手動新增",
     "title": "標題",
     "notes": "備註（選填）",
     "deadline": "截止日期（選填）",
+    "deadlineTime": "截止時間（選填）",
     "deferUntil": "恢復處理時間",
-    "deferHint": "稍後處理不會改變截止日期。",
     "save": "儲存",
     "saving": "正在儲存…",
     "close": "關閉",
@@ -19468,14 +19467,19 @@
     "delete": "刪除",
     "deleteConfirm": "刪除這條待辦？",
     "empty": "此檢視暫無待辦",
-    "emptyHint": "可以直接新增個人待辦。",
     "saveFailed": "儲存失敗，輸入已保留。請再次儲存。",
     "loadFailed": "個人待辦讀取失敗。",
-    "conflict": "事項已於別處更新，或先前建立已提交。重新讀取版本會保留目前輸入；再次儲存將以目前標題、備註和截止日期覆蓋該版本對應欄位。",
+    "conflict": "已在別處更新",
     "reloadVersion": "讀取最新版本以覆蓋儲存",
-    "savedNotice": "已儲存「{{title}}」。下方按鈕可查看所在清單。",
+    "savedNotice": "已儲存「{{title}}」",
     "deletedNotice": "已刪除「{{title}}」。",
-    "rowFailed": "操作失敗，事項未移出。請再試一次，或開啟詳情讀取最新版本。",
-    "overwrite": "覆蓋儲存"
+    "rowFailed": "操作失敗",
+    "overwrite": "覆蓋儲存",
+    "deferInPast": "恢復時間需晚於現在",
+    "reminder": {
+      "due": "待辦到期",
+      "resumed": "已到恢復處理時間",
+      "summary": "{{count}} 則待辦到期"
+    }
   }
 }

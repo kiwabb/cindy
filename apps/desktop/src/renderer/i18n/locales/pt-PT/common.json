@@ -19705,17 +19705,16 @@
   },
   "personalTodos": {
     "mine": "As minhas pendências",
-    "assistant": "Acompanhamento do assistente",
+    "teammates": "Pendências dos colegas",
     "all": "Todas",
     "scope": "Responsável",
     "add": "Adicionar pendência",
     "details": "Detalhes",
-    "ownerSource": "Responsável: eu · Criada por mim · Adicionada manualmente",
     "title": "Título",
     "notes": "Notas (opcional)",
     "deadline": "Prazo (opcional)",
+    "deadlineTime": "Hora (opcional)",
     "deferUntil": "Retomar em",
-    "deferHint": "Adiar não altera o prazo.",
     "save": "Guardar",
     "saving": "A guardar…",
     "close": "Fechar",
@@ -19726,14 +19725,19 @@
     "delete": "Eliminar",
     "deleteConfirm": "Eliminar esta pendência?",
     "empty": "Sem pendências nesta vista",
-    "emptyHint": "Adicione uma pendência pessoal.",
     "saveFailed": "Não foi possível guardar. A introdução foi mantida. Tente guardar novamente.",
     "loadFailed": "Não foi possível carregar as pendências.",
-    "conflict": "Alterada noutro local ou já criada. Recarregar mantém a introdução. Guardar substituirá título, notas e prazo dessa versão.",
+    "conflict": "Atualizado noutro local",
     "reloadVersion": "Carregar versão para substituir",
-    "savedNotice": "“{{title}}” foi guardada. O botão abre a lista.",
+    "savedNotice": "“{{title}}” guardada",
     "deletedNotice": "“{{title}}” foi eliminada.",
-    "rowFailed": "Não foi possível atualizar. Tente novamente ou carregue a versão atual nos detalhes.",
-    "overwrite": "Substituir e guardar"
+    "rowFailed": "Falha na ação",
+    "overwrite": "Substituir e guardar",
+    "deferInPast": "A hora deve ser posterior à atual",
+    "reminder": {
+      "due": "Tarefa a vencer",
+      "resumed": "Hora de retomar",
+      "summary": "{{count}} tarefas a vencer"
+    }
   }
 }

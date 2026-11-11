@@ -77,7 +77,7 @@ beforeEach(() => {
   setDataOwnerGeneration('test-owner', 1);
   __testing.reset();
   personalTodoCacheTesting.reset();
-  localStorage.setItem('personal-todo-view:test-owner', 'assistant');
+  localStorage.setItem('personal-todo-view:test-owner', 'teammates');
   remoteFails = false;
   h.local = [{ id: 'cindy', name: 'Cindy', avatar: '', avatarColor: 'violet' }];
   h.remote = [
@@ -171,7 +171,7 @@ describe('TeammateTodosView', () => {
   setDataOwnerGeneration('test-owner', 1);
   __testing.reset();
   personalTodoCacheTesting.reset();
-  localStorage.setItem('personal-todo-view:test-owner', 'assistant');
+  localStorage.setItem('personal-todo-view:test-owner', 'teammates');
     remoteFails = true;
     h.remote = h.remote.map((bot) => (bot.id === 'dev' ? { ...bot, online: true } : bot));
     view.unmount();
@@ -220,19 +220,57 @@ it('supports personal creation without teammates and preserves input on a failed
   await waitFor(() => expect(rowTitles()).toEqual([item.title]));
 });
 
+const openItem = { id: 'form-unit', revision: 1, title: 'Form unit', notes: '', deadline: null, status: 'open' as const,
+  deferredUntil: null, createdAt: '2026-11-01T00:00:00Z', updatedAt: '2026-11-01T00:00:00Z', ownership: 'self' as const, source: 'manual' as const };
+
+// Default scope is 'all' (no stored preference): teammate todos must be visible next to personal ones.
+it('shows teammate and personal todos together when no scope was chosen yet', async () => {
+  localStorage.removeItem('personal-todo-view:test-owner');
+  h.local = [];
+  vi.mocked(window.electronAPI.localDb.personalTodos.list).mockResolvedValue([openItem]);
+  render(<TeammateTodosView />);
+  // Personal and teammate reads resolve independently; wait for both.
+  await waitFor(() => expect(rowTitles()).toEqual(expect.arrayContaining([openItem.title, '审阅合并请求'])));
+  expect(screen.getByRole('radio', { name: 'personalTodos.all' }).getAttribute('aria-checked')).toBe('true');
+});
+
+// Store contract (INVALID_PARAMS for past deferral; instant needs at on the local date): validated/built in the editor.
+it('sends a time-of-day deadline as an instant and rejects a deferral that is not in the future before saving', async () => {
+  h.local = []; h.remote = [];
+  localStorage.setItem('personal-todo-view:test-owner', 'mine');
+  const api = window.electronAPI.localDb.personalTodos;
+  vi.mocked(api.list).mockResolvedValue([openItem]);
+  render(<TeammateTodosView />);
+  fireEvent.click(await screen.findByRole('button', { name: openItem.title }));
+  fireEvent.change(screen.getByLabelText('personalTodos.deferUntil'), { target: { value: '2026-11-05T10:00' } });
+  fireEvent.click(screen.getByRole('button', { name: 'personalTodos.defer' }));
+  expect((await screen.findByRole('alert')).textContent).toBe('personalTodos.deferInPast');
+  expect(api.update).not.toHaveBeenCalled();
+
+  fireEvent.change(screen.getByLabelText('personalTodos.deadline'), { target: { value: '2026-11-20' } });
+  fireEvent.change(screen.getByLabelText('personalTodos.deadlineTime'), { target: { value: '09:30' } });
+  vi.mocked(api.update).mockResolvedValueOnce({ ...openItem, revision: 2 });
+  fireEvent.click(screen.getByRole('button', { name: 'personalTodos.save' }));
+  await waitFor(() => expect(api.update).toHaveBeenCalledTimes(1));
+  expect(vi.mocked(api.update).mock.lastCall?.[0].deadline).toEqual({
+    kind: 'instant', date: '2026-11-20', at: new Date('2026-11-20T09:30').toISOString(),
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  });
+});
+
 function PersonalCount() { return <output data-testid="personal-count">{useTodoBoardOpenCount()}</output>; }
 // Unit fixtures only: all creation entrances must land on a visible personal open row;
 // the sidebar count shares one read and observes completion/reopening without polling.
-it.each(['assistant', 'done', 'later'] as const)('reveals a new personal todo created from %s and shares inline updates with the badge', async entrance => {
+it.each(['teammates', 'done', 'later'] as const)('reveals a new personal todo created from %s and shares inline updates with the badge', async entrance => {
   h.local = []; h.remote = [];
-  localStorage.setItem('personal-todo-view:test-owner', entrance === 'assistant' ? 'assistant' : 'mine');
+  localStorage.setItem('personal-todo-view:test-owner', entrance === 'teammates' ? 'teammates' : 'mine');
   const item = { id: 'visible-unit', revision: 1, title: 'Visible unit todo', notes: '', deadline: null,
     status: 'open' as const, deferredUntil: null, createdAt: '2026-11-01T00:00:00Z', updatedAt: '2026-11-06T00:00:00Z', ownership: 'self' as const, source: 'manual' as const };
   const api = window.electronAPI.localDb.personalTodos;
   vi.mocked(api.update).mockResolvedValueOnce(item);
   render(<><PersonalCount /><TeammateTodosView /></>);
   await waitFor(() => expect(screen.getByTestId('personal-count').textContent).toBe('0'));
-  if (entrance !== 'assistant') fireEvent.click(screen.getByRole('radio', { name: `bots.todoBoard.view.${entrance}` }));
+  if (entrance !== 'teammates') fireEvent.click(screen.getByRole('radio', { name: `bots.todoBoard.view.${entrance}` }));
   fireEvent.click(screen.getByRole('button', { name: 'personalTodos.add' }));
   fireEvent.change(screen.getByLabelText('personalTodos.title'), { target: { value: item.title } });
   fireEvent.click(screen.getByRole('button', { name: 'personalTodos.save' }));

@@ -19520,17 +19520,16 @@
   },
   "personalTodos": {
     "mine": "Meine To-dos",
-    "assistant": "Assistenten-Nachverfolgung",
+    "teammates": "To-dos der Teammates",
     "all": "Alle",
     "scope": "Verantwortlich",
     "add": "To-do hinzufügen",
     "details": "To-do-Details",
-    "ownerSource": "Verantwortlich: ich · Von mir erstellt · Manuell hinzugefügt",
     "title": "Titel",
     "notes": "Notizen (optional)",
     "deadline": "Fällig am (optional)",
+    "deadlineTime": "Uhrzeit (optional)",
     "deferUntil": "Fortsetzen am",
-    "deferHint": "Verschieben ändert die Frist nicht.",
     "save": "Speichern",
     "saving": "Wird gespeichert…",
     "close": "Schließen",
@@ -19541,14 +19540,19 @@
     "delete": "Löschen",
     "deleteConfirm": "Dieses To-do löschen?",
     "empty": "Keine To-dos in dieser Ansicht",
-    "emptyHint": "Fügen Sie ein persönliches To-do hinzu.",
     "saveFailed": "Speichern fehlgeschlagen. Ihre Eingabe bleibt erhalten. Erneut speichern.",
     "loadFailed": "Persönliche To-dos konnten nicht geladen werden.",
-    "conflict": "Anderswo geändert oder bereits erstellt. Neuladen behält Ihre Eingabe. Speichern überschreibt Titel, Notizen und Frist dieser Version.",
+    "conflict": "Anderswo aktualisiert",
     "reloadVersion": "Neueste Version zum Überschreiben laden",
-    "savedNotice": "„{{title}}“ gespeichert. Die Schaltfläche öffnet die Liste.",
+    "savedNotice": "„{{title}}“ gespeichert",
     "deletedNotice": "„{{title}}“ gelöscht.",
-    "rowFailed": "Aktualisierung fehlgeschlagen. Erneut versuchen oder die neueste Version in den Details laden.",
-    "overwrite": "Überschreiben und speichern"
+    "rowFailed": "Aktion fehlgeschlagen",
+    "overwrite": "Überschreiben und speichern",
+    "deferInPast": "Der Zeitpunkt muss in der Zukunft liegen",
+    "reminder": {
+      "due": "Aufgabe fällig",
+      "resumed": "Zeit, das wieder aufzugreifen",
+      "summary": "{{count}} Aufgaben fällig"
+    }
   }
 }

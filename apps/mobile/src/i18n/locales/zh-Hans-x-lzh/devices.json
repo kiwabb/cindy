@@ -865,6 +865,26 @@
     "sourceDisabled": "原已禁用",
     "botOwner": "主人 ID {{id}}"
   },
+  "personalTodos": {
+    "title": "待办",
+    "add": "新建",
+    "open": "未竟",
+    "later": "且缓",
+    "done": "已竟",
+    "titleField": "题",
+    "notesField": "注",
+    "dateField": "日期",
+    "today": "今日",
+    "tomorrow": "明日",
+    "noDate": "无期",
+    "complete": "成",
+    "reopen": "复开",
+    "deleteConfirm": "删此待办？",
+    "loadFailed": "读取未成",
+    "saveFailed": "保存未成",
+    "conflict": "电脑上已有变更，已重读",
+    "gone": "已无此事"
+  },
   "glance": {
     "open": "{{name}}之近况",
     "dueUnseen": "有待办届期",

@@ -117,6 +117,13 @@ import {
   runBotProjectsTool,
   type BotWorkbenchHostDeps,
 } from '../maker-ipc/botWorkbenchTools.js';
+import { captureDataOwnerBroadcastScope } from '../device-link/broadcast-tap.js';
+import {
+  notifyPersonalTodosChanged,
+  openPersonalTodoStore,
+  PersonalTodoOwnerChangedError,
+} from '../maker-ipc/personalTodoAccess.js';
+import type { PersonalTodoUpdate } from '../../shared/personalTodo.js';
 import { createTaskDigestReader } from './taskDigest.js';
 import { createDesktopTaskDigestDeps, createRemoteWorkbenchMessageReader } from './taskDigestHost.js';
 import { createTaskToolCallAuthorizer } from '../maker-ipc/taskToolCallAuthorizer.js';
@@ -1445,6 +1452,28 @@ export function createDesktopMcpProviders(deps: DesktopMcpProvidersDeps): LiziMc
       // 工作台观察范围与行动授权分开：角色只影响可见性，写入还需 Host 的具体授权。
       // 授权在 botWorkbenchAccess 里逐次确定性校验;投递复用 send_to_session 的同一条宿主路径。
       // 停止走通用的 stop_session_turn。
+      // 用户本人的个人待办:账号级存储,不走伙伴待办的 todoForCaller;写后通知界面与远程资源刷新。
+      personalTodos: async (operation, input) => {
+        try {
+          const scope = captureDataOwnerBroadcastScope();
+          const { store, assertCurrent } = openPersonalTodoStore();
+          if (operation === 'list') {
+            const items = await store.list();
+            assertCurrent();
+            return { ok: true, items };
+          }
+          const todo = await store.update((input ?? {}) as PersonalTodoUpdate);
+          assertCurrent();
+          notifyPersonalTodosChanged(scope);
+          return { ok: true, todo };
+        } catch (error) {
+          if (error instanceof PersonalTodoOwnerChangedError)
+            return { ok: false, errorCode: 'OWNER_CHANGED', message: 'Owner changed' };
+          if (error instanceof TodoError)
+            return { ok: false, errorCode: error.code, message: error.message };
+          return { ok: false, errorCode: 'INTERNAL', message: 'Personal todo storage unavailable' };
+        }
+      },
       botWorkbench: {
         projects: runBotProjectsTool,
         todos: async (caller, operation, input) => {

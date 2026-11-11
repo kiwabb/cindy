@@ -19705,17 +19705,16 @@
   },
   "personalTodos": {
     "mine": "Minhas pendências",
-    "assistant": "Acompanhamento do assistente",
+    "teammates": "Pendências dos colegas",
     "all": "Todas",
     "scope": "Responsável",
     "add": "Adicionar pendência",
     "details": "Detalhes",
-    "ownerSource": "Responsável: eu · Criada por mim · Adicionada manualmente",
     "title": "Título",
     "notes": "Notas (opcional)",
     "deadline": "Prazo (opcional)",
+    "deadlineTime": "Hora (opcional)",
     "deferUntil": "Retomar em",
-    "deferHint": "Adiar não altera o prazo.",
     "save": "Salvar",
     "saving": "Salvando…",
     "close": "Fechar",
@@ -19726,14 +19725,19 @@
     "delete": "Excluir",
     "deleteConfirm": "Excluir esta pendência?",
     "empty": "Nenhuma pendência nesta visualização",
-    "emptyHint": "Adicione uma pendência pessoal.",
     "saveFailed": "Não foi possível salvar. Sua entrada foi mantida. Tente salvar novamente.",
     "loadFailed": "Não foi possível carregar as pendências.",
-    "conflict": "Alterada em outro lugar ou já criada. Recarregar mantém sua entrada. Salvar substituirá título, notas e prazo dessa versão.",
+    "conflict": "Atualizado em outro lugar",
     "reloadVersion": "Carregar versão para sobrescrever",
-    "savedNotice": "“{{title}}” foi salva. O botão abre a lista.",
+    "savedNotice": "“{{title}}” salva",
     "deletedNotice": "“{{title}}” foi excluída.",
-    "rowFailed": "Não foi possível atualizar. Tente novamente ou carregue a versão atual nos detalhes.",
-    "overwrite": "Sobrescrever e salvar"
+    "rowFailed": "Falha na ação",
+    "overwrite": "Sobrescrever e salvar",
+    "deferInPast": "O horário deve ser posterior ao atual",
+    "reminder": {
+      "due": "Tarefa vencendo",
+      "resumed": "Hora de retomar",
+      "summary": "{{count}} tarefas vencendo"
+    }
   }
 }

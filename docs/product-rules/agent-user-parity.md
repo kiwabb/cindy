@@ -98,6 +98,7 @@ Agent 新建普通独立任务（`send_to_session` create 与 `start_session_tas
 | 定时任务 | 删除单条运行记录、标记已读                                 | 无   | 无               |
 | 项目     | 列出、登记、改名、移除；工作目录列表                       | 有   | 无               |
 | 项目     | 查询新项目存放位置（`list_projects.projects_root`，含来源） | 有（只读；修改该设置暂无 Agent 工具，按 #8259 维护者初审意见保留为缺口） | 无 |
+| 个人待办 | 列出、新建、改标题/备注/期限、完成/重开、稍后/恢复、删除（`todos` 类，仅本机、当前账号；与伙伴待办分开） | 有（2026-11-10） | 无（手机经远程资源访问，不是 Agent 跨电脑工具） |
 | 任务导入 | 扫描其他 AI 编程工具的任务、开始导入、查进度与结果（与设置 → 任务导入同一实现） | 有（2026-10-30） | 无 |
 | 伙伴     | 发现伙伴、伙伴间消息                                       | 有   | 有               |
 | 伙伴     | 自身关联项目：列出、添加与移除（原有文件工具按需读资料） | 有 | 无（远程设置界面可管理） |
@@ -134,6 +135,11 @@ Worker 工具省略 working_dir 时保持继承 Lead 任务记录目录，不跟
   `list_available_models` 共用 host 实现；模型项的 `id` 对应 `model`，`providers[].id` 对应
   `providerId`）、`create.ts` / `update.ts` 的 `agentDeviceId`；执行见
   `apps/desktop/src/main/scheduler-host/runner.ts`（按那台电脑的已授权目录解析，不回落本机同名来源）。
+- 个人待办（`list_personal_todos` / `update_personal_todo`）：`packages/lizi-mcps/src/xdt-helper/personal_todo.ts`
+  （`todos` 类目，普通任务与伙伴任务都有；远程 Pi 任务保留，远程 Claude/Codex 沿用只开放 `cindy` 与 `auth`）；
+  宿主回调在 `apps/desktop/src/main/mcp-integrations/mcp-providers.ts` 的 `personalTodos`，用
+  `maker-ipc/personalTodoAccess.ts` 打开账号存储，写后 `notifyPersonalTodosChanged`。新建靠 `creationRequestId`
+  幂等，改动带 `expectedRevision`；沿用任务权限，不进伙伴待办的 `todoForCaller`，不加额外确认。
 - 跨电脑定时任务：`packages/lizi-mcps/src/scheduler/_devices.ts`、
   `apps/desktop/src/main/mcp-integrations/schedulerDevices.ts`。
 - 跨电脑发消息：`apps/desktop/src/main/mcp-integrations/sessionHandoffRemote.ts`、

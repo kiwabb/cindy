@@ -19447,17 +19447,16 @@
   },
   "personalTodos": {
     "mine": "我的待办",
-    "assistant": "助手跟进",
+    "teammates": "伙伴待办",
     "all": "全部",
     "scope": "待办负责人",
     "add": "新增待办",
     "details": "待办详情",
-    "ownerSource": "负责人：我 · 由我创建 · 手动添加",
     "title": "标题",
     "notes": "备注（选填）",
     "deadline": "截止日期（选填）",
+    "deadlineTime": "截止时间（选填）",
     "deferUntil": "恢复处理时间",
-    "deferHint": "稍后处理不会改变截止日期。",
     "save": "保存",
     "saving": "正在保存…",
     "close": "关闭",
@@ -19468,14 +19467,19 @@
     "delete": "删除",
     "deleteConfirm": "删除这条待办？",
     "empty": "此视图暂无待办",
-    "emptyHint": "可以直接新增个人待办。",
     "saveFailed": "保存失败，输入已保留。请再次保存。",
     "loadFailed": "个人待办读取失败。",
-    "conflict": "事项已在别处更新，或此前创建已提交。重新读取版本会保留当前输入；再次保存将用当前标题、备注和截止日期覆盖该版本的对应字段。",
+    "conflict": "已在别处更新",
     "reloadVersion": "读取最新版本以覆盖保存",
-    "savedNotice": "已保存「{{title}}」。下方按钮可查看所在列表。",
+    "savedNotice": "已保存「{{title}}」",
     "deletedNotice": "已删除「{{title}}」。",
-    "rowFailed": "操作失败，事项未移出。请再次点击，或打开详情查看最新版本。",
-    "overwrite": "覆盖保存"
+    "rowFailed": "操作失败",
+    "overwrite": "覆盖保存",
+    "deferInPast": "恢复时间需晚于现在",
+    "reminder": {
+      "due": "待办到期",
+      "resumed": "已到恢复处理时间",
+      "summary": "{{count}} 条待办到期"
+    }
   }
 }

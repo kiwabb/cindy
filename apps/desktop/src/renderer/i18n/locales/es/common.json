@@ -19705,17 +19705,16 @@
   },
   "personalTodos": {
     "mine": "Mis pendientes",
-    "assistant": "Seguimiento del asistente",
+    "teammates": "Pendientes de compañeros",
     "all": "Todos",
     "scope": "Responsable",
     "add": "Añadir pendiente",
     "details": "Detalles",
-    "ownerSource": "Responsable: yo · Creado por mí · Añadido manualmente",
     "title": "Título",
     "notes": "Notas (opcional)",
     "deadline": "Fecha límite (opcional)",
+    "deadlineTime": "Hora (opcional)",
     "deferUntil": "Retomar el",
-    "deferHint": "Posponer no cambia la fecha límite.",
     "save": "Guardar",
     "saving": "Guardando…",
     "close": "Cerrar",
@@ -19726,14 +19725,19 @@
     "delete": "Eliminar",
     "deleteConfirm": "¿Eliminar este pendiente?",
     "empty": "No hay pendientes en esta vista",
-    "emptyHint": "Añade un pendiente personal.",
     "saveFailed": "No se pudo guardar. Tu entrada se conserva. Vuelve a guardar.",
     "loadFailed": "No se pudieron cargar tus pendientes.",
-    "conflict": "Cambió en otro lugar o ya se creó. Recargar conserva tu entrada. Guardar reemplazará el título, las notas y la fecha límite de esa versión.",
+    "conflict": "Actualizado en otro lugar",
     "reloadVersion": "Cargar la versión que se sobrescribirá",
-    "savedNotice": "Se guardó «{{title}}». El botón abre su lista.",
+    "savedNotice": "Se guardó «{{title}}»",
     "deletedNotice": "Se eliminó «{{title}}».",
-    "rowFailed": "No se pudo actualizar. Reintenta o carga la última versión en los detalles.",
-    "overwrite": "Sobrescribir y guardar"
+    "rowFailed": "Acción fallida",
+    "overwrite": "Sobrescribir y guardar",
+    "deferInPast": "La hora debe ser posterior a ahora",
+    "reminder": {
+      "due": "Tarea pendiente vence",
+      "resumed": "Es hora de retomarla",
+      "summary": "{{count}} tareas pendientes vencen"
+    }
   }
 }

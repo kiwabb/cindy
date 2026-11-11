@@ -1223,6 +1223,7 @@ import {
 } from './scheduler-host/index.js';
 import { configureRoutineHost } from './routines/service.js';
 import { configureBotAutonomyHost, initBotAutonomy } from './bot-autonomy/service.js';
+import { startPersonalTodoReminders } from './maker-ipc/personalTodoReminders.js';
 import { voiceCallCoordinator } from './voice-conversation/callCoordinator.js';
 import { hasVoiceConversationLease } from './voice-conversation/lease.js';
 import { getBotRemoteResourceSource, ensureBotRoutineLaneSession } from './localDb/ipc/bots.js';
@@ -10233,6 +10234,9 @@ app.on('ready', async () => {
   // 睡醒白屏取证:suspend/resume/lock/unlock 全部落日志,给 renderer 侧
   // render-watchdog 的漂移/无帧日志提供时间锚点。
   installPowerEventDiagnostics({ powerMonitor });
+  // 个人待办到期提醒：自带 60s 定时、待办变更与睡眠唤醒（resume）重算，按账号隔离。
+  const personalTodoReminders = startPersonalTodoReminders();
+  onQuit('personal-todo-reminders', () => personalTodoReminders.stop(), 'sync');
 
   // 挂起/锁屏时通知 renderer 释放语音输入的保活麦克风(用户已离开,再占着采集
   // 设备只剩隐私指示灯常亮和 idle-sleep assertion 的代价)。

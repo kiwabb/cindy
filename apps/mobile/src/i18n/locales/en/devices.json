@@ -865,6 +865,26 @@
     "sourceDisabled": "Already off",
     "botOwner": "Owner ID {{id}}"
   },
+  "personalTodos": {
+    "title": "Todos",
+    "add": "New",
+    "open": "Open",
+    "later": "Later",
+    "done": "Done",
+    "titleField": "Title",
+    "notesField": "Notes",
+    "dateField": "Date",
+    "today": "Today",
+    "tomorrow": "Tomorrow",
+    "noDate": "No date",
+    "complete": "Complete",
+    "reopen": "Reopen",
+    "deleteConfirm": "Delete this todo?",
+    "loadFailed": "Couldn't load",
+    "saveFailed": "Couldn't save",
+    "conflict": "Changed on the computer, reloaded",
+    "gone": "No longer exists"
+  },
   "glance": {
     "open": "{{name}} at a glance",
     "dueUnseen": "A todo is due",

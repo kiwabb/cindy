@@ -60,6 +60,13 @@ export interface BotTodoStore {
    * and receipts stay as they are.
    */
   importItems(items: TeammateTodo[], remove: string[]): Promise<void>;
+  /**
+   * Drops deleted-item tombstones whose key starts with `keyPrefix` and whose deletion
+   * (updatedAt) is older than `olderThanMs` before `now`, together with the ingest receipts and
+   * cursor of that key. A non-empty prefix is required so another producer's items are never
+   * matched by accident. Returns how many items were removed; writes nothing when none qualify.
+   */
+  purgeDeleted(params: { olderThanMs: number; now: number; keyPrefix: string }): Promise<number>;
 }
 /** A separate versioned affair store preserves the old task/project file unchanged. */
 export function createBotTodoStore(
@@ -375,6 +382,25 @@ export function createBotTodoStore(
         });
         s.items = [...kept, ...added];
       }),
+    purgeDeleted: async ({ olderThanMs, now, keyPrefix }) => {
+      if (!keyPrefix || !Number.isFinite(olderThanMs) || !Number.isFinite(now))
+        throw new TodoError('INVALID_INPUT');
+      const cutoff = now - olderThanMs;
+      const expired = (t: TeammateTodo) =>
+        t.decision?.kind === 'deleted' &&
+        t.key.startsWith(keyPrefix) &&
+        Date.parse(t.updatedAt) < cutoff;
+      // Cheap unlocked check so the daily sweep does not rewrite the file when nothing expired.
+      if (!(await read()).items.some(expired)) return 0;
+      return mutate((s) => {
+        const gone = new Set(s.items.filter(expired).map((t) => t.key));
+        s.items = s.items.filter((t) => !gone.has(t.key));
+        for (const key of gone) delete s.cursors[key];
+        for (const receipt of Object.keys(s.receipts))
+          if (gone.has(receipt.slice(0, receipt.lastIndexOf(':')))) delete s.receipts[receipt];
+        return gone.size;
+      });
+    },
     ingest: (params: {
       source: string;
       sequence: number;

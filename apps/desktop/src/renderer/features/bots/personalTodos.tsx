@@ -21,7 +21,7 @@ import type { PersonalTodo, PersonalTodoUpdate } from '../../../shared/personalT
 import type { TodoBoardItem, TodoBoardView } from './teammateTodoBoard';
 import { emptyTodoState, applyTodoPatch } from '@cindy/maker-shared/teammate-todo';
 
-export type TodoOwnershipView = 'mine' | 'assistant' | 'all';
+export type TodoOwnershipView = 'mine' | 'teammates' | 'all';
 export function usePersonalTodos() {
   const ownerGeneration = useOptionalDataOwnerGeneration();
   const { dataOwnerId } = getDataOwnerGeneration();
@@ -31,14 +31,14 @@ export function usePersonalTodos() {
     getPersonalTodoSnapshot,
   );
   useEffect(ensurePersonalTodos, [dataOwnerId, ownerGeneration]);
-  const [scope, setScope] = useState<TodoOwnershipView>('mine');
+  const [scope, setScope] = useState<TodoOwnershipView>('all');
   const key = `personal-todo-view:${dataOwnerId ?? 'local'}`;
   useEffect(() => {
     try {
       const saved = localStorage.getItem(key);
-      setScope(saved === 'all' || saved === 'assistant' ? saved : 'mine');
+      setScope(saved === 'mine' || saved === 'teammates' ? saved : 'all');
     } catch {
-      setScope('mine');
+      setScope('all');
     }
   }, [key]);
   const selectScope = (value: TodoOwnershipView) => {
@@ -108,6 +108,21 @@ export function personalBoardItems(
     });
 }
 
+/** Wall-clock HH:mm of an instant in the zone the deadline was written in. */
+function instantTime(deadline: PersonalTodo['deadline']): string {
+  if (deadline?.kind !== 'instant' || !deadline.at) return '';
+  try {
+    return new Intl.DateTimeFormat('en-GB', {
+      timeZone: deadline.timeZone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).format(new Date(deadline.at));
+  } catch {
+    return '';
+  }
+}
+
 export function PersonalTodoEditor({
   initial,
   update,
@@ -133,6 +148,7 @@ export function PersonalTodoEditor({
   const [title, setTitle] = useState(initial?.title ?? '');
   const [notes, setNotes] = useState(initial?.notes ?? '');
   const [deadline, setDeadline] = useState(initial?.deadline?.date ?? '');
+  const [time, setTime] = useState(() => instantTime(initial?.deadline ?? null));
   const [until, setUntil] = useState('');
   const [current, setCurrent] = useState(initial);
   const [busy, setBusy] = useState(false);
@@ -140,8 +156,31 @@ export function PersonalTodoEditor({
   const [deleting, setDeleting] = useState(false);
   const [conflict, setConflict] = useState(false);
   const [overwrite, setOverwrite] = useState(false);
+  const untilMs = Date.parse(until);
+  const untilValid = Number.isFinite(untilMs);
+  const buildDeadline = (): PersonalTodoUpdate['deadline'] => {
+    if (!deadline) return null;
+    const saved = current?.deadline;
+    // Untouched deadlines keep their original zone and metadata.
+    if (saved && saved.date === deadline && instantTime(saved) === time) return saved;
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (time) {
+      const at = new Date(`${deadline}T${time}`);
+      if (!Number.isNaN(at.getTime()))
+        return { kind: 'instant', date: deadline, at: at.toISOString(), timeZone: zone };
+    }
+    return {
+      kind: 'date',
+      date: deadline,
+      timeZone: saved?.kind === 'date' ? saved.timeZone : zone,
+    };
+  };
   const act = async (operation?: PersonalTodoUpdate['operation']) => {
     if (busy || !isDataOwnerIdCurrent(owner)) return;
+    if (operation === 'later' && (!untilValid || untilMs <= Date.now())) {
+      setError(t('personalTodos.deferInPast'));
+      return;
+    }
     const attemptOwner = getDataOwnerGeneration();
     setBusy(true);
     setError('');
@@ -153,14 +192,7 @@ export function PersonalTodoEditor({
         expectedRevision: current?.revision,
         title: title.trim(),
         notes,
-        deadline: deadline
-          ? {
-              kind: 'date',
-              date: deadline,
-              timeZone:
-                current?.deadline?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
-            }
-          : null,
+        deadline: buildDeadline(),
         operation,
         ...(operation === 'later' ? { until: new Date(until).toISOString() } : {}),
       });
@@ -190,7 +222,6 @@ export function PersonalTodoEditor({
         <h2 className="font-medium">
           {t(current ? 'personalTodos.details' : 'personalTodos.add')}
         </h2>
-        <p className="text-12 text-[var(--text-tertiary)]">{t('personalTodos.ownerSource')}</p>
         <FormField label={t('personalTodos.title')} required>
           {(props) => (
             <Input
@@ -215,13 +246,35 @@ export function PersonalTodoEditor({
             />
           )}
         </FormField>
-        <FormField label={t('personalTodos.deadline')}>
-          {(props) => (
-            <Input {...props} type="date" value={deadline} onChange={setDeadline} disabled={busy} />
-          )}
-        </FormField>
+        <div className="flex flex-wrap items-end gap-3">
+          <FormField label={t('personalTodos.deadline')}>
+            {(props) => (
+              <Input
+                {...props}
+                type="date"
+                value={deadline}
+                onChange={(value) => {
+                  setDeadline(value);
+                  if (!value) setTime('');
+                }}
+                disabled={busy}
+              />
+            )}
+          </FormField>
+          <FormField label={t('personalTodos.deadlineTime')}>
+            {(props) => (
+              <Input
+                {...props}
+                type="time"
+                value={time}
+                onChange={setTime}
+                disabled={busy || !deadline}
+              />
+            )}
+          </FormField>
+        </div>
         {current?.status === 'open' ? (
-          <FormField label={t('personalTodos.deferUntil')} hint={t('personalTodos.deferHint')}>
+          <FormField label={t('personalTodos.deferUntil')}>
             {(props) => (
               <Input
                 {...props}
@@ -292,12 +345,12 @@ export function PersonalTodoEditor({
               >
                 {t(current.status === 'done' ? 'personalTodos.reopen' : 'personalTodos.complete')}
               </Button>
-              {current.status === 'open' && until ? (
+              {current.status === 'open' ? (
                 <Button
                   type="button"
                   variant="secondary"
                   size="sm"
-                  disabled={busy}
+                  disabled={busy || !untilValid}
                   onClick={() => void act('later')}
                 >
                   {t('personalTodos.defer')}

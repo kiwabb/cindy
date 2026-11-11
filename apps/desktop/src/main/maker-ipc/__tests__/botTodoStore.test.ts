@@ -475,3 +475,37 @@ it('recovers a committed personal creation after a lost reply without creating a
   expect(edited.completedAt).toBe(done.completedAt);
   expect(Date.parse(edited.updatedAt)).toBeGreaterThan(Date.parse(done.updatedAt));
 });
+
+// Unit: the daily tombstone sweep of the personal file must only drop old personal deletions.
+it('purges old deleted personal tombstones with their receipts and keeps teammate and recent ones', async () => {
+  const { file } = await fixture();
+  const store = createPersonalTodoStore(file);
+  const bot = createBotTodoStore(file, async () => ({}));
+  const day = 86_400_000;
+  const deleteTodo = async (request: string) => {
+    const created = await store.update({ creationRequestId: request, title: request });
+    await store.update({ id: created.id, expectedRevision: created.revision, operation: 'delete' });
+  };
+  await deleteTodo('old');
+  await deleteTodo('recent');
+  const live = await store.update({ creationRequestId: 'live', title: 'live' });
+  const teammate = await bot.patch({ ...p, key: 'quote:old' });
+  await bot.patch({ id: teammate.id, expectedRevision: teammate.revision, operation: 'delete' });
+  // 'old' and the teammate item were deleted 31 days ago; 'recent' and 'live' 5 days ago.
+  const raw = JSON.parse(await readFile(file, 'utf8'));
+  const base = Date.now();
+  for (const item of raw.items) {
+    const age = item.key === 'personal:recent' || item.key === 'personal:live' ? 5 : 31;
+    item.updatedAt = new Date(base - age * day).toISOString();
+  }
+  await writeFile(file, JSON.stringify(raw));
+  expect(await bot.purgeDeleted({ olderThanMs: 30 * day, now: base, keyPrefix: 'personal:' })).toBe(1);
+  const after = await bot.read();
+  expect(after.items.map((t) => t.key).sort()).toEqual(['personal:live', 'personal:recent', 'quote:old']);
+  expect(Object.keys(after.receipts).some((k) => k.startsWith('personal:old:'))).toBe(false);
+  expect(after.cursors['personal:old']).toBeUndefined();
+  expect(after.cursors['personal:recent']).toBe(1);
+  expect(await bot.purgeDeleted({ olderThanMs: 30 * day, now: base, keyPrefix: 'personal:' })).toBe(0);
+  await expect(bot.purgeDeleted({ olderThanMs: 0, now: base, keyPrefix: '' })).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+  expect((await store.list()).map((t) => t.id)).toEqual([live.id]);
+});

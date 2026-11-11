@@ -19705,17 +19705,16 @@
   },
   "personalTodos": {
     "mine": "Mes tâches à faire",
-    "assistant": "Suivi de l’assistant",
+    "teammates": "Tâches des coéquipiers",
     "all": "Tout",
     "scope": "Responsable",
     "add": "Ajouter une tâche à faire",
     "details": "Détails",
-    "ownerSource": "Responsable : moi · Créé par moi · Ajout manuel",
     "title": "Titre",
     "notes": "Notes (facultatif)",
     "deadline": "Échéance (facultatif)",
+    "deadlineTime": "Heure (facultatif)",
     "deferUntil": "Reprendre le",
-    "deferHint": "Reporter ne modifie pas l’échéance.",
     "save": "Enregistrer",
     "saving": "Enregistrement…",
     "close": "Fermer",
@@ -19726,14 +19725,19 @@
     "delete": "Supprimer",
     "deleteConfirm": "Supprimer cet élément ?",
     "empty": "Aucun élément dans cette vue",
-    "emptyHint": "Ajoutez un élément personnel pour commencer.",
     "saveFailed": "Échec de l’enregistrement. Votre saisie est conservée. Réessayez.",
     "loadFailed": "Impossible de charger vos éléments personnels.",
-    "conflict": "Modifié ailleurs ou déjà créé. Le rechargement conserve votre saisie. Enregistrer remplacera le titre, les notes et l’échéance de cette version.",
+    "conflict": "Mis à jour ailleurs",
     "reloadVersion": "Charger la version à remplacer",
-    "savedNotice": "« {{title}} » enregistré. Le bouton ouvre sa liste.",
+    "savedNotice": "« {{title}} » enregistré",
     "deletedNotice": "« {{title}} » supprimé.",
-    "rowFailed": "Échec de la mise à jour. Réessayez ou rechargez la version dans les détails.",
-    "overwrite": "Remplacer et enregistrer"
+    "rowFailed": "Action échouée",
+    "overwrite": "Remplacer et enregistrer",
+    "deferInPast": "L’heure doit être postérieure à maintenant",
+    "reminder": {
+      "due": "Tâche à échéance",
+      "resumed": "Il est temps de la reprendre",
+      "summary": "{{count}} tâches à échéance"
+    }
   }
 }

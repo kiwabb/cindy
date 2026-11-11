@@ -3155,7 +3155,7 @@ interface ElectronAPI {
         | { type: 'provider-share-join'; link: string }
         | { type: 'plugin'; pluginId: string }
         | { type: 'local-plugin-share'; snapshotId: string }
-        | { type: 'installed-plugin'; ghostId?: string }
+        | { type: 'installed-plugin'; ghostId?: string } | { type: 'todos' }
         | { type: 'settings'; tab: 'voice-input' | 'providers' | 'billing' | 'remote-control' | 'builtin-tools'; connect?: string; intent?: 'topup' },
     ) => void,
   ) => () => void;
@@ -3179,7 +3179,7 @@ interface ElectronAPI {
     | { type: 'provider-share-join'; link: string }
     | { type: 'plugin'; pluginId: string }
     | { type: 'local-plugin-share'; snapshotId: string }
-    | { type: 'installed-plugin'; ghostId?: string }
+    | { type: 'installed-plugin'; ghostId?: string } | { type: 'todos' }
     | { type: 'settings'; tab: 'voice-input' | 'providers' | 'billing' | 'remote-control' | 'builtin-tools'; connect?: string; intent?: 'topup' }
     | null
   >;
@@ -5077,6 +5077,7 @@ interface ElectronAPI {
     personalTodos: {
       list: () => Promise<import('../shared/personalTodo').PersonalTodo[]>;
       update: (input: import('../shared/personalTodo').PersonalTodoUpdate) => Promise<import('../shared/personalTodo').PersonalTodo>;
+      onChanged: (listener: (ownerStamp?: import('../shared/dataOwnerPush').DataOwnerPushStamp) => void) => () => void;
     };
     bots: {
       getModelChainSettings: () => Promise<{
