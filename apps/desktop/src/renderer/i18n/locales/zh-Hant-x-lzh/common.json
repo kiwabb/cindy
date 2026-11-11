@@ -10061,7 +10061,6 @@
       "todos": "待理",
       "showMore": "顯更多",
       "showLess": "收",
-      "doneCount_other": "已畢 {{count}}",
       "delete": "刪",
       "deleted": "已刪，同一事此後不再記",
       "undo": "復之",
@@ -11723,6 +11722,7 @@
     "todoBoard": {
       "title": "待理",
       "filterTeammates": "以伴擇之",
+      "filter": "篩",
       "discovered": "伴所察",
       "suggested": "擬 {{date}}",
       "laterUntil": "{{date}} 再告",
@@ -19482,7 +19482,61 @@
     "reminder": {
       "due": "待辦屆期",
       "resumed": "復理之時已至",
-      "summary": "待辦屆期者 {{count}} 條"
+      "summary": "待辦屆期者 {{count}} 條",
+      "label": "提醒",
+      "onTime": "屆時",
+      "before15m": "先十五分",
+      "before1h": "先一時",
+      "dayOf": "當日 9:00",
+      "dayBefore": "前一日 9:00",
+      "off": "不提醒",
+      "dueSoon": "將屆期",
+      "dueTomorrow": "明日屆期"
+    },
+    "untagged": "無標籤",
+    "noTag": "無",
+    "newTag": "增標籤…",
+    "tagLimit": "標籤已滿",
+    "deferTonight": "今夕",
+    "group": {
+      "label": "分組",
+      "due": "依期限",
+      "priority": "依緩急",
+      "tag": "依標籤",
+      "none": "不分組"
+    },
+    "order": {
+      "label": "組內之序",
+      "priority": "急者居前",
+      "due": "期近者居前",
+      "created": "新添者居前"
+    },
+    "priority": {
+      "label": "緩急",
+      "high": "甚急",
+      "medium": "稍急",
+      "low": "不急",
+      "none": "未定緩急",
+      "short": {
+        "high": "高",
+        "medium": "中",
+        "low": "低"
+      }
+    },
+    "due": {
+      "label": "期限",
+      "today": "今日",
+      "tomorrow": "明日",
+      "nextMonday": "下週一",
+      "none": "無期",
+      "pick": "擇日…",
+      "overdueToday": "已逾",
+      "overdue_other": "逾期 {{count}} 日"
+    },
+    "composer": {
+      "add": "添",
+      "cancel": "罷",
+      "dismissRecognition": "不識「{{phrase}}」"
     }
   }
 }

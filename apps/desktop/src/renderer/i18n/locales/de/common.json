@@ -10106,8 +10106,6 @@
       "todos": "To-dos",
       "showMore": "Mehr anzeigen",
       "showLess": "Weniger anzeigen",
-      "doneCount_one": "{{count}} erledigt",
-      "doneCount_other": "{{count}} erledigt",
       "delete": "Löschen",
       "deleted": "Gelöscht. Wird nicht erneut hinzugefügt.",
       "undo": "Rückgängig",
@@ -11770,6 +11768,7 @@
     "todoBoard": {
       "title": "To-dos",
       "filterTeammates": "Nach Teammate filtern",
+      "filter": "Filtern",
       "discovered": "Vom Teammate gefunden",
       "suggested": "Vorschlag {{date}}",
       "laterUntil": "Wieder am {{date}}",
@@ -19555,7 +19554,62 @@
     "reminder": {
       "due": "Aufgabe fällig",
       "resumed": "Zeit, das wieder aufzugreifen",
-      "summary": "{{count}} Aufgaben fällig"
+      "summary": "{{count}} Aufgaben fällig",
+      "label": "Erinnerung",
+      "onTime": "Pünktlich",
+      "before15m": "15 Min. vor",
+      "before1h": "1 Std. vor",
+      "dayOf": "Selber Tag, 9:00",
+      "dayBefore": "Vortag, 9:00",
+      "off": "Aus",
+      "dueSoon": "Bald fällig",
+      "dueTomorrow": "Morgen fällig"
+    },
+    "untagged": "Ohne Tag",
+    "noTag": "Keiner",
+    "newTag": "Neuer Tag…",
+    "tagLimit": "Tag-Limit erreicht",
+    "deferTonight": "Heute Abend",
+    "group": {
+      "label": "Gruppieren",
+      "due": "Nach Fälligkeit",
+      "priority": "Nach Priorität",
+      "tag": "Nach Tag",
+      "none": "Nicht gruppieren"
+    },
+    "order": {
+      "label": "Reihenfolge in der Gruppe",
+      "priority": "Höchste Priorität zuerst",
+      "due": "Früheste Fälligkeit zuerst",
+      "created": "Zuletzt hinzugefügt zuerst"
+    },
+    "priority": {
+      "label": "Priorität",
+      "high": "Hohe Priorität",
+      "medium": "Mittlere Priorität",
+      "low": "Niedrige Priorität",
+      "none": "Keine Priorität",
+      "short": {
+        "high": "Hoch",
+        "medium": "Mittel",
+        "low": "Niedrig"
+      }
+    },
+    "due": {
+      "label": "Fällig",
+      "today": "Heute",
+      "tomorrow": "Morgen",
+      "nextMonday": "Nächsten Montag",
+      "none": "Kein Datum",
+      "pick": "Datum wählen…",
+      "overdueToday": "Überfällig",
+      "overdue_one": "{{count}} Tag überfällig",
+      "overdue_other": "{{count}} Tage überfällig"
+    },
+    "composer": {
+      "add": "Hinzufügen",
+      "cancel": "Abbrechen",
+      "dismissRecognition": "„{{phrase}}“ nicht erkennen"
     }
   }
 }

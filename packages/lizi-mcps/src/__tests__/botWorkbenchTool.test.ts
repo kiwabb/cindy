@@ -256,4 +256,33 @@ describe('personal todo tools', () => {
     expect(await ids('all')).toEqual(['a', 'b', 'c']);
     expect(parse(await reg.call('list_personal_todos', {}))).toMatchObject({ scope: 'local-current-account' });
   });
+
+  it('forwards priority/tagIds/reminder and lists them with resolved tag names and the catalog', async () => {
+    const items = [
+      { id: 'a', revision: 1, title: 'A', notes: '', deadline: null, status: 'open', deferredUntil: null, priority: 3, tagIds: ['t1', 'gone'], reminder: 'before-1h' },
+      { id: 'b', revision: 1, title: 'B', notes: '', deadline: null, status: 'open', deferredUntil: null },
+    ];
+    const tags = [{ id: 't1', name: '工作', color: 'blue', revision: 4 }];
+    const callback = vi.fn<PersonalTodoCallbacks>(async (operation) =>
+      operation === 'list' ? { ok: true as const, items, tags } : { ok: true as const, todo: items[0] },
+    );
+    const reg = new XdtHelperToolRegistry();
+    registerPersonalTodoTools(reg, callback);
+    const patch = { id: 'a', expectedRevision: 1, priority: 3, tagIds: ['t1'], reminder: 'before-1h' };
+    expect(parse(await reg.call('update_personal_todo', patch)).ok).toBe(true);
+    expect(callback).toHaveBeenCalledWith('update', patch);
+    expect(parse(await reg.call('update_personal_todo', { id: 'a', priority: 4 })).ok).toBe(false);
+    expect(parse(await reg.call('update_personal_todo', { id: 'a', reminder: 'soon' })).ok).toBe(false);
+    const listed = parse(await reg.call('list_personal_todos', {}));
+    expect(listed.tags).toEqual([{ id: 't1', name: '工作', color: 'blue' }]);
+    expect(listed.items).toMatchObject([
+      { id: 'a', priority: 3, tagIds: ['t1', 'gone'], reminder: 'before-1h', tags: [{ id: 't1', name: '工作', color: 'blue' }] },
+      { id: 'b', priority: 0, tagIds: [], reminder: 'default', tags: [] },
+    ]);
+    const ids = async (filter: object) =>
+      (parse(await reg.call('list_personal_todos', filter)).items as Array<{ id: string }>).map((t) => t.id);
+    expect(await ids({ priority: 2 })).toEqual(['a']);
+    expect(await ids({ tagId: 't1' })).toEqual(['a']);
+    expect(await ids({ tagId: 'other' })).toEqual([]);
+  });
 });

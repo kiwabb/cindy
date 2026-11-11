@@ -10106,8 +10106,6 @@
       "todos": "Todos",
       "showMore": "Show more",
       "showLess": "Show less",
-      "doneCount_one": "{{count}} done",
-      "doneCount_other": "{{count}} done",
       "delete": "Delete",
       "deleted": "Deleted. It won't be added again.",
       "undo": "Undo",
@@ -11770,6 +11768,7 @@
     "todoBoard": {
       "title": "Todos",
       "filterTeammates": "Filter by teammate",
+      "filter": "Filter",
       "discovered": "Found by teammate",
       "suggested": "Suggested {{date}}",
       "laterUntil": "Back {{date}}",
@@ -19555,7 +19554,62 @@
     "reminder": {
       "due": "Todo due",
       "resumed": "Time to pick this up again",
-      "summary": "{{count}} todos due"
+      "summary": "{{count}} todos due",
+      "label": "Reminder",
+      "onTime": "On time",
+      "before15m": "15 min before",
+      "before1h": "1 h before",
+      "dayOf": "Day of, 9:00",
+      "dayBefore": "Day before, 9:00",
+      "off": "None",
+      "dueSoon": "Due soon",
+      "dueTomorrow": "Due tomorrow"
+    },
+    "untagged": "No tag",
+    "noTag": "None",
+    "newTag": "New tag…",
+    "tagLimit": "Tag limit reached",
+    "deferTonight": "Tonight",
+    "group": {
+      "label": "Group",
+      "due": "By due date",
+      "priority": "By priority",
+      "tag": "By tag",
+      "none": "No grouping"
+    },
+    "order": {
+      "label": "Order within group",
+      "priority": "Highest priority first",
+      "due": "Earliest due first",
+      "created": "Recently added first"
+    },
+    "priority": {
+      "label": "Priority",
+      "high": "High priority",
+      "medium": "Medium priority",
+      "low": "Low priority",
+      "none": "No priority",
+      "short": {
+        "high": "High",
+        "medium": "Medium",
+        "low": "Low"
+      }
+    },
+    "due": {
+      "label": "Due",
+      "today": "Today",
+      "tomorrow": "Tomorrow",
+      "nextMonday": "Next Monday",
+      "none": "No date",
+      "pick": "Pick a date…",
+      "overdueToday": "Overdue",
+      "overdue_one": "{{count}} day overdue",
+      "overdue_other": "{{count}} days overdue"
+    },
+    "composer": {
+      "add": "Add",
+      "cancel": "Cancel",
+      "dismissRecognition": "Don’t recognize “{{phrase}}”"
     }
   }
 }

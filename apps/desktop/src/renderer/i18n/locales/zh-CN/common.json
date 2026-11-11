@@ -10061,7 +10061,6 @@
       "todos": "待办",
       "showMore": "显示更多",
       "showLess": "收起",
-      "doneCount_other": "已完成 {{count}}",
       "delete": "删除",
       "deleted": "已删除，同一件事以后不再记",
       "undo": "撤销",
@@ -11723,6 +11722,7 @@
     "todoBoard": {
       "title": "待办",
       "filterTeammates": "按伙伴筛选",
+      "filter": "筛选",
       "discovered": "伙伴发现",
       "suggested": "建议 {{date}}",
       "laterUntil": "{{date}} 再提醒",
@@ -11735,8 +11735,8 @@
       },
       "view": {
         "label": "状态",
-        "open": "进行中",
-        "later": "稍后再说",
+        "open": "未完成",
+        "later": "稍后",
         "done": "已完成"
       },
       "bucket": {
@@ -19482,7 +19482,61 @@
     "reminder": {
       "due": "待办到期",
       "resumed": "已到恢复处理时间",
-      "summary": "{{count}} 条待办到期"
+      "summary": "{{count}} 条待办到期",
+      "label": "提醒",
+      "onTime": "准时",
+      "before15m": "提前 15 分钟",
+      "before1h": "提前 1 小时",
+      "dayOf": "当天 9:00",
+      "dayBefore": "前一天 9:00",
+      "off": "不提醒",
+      "dueSoon": "即将到期",
+      "dueTomorrow": "明天到期"
+    },
+    "untagged": "无标签",
+    "noTag": "无",
+    "newTag": "新建标签…",
+    "tagLimit": "标签数量已达上限",
+    "deferTonight": "今晚",
+    "group": {
+      "label": "分组",
+      "due": "按截止时间",
+      "priority": "按优先级",
+      "tag": "按标签",
+      "none": "不分组"
+    },
+    "order": {
+      "label": "组内顺序",
+      "priority": "优先级高的在前",
+      "due": "截止早的在前",
+      "created": "最近添加的在前"
+    },
+    "priority": {
+      "label": "优先级",
+      "high": "高优先级",
+      "medium": "中优先级",
+      "low": "低优先级",
+      "none": "无优先级",
+      "short": {
+        "high": "高",
+        "medium": "中",
+        "low": "低"
+      }
+    },
+    "due": {
+      "label": "截止",
+      "today": "今天",
+      "tomorrow": "明天",
+      "nextMonday": "下周一",
+      "none": "无日期",
+      "pick": "选择日期…",
+      "overdueToday": "已逾期",
+      "overdue_other": "逾期 {{count}} 天"
+    },
+    "composer": {
+      "add": "添加",
+      "cancel": "取消",
+      "dismissRecognition": "不识别“{{phrase}}”"
     }
   }
 }

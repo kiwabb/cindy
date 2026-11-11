@@ -10184,8 +10184,6 @@
       "todos": "Pendientes",
       "showMore": "Mostrar más",
       "showLess": "Mostrar menos",
-      "doneCount_one": "{{count}} completado",
-      "doneCount_other": "{{count}} completados",
       "delete": "Eliminar",
       "deleted": "Eliminado. No se volverá a agregar.",
       "undo": "Deshacer",
@@ -10213,8 +10211,7 @@
         "community": "De la comunidad",
         "task": "de una tarea"
       },
-      "offlineCount_many": "{{count}} sin conexión",
-      "doneCount_many": "{{count}} completados"
+      "offlineCount_many": "{{count}} sin conexión"
     },
     "autonomy": {
       "title": "Dar seguimiento a mis sesiones",
@@ -11866,6 +11863,7 @@
     "todoBoard": {
       "title": "Pendientes",
       "filterTeammates": "Filtrar por compañero",
+      "filter": "Filtrar",
       "discovered": "Encontrado por el compañero",
       "suggested": "Sugerido {{date}}",
       "laterUntil": "Vuelve el {{date}}",
@@ -19740,7 +19738,63 @@
     "reminder": {
       "due": "Tarea pendiente vence",
       "resumed": "Es hora de retomarla",
-      "summary": "{{count}} tareas pendientes vencen"
+      "summary": "{{count}} tareas pendientes vencen",
+      "label": "Recordatorio",
+      "onTime": "A la hora",
+      "before15m": "15 min antes",
+      "before1h": "1 h antes",
+      "dayOf": "Mismo día, 9:00",
+      "dayBefore": "Día antes, 9:00",
+      "off": "Ninguno",
+      "dueSoon": "Vence pronto",
+      "dueTomorrow": "Vence mañana"
+    },
+    "untagged": "Sin etiqueta",
+    "noTag": "Ninguna",
+    "newTag": "Nueva etiqueta…",
+    "tagLimit": "Se alcanzó el límite de etiquetas",
+    "deferTonight": "Esta noche",
+    "group": {
+      "label": "Agrupar",
+      "due": "Por fecha límite",
+      "priority": "Por prioridad",
+      "tag": "Por etiqueta",
+      "none": "Sin agrupar"
+    },
+    "order": {
+      "label": "Orden dentro del grupo",
+      "priority": "Mayor prioridad primero",
+      "due": "Fecha límite más próxima primero",
+      "created": "Añadidos recientemente primero"
+    },
+    "priority": {
+      "label": "Prioridad",
+      "high": "Prioridad alta",
+      "medium": "Prioridad media",
+      "low": "Prioridad baja",
+      "none": "Sin prioridad",
+      "short": {
+        "high": "Alta",
+        "medium": "Media",
+        "low": "Baja"
+      }
+    },
+    "due": {
+      "label": "Vence",
+      "today": "Hoy",
+      "tomorrow": "Mañana",
+      "nextMonday": "Próximo lunes",
+      "none": "Sin fecha",
+      "pick": "Elegir fecha…",
+      "overdueToday": "Vencido",
+      "overdue_one": "{{count}} día de retraso",
+      "overdue_many": "{{count}} de días de retraso",
+      "overdue_other": "{{count}} días de retraso"
+    },
+    "composer": {
+      "add": "Añadir",
+      "cancel": "Cancelar",
+      "dismissRecognition": "No reconocer «{{phrase}}»"
     }
   }
 }

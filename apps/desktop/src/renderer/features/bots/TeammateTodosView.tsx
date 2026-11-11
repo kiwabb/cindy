@@ -1,22 +1,32 @@
 import { getDataOwnerGeneration } from '@/contexts/dataOwnerGeneration';
 import { useOptionalDataOwnerGeneration } from '@/contexts/AuthContext';
+import { PersonalTodoComposer } from './PersonalTodoComposer';
+import { PersonalTodoRow } from './PersonalTodoRow';
+import { PersonalGroupingMenu, PersonalTagChips } from './PersonalTodoToolbar';
 import {
-  personalBoardItems,
-  PersonalTodoEditor,
-  usePersonalTodos,
-  type TodoOwnershipView,
-} from './personalTodos';
+  ALL_TAGS,
+  effectiveTagFilter,
+  matchesTagFilter,
+  personalCounts,
+  personalSections,
+  personalTagChips,
+  resolvePersonalTag,
+  type PersonalSection,
+  type PersonalTagFilter,
+} from './personalTodoModel';
+import { PRIORITY_KEY, chipClass, tagDisplayName } from './personalTodoVisuals';
+import { PersonalTodoEditor, usePersonalTodos, type TodoOwnershipView } from './personalTodos';
+import { usePersonalTaskTags } from './usePersonalTaskTags';
 import type { PersonalTodo, PersonalTodoUpdate } from '../../../shared/personalTodo';
 /**
- * 内置待办页：个人事项直接管理，伙伴事项沿用只读清单并打开对应伙伴。
- * 三种归属视图共用截止分组；个人归属不由伙伴 origin 字段推断。
+ * 内置待办页：「我的待办」直接管理（行内新增、分组、标签筛选、详情面板），「伙伴待办」沿用只读清单
+ * 并打开对应伙伴。两者各有各的清单，不混排；个人归属不由伙伴 origin 字段推断。
  */
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Check, ChevronDown, ChevronRight, CircleDot, Circle } from 'lucide-react';
+import { Check, ChevronRight, CircleDot, ListFilter } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  createTodoDueComparator,
   effectiveTodoDeadline,
   todoDateLabel,
   todoDue,
@@ -25,6 +35,7 @@ import {
 } from '@cindy/maker-shared/teammate-todo';
 
 import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Tip } from '@/components/ui/tooltip';
 import { SETTINGS_SECTION_TITLE_CLASS } from '@/components/settings/settingsRowClasses';
@@ -35,6 +46,7 @@ import {
   groupTodoBoardItems,
   refreshTodoBoardEntry,
   todoBoardItems,
+  type TodoBoardFilter,
   type TodoBoardItem,
   type TodoBoardOrigin,
   type TodoBoardTeammate,
@@ -224,118 +236,16 @@ function Deadline({
   );
 }
 
-function PersonalTodoRow({
-  item,
-  view,
-  onOpen,
-  onUpdate,
-}: {
-  item: TodoBoardItem;
-  view: TodoBoardView;
-  onOpen: (item: TodoBoardItem) => void;
-  onUpdate: (input: PersonalTodoUpdate) => Promise<void>;
-}) {
-  const { t, i18n } = useTranslation();
-  const [busy, setBusy] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const todo = item.personal!;
-  const done = todo.status === 'done';
-  const label = `${t(done ? 'personalTodos.reopen' : 'personalTodos.complete')}: ${todo.title}`;
-  return (
-    <div data-testid="todo-board-row">
-      <div className="flex min-h-8 w-full items-center gap-3 rounded-lg px-2 py-1 hover:bg-[var(--surface-hover)] focus-within:ring-2 focus-within:ring-inset focus-within:ring-[var(--focus-ring)]">
-        <button
-          type="button"
-          role="checkbox"
-          aria-checked={done}
-          aria-label={label}
-          aria-busy={busy}
-          disabled={busy}
-          onClick={async () => {
-            setBusy(true);
-            setFailed(false);
-            try {
-              await onUpdate({
-                id: todo.id,
-                expectedRevision: todo.revision,
-                operation: done ? 'reopen' : 'complete',
-              });
-            } catch {
-              setFailed(true);
-            } finally {
-              setBusy(false);
-            }
-          }}
-          className="-mx-0.5 inline-flex size-6 shrink-0 items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
-        >
-          {done ? (
-            <span
-              aria-hidden
-              className={cn(
-                'inline-flex size-5 items-center justify-center rounded-full bg-[var(--surface-chip)] text-[var(--text-primary)]',
-                busy && 'opacity-50',
-              )}
-            >
-              <Check size={12} />
-            </span>
-          ) : (
-            <Circle
-              size={20}
-              aria-hidden
-              className={cn('text-[var(--text-tertiary)]', busy && 'opacity-50')}
-            />
-          )}
-        </button>
-        <button
-          type="button"
-          aria-label={todo.title}
-          onClick={() => onOpen(item)}
-          className="flex min-h-8 min-w-0 flex-1 items-center gap-3 self-stretch rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--focus-ring)]"
-        >
-          <span className="min-w-0 flex-1">
-            <span
-              title={todo.title}
-              className={cn(
-                'block truncate text-13 leading-5',
-                done ? 'text-[var(--text-secondary)]' : 'text-[var(--text-primary)]',
-              )}
-            >
-              {todo.title}
-            </span>
-            {todo.completedAt ? (
-              <span className="block truncate text-12 leading-4 text-[var(--text-tertiary)]">
-                {t('bots.todoBoard.completedOn', {
-                  date: shortDate(todo.completedAt, i18n.language),
-                })}
-              </span>
-            ) : null}
-          </span>
-          {view !== 'done' ? <Deadline todo={item.todo} view={view} offline={false} /> : null}
-        </button>
-      </div>
-      {failed ? (
-        <p role="alert" className="px-2 text-12 text-[var(--error-fg)]">
-          {t('personalTodos.rowFailed')}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
 function TodoRow({
   item,
   view,
   onOpen,
-  onUpdate,
 }: {
   item: TodoBoardItem;
   view: TodoBoardView;
   onOpen: (item: TodoBoardItem) => void;
-  onUpdate: (input: PersonalTodoUpdate) => Promise<void>;
 }) {
   const { t, i18n } = useTranslation();
-  if (item.personal)
-    return <PersonalTodoRow item={item} view={view} onOpen={onOpen} onUpdate={onUpdate} />;
   const { todo, teammate } = item;
   const offline = teammate.offline;
   const done = view === 'done';
@@ -500,38 +410,43 @@ export function TeammateTodosView() {
   return <TodoBoard key={dataOwnerId ?? 'local'} />;
 }
 
-function completionTime(item: TodoBoardItem): number {
-  return (
-    Date.parse(
-      item.personal
-        ? (item.personal.completedAt ?? item.personal.createdAt)
-        : (item.todo.history.at(-1)?.at ?? item.todo.updatedAt),
-    ) || 0
-  );
+const ANY_TEAMMATE: TodoBoardFilter = { teammates: new Set(), origin: 'all' };
+
+/** A label with the number of items it holds, for the segmented controls. */
+function counted(label: string, count: number) {
+  return {
+    label: (
+      <>
+        {label}
+        <span className="ml-1.5 text-12 tabular-nums text-[var(--text-tertiary)]">{count}</span>
+      </>
+    ),
+    'aria-label': `${label} ${count}`,
+  };
 }
 
 function TodoBoard() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const personal = usePersonalTodos();
-  const [editor, setEditor] = useState<PersonalTodo | null | undefined>(undefined);
+  const taskTags = usePersonalTaskTags();
+  const [editor, setEditor] = useState<PersonalTodo | undefined>(undefined);
   useEffect(() => setEditor(undefined), [personal.dataOwnerId]);
   const teammates = useTodoBoardTeammates();
   const entries = useTodoBoardEntries();
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
   const [origin, setOrigin] = useState<TodoBoardOrigin>('all');
   const [view, setView] = useState<TodoBoardView>('open');
-  const [doneOpen, setDoneOpen] = useState(false);
+  const [tagFilter, setTagFilter] = useState<PersonalTagFilter>(ALL_TAGS);
   const [notice, setNotice] = useState<{
     title: string;
     target: TodoBoardView;
     operation?: string;
   } | null>(null);
-  const saved = (
-    todo: PersonalTodo,
-    operation?: PersonalTodoUpdate['operation'],
-    created = false,
-  ) => {
+  const mine = personal.scope === 'mine';
+  const now = new Date();
+  const catalog = taskTags.tags;
+  const saved = (todo: PersonalTodo, operation?: PersonalTodoUpdate['operation']) => {
     const target =
       todo.status === 'done'
         ? 'done'
@@ -540,13 +455,18 @@ function TodoBoard() {
           : 'open';
     setEditor(undefined);
     setNotice({ title: todo.title, target, operation });
-    if (created || operation === 'reopen' || operation === 'restore') {
+    if (operation === 'reopen' || operation === 'restore') {
       personal.selectScope('mine');
-      setView(created ? target : 'open');
+      setView('open');
     }
   };
   const updateRow = async (input: PersonalTodoUpdate) =>
     saved(await personal.update(input), input.operation);
+  // A todo added from the composer stays visible: a filter that would hide it is cleared.
+  const created = (todo: PersonalTodo) => {
+    if (!matchesTagFilter(todo, catalog, effectiveTagFilter(tagFilter, catalog)))
+      setTagFilter(ALL_TAGS);
+  };
 
   // 伙伴改了名单（归档、换电脑）后，筛选里只留还在的。
   const activeSelection = useMemo(
@@ -555,39 +475,39 @@ function TodoBoard() {
     [selected, teammates],
   );
   const filter = useMemo(() => ({ teammates: activeSelection, origin }), [activeSelection, origin]);
-  const items = useMemo(
-    () =>
-      [
-        ...(personal.scope !== 'mine' ? todoBoardItems(teammates, entries, view, filter) : []),
-        ...(personal.scope !== 'teammates'
-          ? personalBoardItems(personal.items, view, t('personalTodos.mine'))
-          : []),
-      ].sort((a, b) =>
-        view === 'done'
-          ? completionTime(b) - completionTime(a)
-          : createTodoDueComparator()(a.todo, b.todo),
-      ),
-    [teammates, entries, view, filter, personal.scope, personal.items, t],
+  const teammateItems = useMemo(
+    () => todoBoardItems(teammates, entries, view, filter),
+    [teammates, entries, view, filter],
   );
-  const done = useMemo(
-    () =>
-      view === 'open'
-        ? [
-            ...(personal.scope !== 'mine'
-              ? todoBoardItems(teammates, entries, 'done', filter)
-              : []),
-            ...(personal.scope !== 'teammates'
-              ? personalBoardItems(personal.items, 'done', t('personalTodos.mine'))
-              : []),
-          ].sort((a, b) => completionTime(b) - completionTime(a))
-        : [],
-    [teammates, entries, view, filter, personal.scope, personal.items, t],
+  const teammateGroups = useMemo(
+    () => (view === 'done' ? [] : groupTodoBoardItems(teammateItems)),
+    [teammateItems, view],
   );
-  const groups = useMemo(() => (view === 'done' ? [] : groupTodoBoardItems(items)), [items, view]);
-  const loading =
-    (personal.scope !== 'teammates' && personal.loading) ||
-    (personal.scope !== 'mine' &&
-      teammates.some((teammate) => !teammate.offline && !entries.has(teammate.key)));
+  const teammateCounts = useMemo(
+    () => ({
+      open: todoBoardItems(teammates, entries, 'open', ANY_TEAMMATE).length,
+      later: todoBoardItems(teammates, entries, 'later', ANY_TEAMMATE).length,
+      done: todoBoardItems(teammates, entries, 'done', ANY_TEAMMATE).length,
+    }),
+    [teammates, entries],
+  );
+  const mineCounts = personalCounts(personal.items, now);
+  const counts = mine ? mineCounts : teammateCounts;
+  const effectiveFilter = effectiveTagFilter(tagFilter, catalog);
+  const sections = personalSections({
+    items: personal.items,
+    view,
+    grouping: personal.grouping,
+    order: personal.order,
+    catalog,
+    filter: effectiveFilter,
+    now,
+  });
+  const chips = personalTagChips(personal.items, catalog, effectiveFilter, now);
+  const showTag = personal.grouping !== 'tag' && effectiveFilter.kind === 'all';
+  const loading = mine
+    ? personal.loading
+    : teammates.some((teammate) => !teammate.offline && !entries.has(teammate.key));
 
   const toggleTeammate = (key: string) => {
     setSelected((previous) => {
@@ -597,8 +517,6 @@ function TodoBoard() {
       return next;
     });
   };
-  const open = (item: TodoBoardItem) =>
-    item.personal ? setEditor(item.personal) : navigate(item.teammate.route);
   const chatTarget =
     teammates.find((teammate) => activeSelection.has(teammate.key)) ?? teammates[0];
   // 同名伙伴（如每台电脑各有一位 Cindy）在筛选里带上电脑名。
@@ -614,10 +532,10 @@ function TodoBoard() {
       data-testid="todo-board-empty"
     >
       <span className="text-13 text-[var(--text-secondary)]">{text}</span>
-      {personal.scope !== 'mine' ? (
+      {!mine ? (
         <span className="text-12 text-[var(--text-tertiary)]">{t('bots.todoBoard.empty.hint')}</span>
       ) : null}
-      {personal.scope !== 'mine' && chatTarget ? (
+      {!mine && chatTarget ? (
         <Button
           variant="secondary"
           size="sm"
@@ -630,17 +548,53 @@ function TodoBoard() {
     </div>
   );
 
+  const sectionLabel = (section: PersonalSection) => {
+    const key = section.key;
+    if (key.kind === 'bucket') return t(`bots.todoBoard.bucket.${key.bucket}`);
+    if (key.kind === 'priority')
+      return key.priority
+        ? t(`personalTodos.priority.short.${PRIORITY_KEY[key.priority]}`)
+        : t('personalTodos.priority.none');
+    if (key.kind === 'tag') return key.tag ? tagDisplayName(key.tag, t) : t('personalTodos.untagged');
+    return view === 'done' || view === 'later' ? t(`bots.todoBoard.view.${view}`) : t('personalTodos.all');
+  };
+
   let list: ReactNode;
-  if (view === 'done') {
-    list = items.length ? (
-      <Section label={t('bots.todoBoard.view.done')} count={items.length}>
-        {items.map((item) => (
+  if (mine) {
+    list = sections.length
+      ? sections.map((section) => (
+          <Section key={section.id} label={sectionLabel(section)} count={section.items.length}>
+            {section.items.map((todo) => (
+              <PersonalTodoRow
+                key={todo.id}
+                todo={todo}
+                view={view}
+                tag={showTag ? resolvePersonalTag(todo, catalog) : null}
+                groupBucket={
+                  personal.grouping === 'due' && section.key.kind === 'bucket'
+                    ? section.key.bucket
+                    : undefined
+                }
+                selected={editor?.id === todo.id}
+                now={now}
+                onOpen={setEditor}
+                onUpdate={updateRow}
+              />
+            ))}
+          </Section>
+        ))
+      : loading
+        ? null
+        : empty(t('personalTodos.empty'));
+  } else if (view === 'done') {
+    list = teammateItems.length ? (
+      <Section label={t('bots.todoBoard.view.done')} count={teammateItems.length}>
+        {teammateItems.map((item) => (
           <TodoRow
             key={`${item.teammate.key}:${item.todo.id}`}
             item={item}
             view="done"
-            onOpen={open}
-            onUpdate={updateRow}
+            onOpen={(entry) => navigate(entry.teammate.route)}
           />
         ))}
       </Section>
@@ -648,8 +602,8 @@ function TodoBoard() {
       empty(t('bots.todoBoard.empty.done'))
     );
   } else {
-    list = groups.length
-      ? groups.map((group) => (
+    list = teammateGroups.length
+      ? teammateGroups.map((group) => (
           <Section
             key={group.bucket}
             label={t(`bots.todoBoard.bucket.${group.bucket}`)}
@@ -660,25 +614,18 @@ function TodoBoard() {
                 key={`${item.teammate.key}:${item.todo.id}`}
                 item={item}
                 view={view}
-                onOpen={open}
-                onUpdate={updateRow}
+                onOpen={(entry) => navigate(entry.teammate.route)}
               />
             ))}
           </Section>
         ))
       : loading
         ? null
-        : empty(
-            t(
-              personal.scope === 'mine'
-                ? 'personalTodos.empty'
-                : view === 'later'
-                  ? 'bots.todoBoard.empty.later'
-                  : 'bots.todoBoard.empty.open',
-            ),
-          );
+        : empty(t(view === 'later' ? 'bots.todoBoard.empty.later' : 'bots.todoBoard.empty.open'));
   }
 
+  const filterActive = activeSelection.size > 0 || origin !== 'all';
+  const showEditor = mine && editor !== undefined;
   return (
     <main
       className="h-full overflow-y-auto pl-4 pr-6 [scrollbar-gutter:stable]"
@@ -690,50 +637,15 @@ function TodoBoard() {
           <h1 className={cn(SETTINGS_SECTION_TITLE_CLASS, 'min-w-0 flex-[1_1_12rem]')}>
             {t('bots.todoBoard.title')}
           </h1>
-          <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
-            {personal.scope !== 'mine' && teammates.length > 1 ? (
-              <div
-                className="flex flex-wrap items-center gap-1.5"
-                role="group"
-                aria-label={t('bots.todoBoard.filterTeammates')}
-              >
-                <TeammatePill
-                  pressed={activeSelection.size === 0}
-                  onClick={() => setSelected(new Set())}
-                  label={t('bots.todoBoard.origin.all')}
-                />
-                {teammates.map((teammate) => (
-                  <TeammatePill
-                    key={teammate.key}
-                    teammate={teammate}
-                    label={pillLabel(teammate)}
-                    pressed={activeSelection.has(teammate.key)}
-                    onClick={() => toggleTeammate(teammate.key)}
-                  />
-                ))}
-              </div>
-            ) : null}
-            {personal.scope !== 'mine' ? (
-              <SegmentedControl<TodoBoardOrigin>
-                aria-label={t('bots.todoBoard.origin.label')}
-                value={origin}
-                onValueChange={setOrigin}
-                options={(['all', 'assigned', 'discovered'] as const).map((value) => ({
-                  value,
-                  label: t(`bots.todoBoard.origin.${value}`),
-                }))}
-              />
-            ) : null}
-            <SegmentedControl<TodoBoardView>
-              aria-label={t('bots.todoBoard.view.label')}
-              value={view}
-              onValueChange={setView}
-              options={(['open', 'later', 'done'] as const).map((value) => ({
-                value,
-                label: t(`bots.todoBoard.view.${value}`),
-              }))}
-            />
-          </div>
+          <SegmentedControl<TodoBoardView>
+            aria-label={t('bots.todoBoard.view.label')}
+            value={view}
+            onValueChange={setView}
+            options={(['open', 'later', 'done'] as const).map((value) => ({
+              value,
+              ...counted(t(`bots.todoBoard.view.${value}`), counts[value]),
+            }))}
+          />
         </div>
         {notice ? (
           <div
@@ -762,22 +674,98 @@ function TodoBoard() {
             ) : null}
           </div>
         ) : null}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-2 py-4">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-2 px-2 pb-3 pt-4">
           <SegmentedControl<TodoOwnershipView>
             aria-label={t('personalTodos.scope')}
             value={personal.scope}
-            onValueChange={personal.selectScope}
-            options={(['mine', 'teammates', 'all'] as const).map((value) => ({
+            onValueChange={(value) => {
+              personal.selectScope(value);
+              setEditor(undefined);
+            }}
+            options={(['mine', 'teammates'] as const).map((value) => ({
               value,
-              label: t(`personalTodos.${value}`),
+              ...counted(
+                t(`personalTodos.${value}`),
+                value === 'mine' ? mineCounts.open : teammateCounts.open,
+              ),
             }))}
           />
-          <Button size="sm" onClick={() => setEditor(null)}>
-            {t('personalTodos.add')}
-          </Button>
+          {mine && taskTags.loaded && chips.tags.length > 0 ? (
+            <>
+              <span aria-hidden className="mx-1.5 h-4 w-px shrink-0 bg-[var(--border-default)]" />
+              <PersonalTagChips
+                all={chips.all}
+                none={chips.none}
+                tags={chips.tags}
+                filter={effectiveFilter}
+                onChange={setTagFilter}
+              />
+            </>
+          ) : null}
+          <span className="flex-1" />
+          {mine ? (
+            <PersonalGroupingMenu
+              grouping={personal.grouping}
+              order={personal.order}
+              onGrouping={personal.selectGrouping}
+              onOrder={personal.selectOrder}
+            />
+          ) : (
+            <Popover>
+              <PopoverTrigger asChild>
+                <button type="button" className={chipClass(filterActive)}>
+                  <ListFilter size={13} aria-hidden />
+                  {t('bots.todoBoard.filter')}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="flex w-80 flex-col gap-3">
+                {teammates.length > 1 ? (
+                  <div className="flex flex-col gap-2">
+                    <span className="text-12 text-[var(--text-tertiary)]">
+                      {t('bots.todoBoard.filterTeammates')}
+                    </span>
+                    <div
+                      className="flex flex-wrap items-center gap-1.5"
+                      role="group"
+                      aria-label={t('bots.todoBoard.filterTeammates')}
+                    >
+                      <TeammatePill
+                        pressed={activeSelection.size === 0}
+                        onClick={() => setSelected(new Set())}
+                        label={t('bots.todoBoard.origin.all')}
+                      />
+                      {teammates.map((teammate) => (
+                        <TeammatePill
+                          key={teammate.key}
+                          teammate={teammate}
+                          label={pillLabel(teammate)}
+                          pressed={activeSelection.has(teammate.key)}
+                          onClick={() => toggleTeammate(teammate.key)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                <div className="flex flex-col gap-2">
+                  <span className="text-12 text-[var(--text-tertiary)]">
+                    {t('bots.todoBoard.origin.label')}
+                  </span>
+                  <SegmentedControl<TodoBoardOrigin>
+                    aria-label={t('bots.todoBoard.origin.label')}
+                    value={origin}
+                    onValueChange={setOrigin}
+                    options={(['all', 'assigned', 'discovered'] as const).map((value) => ({
+                      value,
+                      label: t(`bots.todoBoard.origin.${value}`),
+                    }))}
+                  />
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
         </div>
-        {personal.scope !== 'mine' ? <TeammateNotes teammates={teammates} /> : null}
-        {personal.scope !== 'teammates' && personal.failed ? (
+        {!mine ? <TeammateNotes teammates={teammates} /> : null}
+        {mine && personal.failed ? (
           <p role="alert" className="px-4 text-12 text-[var(--error-fg)]">
             {t('personalTodos.loadFailed')}{' '}
             <Button variant="secondary" size="sm" onClick={() => void personal.refresh()}>
@@ -787,15 +775,16 @@ function TodoBoard() {
         ) : null}
         <div
           className={cn(
-            'mt-4 grid min-w-0 gap-4',
-            editor !== undefined && 'min-[1100px]:grid-cols-[minmax(0,1fr)_320px]',
+            'mt-1 grid min-w-0 gap-4',
+            showEditor && 'min-[1100px]:grid-cols-[minmax(0,1fr)_340px]',
           )}
         >
-          {editor !== undefined ? (
+          {showEditor ? (
             <div className="min-w-0 min-[1100px]:col-start-2 min-[1100px]:row-start-1">
               <PersonalTodoEditor
-                key={`${personal.dataOwnerId}:${editor?.id ?? 'new'}`}
+                key={`${personal.dataOwnerId}:${editor.id}`}
                 initial={editor}
+                tags={catalog}
                 update={personal.update}
                 onClose={() => setEditor(undefined)}
                 onSaved={saved}
@@ -803,39 +792,17 @@ function TodoBoard() {
             </div>
           ) : null}
           <div className="min-w-0 min-[1100px]:col-start-1 min-[1100px]:row-start-1">
-            {personal.scope === 'mine' && personal.failed && !personal.items.length ? null : list}
-            {view === 'open' && done.length > 0 ? (
-              <div className="mt-1.5 border-t border-[var(--border-default)] px-2 py-1.5">
-                <button
-                  type="button"
-                  aria-expanded={doneOpen}
-                  onClick={() => setDoneOpen((value) => !value)}
-                  className="flex min-h-8 w-full items-center gap-1.5 rounded-lg px-2 text-left text-12 text-[var(--text-tertiary)] outline-none transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--text-secondary)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--focus-ring)]"
-                >
-                  <span>{t('bots.glance.doneCount', { count: done.length })}</span>
-                  <ChevronDown
-                    size={12}
-                    className={cn(
-                      'shrink-0 transition-transform duration-150',
-                      doneOpen && 'rotate-180',
-                    )}
-                  />
-                </button>
-                {doneOpen ? (
-                  <div className="flex flex-col">
-                    {done.map((item) => (
-                      <TodoRow
-                        key={`${item.teammate.key}:${item.todo.id}`}
-                        item={item}
-                        view="done"
-                        onOpen={open}
-                        onUpdate={updateRow}
-                      />
-                    ))}
-                  </div>
-                ) : null}
-              </div>
+            {mine && view === 'open' ? (
+              <PersonalTodoComposer
+                update={personal.update}
+                tags={catalog}
+                supportedColors={taskTags.supportedColors}
+                createTag={taskTags.create}
+                activeTagId={effectiveFilter.kind === 'tag' ? effectiveFilter.id : null}
+                onCreated={created}
+              />
             ) : null}
+            {mine && personal.failed && !personal.items.length ? null : list}
           </div>
         </div>
       </div>

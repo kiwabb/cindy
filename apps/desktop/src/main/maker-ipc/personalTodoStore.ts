@@ -1,6 +1,10 @@
 import { isDeepStrictEqual } from 'node:util';
 import { TodoError, type TodoPatch } from '@cindy/maker-shared/teammate-todo';
-import { projectPersonalTodo, type PersonalTodoUpdate } from '../../shared/personalTodo.js';
+import {
+  PERSONAL_TODO_UPDATE_KEYS,
+  projectPersonalTodo,
+  type PersonalTodoUpdate,
+} from '../../shared/personalTodo.js';
 import { createBotTodoStore } from './botTodoStore.js';
 
 /** Dedicated account file; no bot lookup, legacy import, model dispatch or remote projection. */
@@ -14,16 +18,7 @@ export function createPersonalTodoStore(file: string, assertCurrent = () => {}) 
     async update(input: PersonalTodoUpdate) {
       if (!input || typeof input !== 'object' || Array.isArray(input))
         throw new TodoError('INVALID_INPUT');
-      const allowed = [
-        'id',
-        'creationRequestId',
-        'expectedRevision',
-        'title',
-        'notes',
-        'deadline',
-        'operation',
-        'until',
-      ];
+      const allowed: readonly string[] = PERSONAL_TODO_UPDATE_KEYS;
       if (Object.keys(input).some((k) => !allowed.includes(k)))
         throw new TodoError('INVALID_INPUT');
       if (
@@ -46,6 +41,9 @@ export function createPersonalTodoStore(file: string, assertCurrent = () => {}) 
         progress: input.notes,
         operation: input.operation,
         until: input.until,
+        priority: input.priority,
+        tagIds: input.tagIds,
+        reminder: input.reminder,
         ...(input.deadline !== undefined ? { deadlineOverride: { value: input.deadline } } : {}),
         ...(!input.id ? { key, outcome: input.title } : {}),
         ...(input.operation === 'complete'
@@ -62,7 +60,10 @@ export function createPersonalTodoStore(file: string, assertCurrent = () => {}) 
       if (
         existing.title !== input.title?.trim() ||
         existing.progress !== (input.notes ?? '') ||
-        !isDeepStrictEqual(existing.deadlineOverride?.value ?? null, input.deadline ?? null)
+        !isDeepStrictEqual(existing.deadlineOverride?.value ?? null, input.deadline ?? null) ||
+        (existing.priority ?? 0) !== (input.priority ?? 0) ||
+        !isDeepStrictEqual(existing.tagIds ?? [], input.tagIds ?? []) ||
+        (existing.reminder ?? 'default') !== (input.reminder ?? 'default')
       )
         throw new TodoError('CONFLICT');
       return projectPersonalTodo(existing);

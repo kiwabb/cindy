@@ -10061,7 +10061,6 @@
       "todos": "할 일",
       "showMore": "더 보기",
       "showLess": "접기",
-      "doneCount_other": "완료 {{count}}",
       "delete": "삭제",
       "deleted": "삭제했습니다. 같은 일은 다시 기록하지 않습니다",
       "undo": "실행 취소",
@@ -11723,6 +11722,7 @@
     "todoBoard": {
       "title": "할 일",
       "filterTeammates": "동료별 필터",
+      "filter": "필터",
       "discovered": "동료가 찾음",
       "suggested": "제안 {{date}}",
       "laterUntil": "{{date}}에 다시 알림",
@@ -19482,7 +19482,61 @@
     "reminder": {
       "due": "할 일 마감",
       "resumed": "다시 처리할 시간입니다",
-      "summary": "할 일 {{count}}개 마감"
+      "summary": "할 일 {{count}}개 마감",
+      "label": "알림",
+      "onTime": "정시",
+      "before15m": "15분 전",
+      "before1h": "1시간 전",
+      "dayOf": "당일 9:00",
+      "dayBefore": "전날 9:00",
+      "off": "알리지 않음",
+      "dueSoon": "곧 마감",
+      "dueTomorrow": "내일 마감"
+    },
+    "untagged": "태그 없음",
+    "noTag": "없음",
+    "newTag": "새 태그…",
+    "tagLimit": "태그 수가 한도에 도달했습니다",
+    "deferTonight": "오늘 밤",
+    "group": {
+      "label": "그룹",
+      "due": "마감일별",
+      "priority": "우선순위별",
+      "tag": "태그별",
+      "none": "그룹 안 함"
+    },
+    "order": {
+      "label": "그룹 내 순서",
+      "priority": "우선순위 높은 순",
+      "due": "마감 빠른 순",
+      "created": "최근 추가 순"
+    },
+    "priority": {
+      "label": "우선순위",
+      "high": "높은 우선순위",
+      "medium": "보통 우선순위",
+      "low": "낮은 우선순위",
+      "none": "우선순위 없음",
+      "short": {
+        "high": "높음",
+        "medium": "보통",
+        "low": "낮음"
+      }
+    },
+    "due": {
+      "label": "마감",
+      "today": "오늘",
+      "tomorrow": "내일",
+      "nextMonday": "다음 주 월요일",
+      "none": "날짜 없음",
+      "pick": "날짜 선택…",
+      "overdueToday": "기한 지남",
+      "overdue_other": "기한 지남 {{count}}일"
+    },
+    "composer": {
+      "add": "추가",
+      "cancel": "취소",
+      "dismissRecognition": "“{{phrase}}” 인식 안 함"
     }
   }
 }

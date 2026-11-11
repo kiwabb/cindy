@@ -10061,7 +10061,6 @@
       "todos": "待辦",
       "showMore": "顯示更多",
       "showLess": "收起",
-      "doneCount_other": "已完成 {{count}}",
       "delete": "刪除",
       "deleted": "已刪除，同一件事之後不再記錄",
       "undo": "復原",
@@ -11723,6 +11722,7 @@
     "todoBoard": {
       "title": "待辦",
       "filterTeammates": "依夥伴篩選",
+      "filter": "篩選",
       "discovered": "夥伴發現",
       "suggested": "建議 {{date}}",
       "laterUntil": "{{date}} 再提醒",
@@ -11735,8 +11735,8 @@
       },
       "view": {
         "label": "狀態",
-        "open": "進行中",
-        "later": "稍後再說",
+        "open": "未完成",
+        "later": "稍後",
         "done": "已完成"
       },
       "bucket": {
@@ -19482,7 +19482,61 @@
     "reminder": {
       "due": "待辦到期",
       "resumed": "已到恢復處理時間",
-      "summary": "{{count}} 則待辦到期"
+      "summary": "{{count}} 則待辦到期",
+      "label": "提醒",
+      "onTime": "準時",
+      "before15m": "提前 15 分鐘",
+      "before1h": "提前 1 小時",
+      "dayOf": "當天 9:00",
+      "dayBefore": "前一天 9:00",
+      "off": "不提醒",
+      "dueSoon": "即將到期",
+      "dueTomorrow": "明天到期"
+    },
+    "untagged": "無標籤",
+    "noTag": "無",
+    "newTag": "新增標籤…",
+    "tagLimit": "標籤數量已達上限",
+    "deferTonight": "今晚",
+    "group": {
+      "label": "分組",
+      "due": "依截止時間",
+      "priority": "依優先順序",
+      "tag": "依標籤",
+      "none": "不分組"
+    },
+    "order": {
+      "label": "組內順序",
+      "priority": "優先順序高的在前",
+      "due": "截止早的在前",
+      "created": "最近新增的在前"
+    },
+    "priority": {
+      "label": "優先順序",
+      "high": "高優先順序",
+      "medium": "中優先順序",
+      "low": "低優先順序",
+      "none": "無優先順序",
+      "short": {
+        "high": "高",
+        "medium": "中",
+        "low": "低"
+      }
+    },
+    "due": {
+      "label": "截止",
+      "today": "今天",
+      "tomorrow": "明天",
+      "nextMonday": "下週一",
+      "none": "無日期",
+      "pick": "選擇日期…",
+      "overdueToday": "已逾期",
+      "overdue_other": "逾期 {{count}} 天"
+    },
+    "composer": {
+      "add": "新增",
+      "cancel": "取消",
+      "dismissRecognition": "不辨識「{{phrase}}」"
     }
   }
 }
