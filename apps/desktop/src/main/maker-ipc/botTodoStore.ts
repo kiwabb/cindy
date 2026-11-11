@@ -9,6 +9,9 @@ import {
   todoVisible,
   validateTodoDeadline,
   validateTodoTimestamp,
+  validTodoPriority,
+  validTodoReminder,
+  normalizeTodoTagIds,
   type TodoPatch,
   type TodoState,
   type TeammateTodo,
@@ -181,9 +184,19 @@ export function createBotTodoStore(
           t.value.length > 4000 ||
           !['assigned', 'discovered'].includes(t.origin) ||
           !validTimestamp(t.createdAt) ||
-          !validTimestamp(t.updatedAt)
+          !validTimestamp(t.updatedAt) ||
+          (t.priority !== undefined && !validTodoPriority(t.priority)) ||
+          (t.reminder !== undefined && !validTodoReminder(t.reminder))
         )
           throw new TodoError('CORRUPT_STORE');
+        if (t.tagIds !== undefined) {
+          try {
+            if (normalizeTodoTagIds(t.tagIds).length !== t.tagIds.length)
+              throw new TodoError('CORRUPT_STORE');
+          } catch {
+            throw new TodoError('CORRUPT_STORE');
+          }
+        }
         try {
           validateTodoDeadline(t.sourceDeadline);
           if (t.suggestedDate !== null) {

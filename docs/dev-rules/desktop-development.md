@@ -297,6 +297,9 @@ pnpm test:unit:related
 pnpm test:unit
 ```
 
+`pnpm --filter desktop typecheck` 是增量检查：记录写在 `apps/desktop/node_modules/.cache/tsc/desktop.tsbuildinfo`，
+同一工作区第二次起只重查改动影响到的文件；首次或删除该文件后为完整检查。
+
 - 改 TypeScript 至少运行相关类型检查和定向测试。
 - 跨模块、共享 package、构建链或广泛重构再扩大到 Desktop 全量测试、构建或根级单测。
 - 调整 Desktop Vitest worker 或测试分池前，先读取

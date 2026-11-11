@@ -1127,14 +1127,6 @@
     "cancel": "Rester connecté",
     "disconnect": "Déconnecter"
   },
-  "awayGuard": {
-    "status": "Cindy travaille",
-    "hint": "Appuyez sur une touche pour verrouiller, puis déverrouillez avec Touch ID ou votre mot de passe.",
-    "lockFailed": {
-      "status": "Cindy n'a pas pu verrouiller ce Mac",
-      "hint": "Appuyez sur Contrôle-Commande-Q pour le verrouiller. L'écran se verrouillera aussi de lui-même au bout d'un moment."
-    }
-  },
   "appBadge": {
     "attentionCount": "Tâches nécessitant votre attention : {{count}}"
   },
@@ -10532,15 +10524,12 @@
       "offlineCount_other": "{{count}} hors ligne",
       "showMore": "Afficher plus",
       "showLess": "Afficher moins",
-      "doneCount_one": "{{count}} terminée",
-      "doneCount_other": "{{count}} terminées",
       "recentTasks": "Tâches récentes",
       "unread": "Résultat non lu",
       "outputs": "Productions",
       "outputMeta": "{{time}} · {{task}}",
       "openFailed": "Impossible d'ouvrir le fichier",
-      "offlineCount_many": "{{count}} hors ligne",
-      "doneCount_many": "{{count}} terminées"
+      "offlineCount_many": "{{count}} hors ligne"
     },
     "remoteSettings": {
       "empty": "Rien pour l'instant.",
@@ -12161,18 +12150,8 @@
       "failed": "Impossible de mettre à jour les projets. Rechargez pour vérifier l'état enregistré.",
       "noAvailable": "Ajoutez d'abord d'autres projets depuis la liste des projets."
     },
-    "automations": {
-      "title": "Automatisations",
-      "description": "Automatisations du projet de {{name}}. Activez-les ou désactivez-les ici ; modifiez-les dans Automatisations.",
-      "empty": "{{name}} n'a pas encore d'automatisation.",
-      "failed": "Impossible de charger les automatisations.",
-      "toggle": "Activer « {{name}} »",
-      "manage": "Gérer dans Automatisations",
-      "create": "Créer dans Automatisations"
-    },
     "todoBoard": {
       "title": "À faire",
-      "suggested": "Suggéré {{date}}",
       "laterUntil": "De retour le {{date}}",
       "completedOn": "Terminé le {{date}}",
       "view": {
@@ -12187,10 +12166,16 @@
         "week": "Cette semaine",
         "later": "Après cette semaine",
         "none": "Sans échéance"
-      },
-      "empty": {
-        "done": "Aucune tâche terminée pour l’instant"
       }
+    },
+    "automations": {
+      "title": "Automatisations",
+      "description": "Automatisations du projet de {{name}}. Activez-les ou désactivez-les ici ; modifiez-les dans Automatisations.",
+      "empty": "{{name}} n'a pas encore d'automatisation.",
+      "failed": "Impossible de charger les automatisations.",
+      "toggle": "Activer « {{name}} »",
+      "manage": "Gérer dans Automatisations",
+      "create": "Créer dans Automatisations"
     }
   },
   "common": {
@@ -20055,6 +20040,104 @@
     "wrap": "Retour à la ligne",
     "lineNumbers": "Numéros de ligne"
   },
+  "personalTodos": {
+    "all": "Tout",
+    "add": "Ajouter une tâche à faire",
+    "details": "Détails",
+    "title": "Titre",
+    "notes": "Notes (facultatif)",
+    "deadline": "Échéance (facultatif)",
+    "deadlineTime": "Heure (facultatif)",
+    "deferUntil": "Reprendre le",
+    "save": "Enregistrer",
+    "saving": "Enregistrement…",
+    "close": "Fermer",
+    "complete": "Terminer",
+    "reopen": "Rouvrir",
+    "defer": "Reporter",
+    "restore": "Reprendre maintenant",
+    "delete": "Supprimer",
+    "deleteConfirm": "Supprimer cet élément ?",
+    "empty": "Aucun élément dans cette vue",
+    "saveFailed": "Échec de l’enregistrement. Votre saisie est conservée. Réessayez.",
+    "loadFailed": "Impossible de charger vos éléments personnels.",
+    "conflict": "Mis à jour ailleurs",
+    "reloadVersion": "Charger la version à remplacer",
+    "savedNotice": "« {{title}} » enregistré",
+    "deletedNotice": "« {{title}} » supprimé.",
+    "rowFailed": "Action échouée",
+    "overwrite": "Remplacer et enregistrer",
+    "deferInPast": "L’heure doit être postérieure à maintenant",
+    "reminder": {
+      "due": "Tâche à échéance",
+      "resumed": "Il est temps de la reprendre",
+      "summary": "{{count}} tâches à échéance",
+      "label": "Rappel",
+      "onTime": "À l’heure",
+      "before15m": "15 min avant",
+      "before1h": "1 h avant",
+      "dayOf": "Jour même, 9:00",
+      "dayBefore": "Veille, 9:00",
+      "off": "Aucun",
+      "dueSoon": "Échéance proche",
+      "dueTomorrow": "Échéance demain"
+    },
+    "untagged": "Sans étiquette",
+    "noTag": "Aucune",
+    "newTag": "Nouvelle étiquette…",
+    "tagLimit": "Limite d’étiquettes atteinte",
+    "deferTonight": "Ce soir",
+    "group": {
+      "label": "Regrouper",
+      "due": "Par échéance",
+      "priority": "Par priorité",
+      "tag": "Par étiquette",
+      "none": "Sans regroupement"
+    },
+    "order": {
+      "label": "Ordre dans le groupe",
+      "priority": "Priorité la plus haute d’abord",
+      "due": "Échéance la plus proche d’abord",
+      "created": "Ajoutées récemment d’abord"
+    },
+    "priority": {
+      "label": "Priorité",
+      "high": "Priorité haute",
+      "medium": "Priorité moyenne",
+      "low": "Priorité basse",
+      "none": "Sans priorité",
+      "short": {
+        "high": "Haute",
+        "medium": "Moyenne",
+        "low": "Basse"
+      }
+    },
+    "due": {
+      "label": "Échéance",
+      "today": "Aujourd’hui",
+      "tomorrow": "Demain",
+      "nextMonday": "Lundi prochain",
+      "none": "Sans date",
+      "pick": "Choisir une date…",
+      "overdueToday": "En retard",
+      "overdue_one": "{{count}} jour de retard",
+      "overdue_many": "{{count}} de jours de retard",
+      "overdue_other": "{{count}} jours de retard"
+    },
+    "composer": {
+      "add": "Ajouter",
+      "cancel": "Annuler",
+      "dismissRecognition": "Ne pas reconnaître « {{phrase}} »"
+    }
+  },
+  "awayGuard": {
+    "status": "Cindy travaille",
+    "hint": "Appuyez sur une touche pour verrouiller, puis déverrouillez avec Touch ID ou votre mot de passe.",
+    "lockFailed": {
+      "status": "Cindy n'a pas pu verrouiller ce Mac",
+      "hint": "Appuyez sur Contrôle-Commande-Q pour le verrouiller. L'écran se verrouillera aussi de lui-même au bout d'un moment."
+    }
+  },
   "subscriptionAccounts": {
     "unassigned": "Compte non attribué",
     "providerManagedAuth": "Le fournisseur actuel de Codex ne permet pas de consulter le compte ChatGPT. Lors de l’ajout du fournisseur, choisissez « $t(subscriptionAccounts.signIn.anotherAccount) » pour utiliser un dossier séparé.",
@@ -20126,38 +20209,5 @@
     "detail": "Demande de {{device}}\nMotif : {{purpose}}\n\nLes appareils de votre compte pourront contrôler cet ordinateur, exécuter des tâches et accéder aux fichiers. Ce réglage reste actif jusqu’à sa désactivation dans les paramètres.",
     "decline": "Pas maintenant",
     "enable": "Activer le contrôle à distance"
-  },
-  "personalTodos": {
-    "add": "Ajouter une tâche à faire",
-    "details": "Détails",
-    "title": "Titre",
-    "notes": "Notes (facultatif)",
-    "deadline": "Échéance (facultatif)",
-    "deadlineTime": "Heure (facultatif)",
-    "deferUntil": "Reprendre le",
-    "save": "Enregistrer",
-    "saving": "Enregistrement…",
-    "close": "Fermer",
-    "complete": "Terminer",
-    "reopen": "Rouvrir",
-    "defer": "Reporter",
-    "restore": "Reprendre maintenant",
-    "delete": "Supprimer",
-    "deleteConfirm": "Supprimer cet élément ?",
-    "empty": "Aucun élément dans cette vue",
-    "saveFailed": "Échec de l’enregistrement. Votre saisie est conservée. Réessayez.",
-    "loadFailed": "Impossible de charger vos éléments personnels.",
-    "conflict": "Mis à jour ailleurs",
-    "reloadVersion": "Charger la version à remplacer",
-    "savedNotice": "« {{title}} » enregistré",
-    "deletedNotice": "« {{title}} » supprimé.",
-    "rowFailed": "Action échouée",
-    "overwrite": "Remplacer et enregistrer",
-    "deferInPast": "L’heure doit être postérieure à maintenant",
-    "reminder": {
-      "due": "Tâche à échéance",
-      "resumed": "Il est temps de la reprendre",
-      "summary": "{{count}} tâches à échéance"
-    }
   }
 }

@@ -10,6 +10,8 @@ import {
   isDataOwnerBroadcastScopeCurrent,
   type DataOwnerBroadcastScope,
 } from '../device-link/broadcast-tap.js';
+import type { TaskTag } from '@cindy/maker-shared';
+import { executeTaskTags } from '../localDb/ipc/taskTags.js';
 import { createPersonalTodoStore } from './personalTodoStore.js';
 
 export const PERSONAL_TODO_FILE = 'personal-todos.v1.json';
@@ -67,4 +69,12 @@ export function notifyPersonalTodosChanged(scope = captureDataOwnerBroadcastScop
       // One subscriber must not block the others.
     }
   }
+}
+
+/**
+ * Personal todos share this device's task-tag catalog. Agent tools and remote controllers resolve
+ * tag ids through it; an id missing from the catalog reads as untagged on every surface.
+ */
+export async function listPersonalTodoTagCatalog(): Promise<TaskTag[]> {
+  return (await executeTaskTags({ action: 'list' })).tags;
 }

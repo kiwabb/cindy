@@ -1098,14 +1098,6 @@
     "cancel": "연결 유지",
     "disconnect": "연결 끊기"
   },
-  "awayGuard": {
-    "status": "Cindy가 작업 중입니다",
-    "hint": "아무 키나 누르면 잠깁니다. Touch ID나 암호로 잠금 해제하세요.",
-    "lockFailed": {
-      "status": "Cindy가 이 Mac을 잠그지 못했습니다",
-      "hint": "Control-Command-Q를 눌러 잠그세요. 잠시 후 시스템도 자동으로 잠급니다."
-    }
-  },
   "appBadge": {
     "attentionCount": "확인이 필요한 세션: {{count}}"
   },
@@ -10404,7 +10396,6 @@
       "offlineCount_other": "오프라인 {{count}}대",
       "showMore": "더 보기",
       "showLess": "접기",
-      "doneCount_other": "완료 {{count}}",
       "recentTasks": "최근 세션",
       "unread": "읽지 않은 결과",
       "outputs": "결과물",
@@ -12013,18 +12004,8 @@
       "failed": "프로젝트를 업데이트하지 못했습니다. 다시 불러와 저장 상태를 확인하세요.",
       "noAvailable": "다른 프로젝트는 먼저 프로젝트 목록에 추가하세요."
     },
-    "automations": {
-      "title": "자동화",
-      "description": "{{name}} 프로젝트의 자동화입니다. 여기서 켜고 끄며, 편집은 자동화 페이지에서 합니다.",
-      "empty": "{{name}}에게 아직 자동화가 없습니다.",
-      "failed": "자동화를 불러오지 못했습니다.",
-      "toggle": "“{{name}}” 켜기",
-      "manage": "자동화 페이지에서 관리",
-      "create": "자동화 페이지에서 만들기"
-    },
     "todoBoard": {
       "title": "할 일",
-      "suggested": "제안 {{date}}",
       "laterUntil": "{{date}}에 다시 알림",
       "completedOn": "{{date}} 완료",
       "view": {
@@ -12039,10 +12020,16 @@
         "week": "이번 주",
         "later": "그 이후",
         "none": "기한 없음"
-      },
-      "empty": {
-        "done": "완료한 할 일이 아직 없습니다"
       }
+    },
+    "automations": {
+      "title": "자동화",
+      "description": "{{name}} 프로젝트의 자동화입니다. 여기서 켜고 끄며, 편집은 자동화 페이지에서 합니다.",
+      "empty": "{{name}}에게 아직 자동화가 없습니다.",
+      "failed": "자동화를 불러오지 못했습니다.",
+      "toggle": "“{{name}}” 켜기",
+      "manage": "자동화 페이지에서 관리",
+      "create": "자동화 페이지에서 만들기"
     }
   },
   "common": {
@@ -19794,6 +19781,102 @@
     "wrap": "자동 줄 바꿈",
     "lineNumbers": "줄 번호"
   },
+  "personalTodos": {
+    "all": "전체",
+    "add": "할 일 추가",
+    "details": "할 일 세부 정보",
+    "title": "제목",
+    "notes": "메모(선택)",
+    "deadline": "마감일(선택)",
+    "deadlineTime": "시간(선택)",
+    "deferUntil": "다시 처리할 시간",
+    "save": "저장",
+    "saving": "저장 중…",
+    "close": "닫기",
+    "complete": "완료",
+    "reopen": "다시 열기",
+    "defer": "나중에 처리",
+    "restore": "지금 처리",
+    "delete": "삭제",
+    "deleteConfirm": "이 할 일을 삭제할까요?",
+    "empty": "이 보기에 할 일이 없습니다",
+    "saveFailed": "저장하지 못했습니다. 입력은 유지됩니다. 다시 저장하세요.",
+    "loadFailed": "개인 할 일을 불러오지 못했습니다.",
+    "conflict": "다른 곳에서 업데이트됨",
+    "reloadVersion": "덮어쓸 최신 버전 불러오기",
+    "savedNotice": "“{{title}}”을 저장했습니다",
+    "deletedNotice": "“{{title}}”을 삭제했습니다.",
+    "rowFailed": "작업하지 못했습니다",
+    "overwrite": "덮어써서 저장",
+    "deferInPast": "재개 시간은 현재 이후여야 합니다",
+    "reminder": {
+      "due": "할 일 마감",
+      "resumed": "다시 처리할 시간입니다",
+      "summary": "할 일 {{count}}개 마감",
+      "label": "알림",
+      "onTime": "정시",
+      "before15m": "15분 전",
+      "before1h": "1시간 전",
+      "dayOf": "당일 9:00",
+      "dayBefore": "전날 9:00",
+      "off": "알리지 않음",
+      "dueSoon": "곧 마감",
+      "dueTomorrow": "내일 마감"
+    },
+    "untagged": "태그 없음",
+    "noTag": "없음",
+    "newTag": "새 태그…",
+    "tagLimit": "태그 수가 한도에 도달했습니다",
+    "deferTonight": "오늘 밤",
+    "group": {
+      "label": "그룹",
+      "due": "마감일별",
+      "priority": "우선순위별",
+      "tag": "태그별",
+      "none": "그룹 안 함"
+    },
+    "order": {
+      "label": "그룹 내 순서",
+      "priority": "우선순위 높은 순",
+      "due": "마감 빠른 순",
+      "created": "최근 추가 순"
+    },
+    "priority": {
+      "label": "우선순위",
+      "high": "높은 우선순위",
+      "medium": "보통 우선순위",
+      "low": "낮은 우선순위",
+      "none": "우선순위 없음",
+      "short": {
+        "high": "높음",
+        "medium": "보통",
+        "low": "낮음"
+      }
+    },
+    "due": {
+      "label": "마감",
+      "today": "오늘",
+      "tomorrow": "내일",
+      "nextMonday": "다음 주 월요일",
+      "none": "날짜 없음",
+      "pick": "날짜 선택…",
+      "overdueToday": "기한 지남",
+      "overdue_other": "기한 지남 {{count}}일"
+    },
+    "composer": {
+      "add": "추가",
+      "cancel": "취소",
+      "dismissRecognition": "“{{phrase}}” 인식 안 함"
+    }
+  },
+  "awayGuard": {
+    "status": "Cindy가 작업 중입니다",
+    "hint": "아무 키나 누르면 잠깁니다. Touch ID나 암호로 잠금 해제하세요.",
+    "lockFailed": {
+      "status": "Cindy가 이 Mac을 잠그지 못했습니다",
+      "hint": "Control-Command-Q를 눌러 잠그세요. 잠시 후 시스템도 자동으로 잠급니다."
+    }
+  },
   "subscriptionAccounts": {
     "unassigned": "계정 미배정",
     "providerManagedAuth": "현재 Codex 제공자에서는 ChatGPT 계정 정보를 확인할 수 없습니다. 제공자를 추가할 때 ‘$t(subscriptionAccounts.signIn.anotherAccount)’를 선택하면 별도 폴더를 사용할 수 있습니다.",
@@ -19865,38 +19948,5 @@
     "detail": "요청 기기: {{device}}\n목적: {{purpose}}\n\n활성화하면 같은 계정의 기기에서 작업 실행 및 파일 접근을 포함하여 이 컴퓨터를 제어할 수 있습니다. 설정에서 끌 때까지 유지됩니다.",
     "decline": "나중에",
     "enable": "원격 제어 활성화"
-  },
-  "personalTodos": {
-    "add": "할 일 추가",
-    "details": "할 일 세부 정보",
-    "title": "제목",
-    "notes": "메모(선택)",
-    "deadline": "마감일(선택)",
-    "deadlineTime": "시간(선택)",
-    "deferUntil": "다시 처리할 시간",
-    "save": "저장",
-    "saving": "저장 중…",
-    "close": "닫기",
-    "complete": "완료",
-    "reopen": "다시 열기",
-    "defer": "나중에 처리",
-    "restore": "지금 처리",
-    "delete": "삭제",
-    "deleteConfirm": "이 할 일을 삭제할까요?",
-    "empty": "이 보기에 할 일이 없습니다",
-    "saveFailed": "저장하지 못했습니다. 입력은 유지됩니다. 다시 저장하세요.",
-    "loadFailed": "개인 할 일을 불러오지 못했습니다.",
-    "conflict": "다른 곳에서 업데이트됨",
-    "reloadVersion": "덮어쓸 최신 버전 불러오기",
-    "savedNotice": "“{{title}}”을 저장했습니다",
-    "deletedNotice": "“{{title}}”을 삭제했습니다.",
-    "rowFailed": "작업하지 못했습니다",
-    "overwrite": "덮어써서 저장",
-    "deferInPast": "재개 시간은 현재 이후여야 합니다",
-    "reminder": {
-      "due": "할 일 마감",
-      "resumed": "다시 처리할 시간입니다",
-      "summary": "할 일 {{count}}개 마감"
-    }
   }
 }

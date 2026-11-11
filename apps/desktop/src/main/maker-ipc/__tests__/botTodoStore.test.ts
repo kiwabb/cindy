@@ -342,6 +342,30 @@ describe('personal todo account store', () => {
     await expect(switched.update({ creationRequestId: crypto.randomUUID(), title: 'Wrong owner' })).rejects.toThrow('Owner changed');
     expect((await store.list()).map(t => t.title)).toEqual(['Versioned unit input']);
   });
+  // Contract for priority / tags / reminder (2026-11-11): older files carry none of them and must
+  // keep reading as defaults; invalid values are rejected before anything is written.
+  it('round-trips priority, tag ids and reminder, and reads items written before they existed', async () => {
+    const { file } = await fixture();
+    const store = createPersonalTodoStore(file);
+    const legacy = await store.update({ creationRequestId: 'before-organize', title: 'Older unit item' });
+    const raw = JSON.parse(await readFile(file, 'utf8'));
+    for (const item of raw.items) { delete item.priority; delete item.tagIds; delete item.reminder; }
+    await writeFile(file, JSON.stringify(raw));
+    expect(await store.list()).toEqual([expect.objectContaining({ id: legacy.id, priority: 0, tagIds: [], reminder: 'default' })]);
+    const created = await store.update({ creationRequestId: 'organized', title: 'Organized unit item', priority: 3, tagIds: ['preset:work', 'preset:work'], reminder: 'before-15m' });
+    expect(created).toMatchObject({ priority: 3, tagIds: ['preset:work'], reminder: 'before-15m' });
+    const edited = await store.update({ id: created.id, expectedRevision: created.revision, priority: 0, tagIds: [], reminder: 'off' });
+    expect(edited).toMatchObject({ priority: 0, tagIds: [], reminder: 'off' });
+    await expect(store.update({ id: edited.id, expectedRevision: edited.revision, priority: 4 as never })).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+    await expect(store.update({ id: edited.id, expectedRevision: edited.revision, reminder: 'soon' as never })).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+    await expect(store.update({ id: edited.id, expectedRevision: edited.revision, tagIds: [''] })).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+    // A retried creation with different organize fields is an edited draft, not a duplicate.
+    await expect(store.update({ creationRequestId: 'organized', title: 'Organized unit item', priority: 1 })).rejects.toMatchObject({ code: 'CONFLICT' });
+    const corrupt = JSON.parse(await readFile(file, 'utf8'));
+    corrupt.items[0].priority = 9;
+    await writeFile(file, JSON.stringify(corrupt));
+    await expect(store.list()).rejects.toMatchObject({ code: 'CORRUPT_STORE' });
+  });
 });
 
 // Unit: a real atomic store commit followed by a lost transport receipt must be replay-safe.

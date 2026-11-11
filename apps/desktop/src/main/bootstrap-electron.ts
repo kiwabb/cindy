@@ -5,7 +5,8 @@ import { createPersonalBuildMonitor, personalMonitorEnvironment } from './person
 import { updatePersonalLocalPlugins } from './cindy-brain/index.js';
 import { observeDesktopStartupResult } from './devStartupStatus.js';
 import { registerRuntimeSettingsSection } from './app-settings/runtime.js';
-import { notePersonalStorageOpened, notePersonalRendererCommitted } from './personal-update/runtime.js';
+import { notePersonalStorageOpened, notePersonalRendererCommitted, readPersonalBuildInfo } from './personal-update/runtime.js';
+import { formatPersonalBuildVersion } from '../shared/personalBuildVersion.js';
 import { z as settingsSchema } from 'zod';
 import { flushPluginUsageLifecycle } from './plugin-usage/current.js';
 import { flushSessionPiTurnUsage, retryPendingPiUsageReceipts } from './maker-ipc/piUsageReceipts.js';
@@ -261,14 +262,22 @@ function readGitText(args: string[]): string | null {
 interface AppDisplayVersionInfo {
   display: string;
   detail: string;
+  /** Packaged personal-channel build: display is its build time and commit, not the community 0.0.0. */
+  personal: boolean;
 }
 
 function getAppDisplayVersionInfo(): AppDisplayVersionInfo {
   const version = app.getVersion();
   if (app.isPackaged) {
+    const personal = readPersonalBuildInfo();
+    if (personal) {
+      const display = formatPersonalBuildVersion(personal.identity.sourceCommit, personal.builtAt);
+      return { display, detail: `${display} · r${personal.identity.revision}`, personal: true };
+    }
     return {
       display: version,
       detail: version,
+      personal: false,
     };
   }
 
@@ -280,6 +289,7 @@ function getAppDisplayVersionInfo(): AppDisplayVersionInfo {
   return {
     display,
     detail: display,
+    personal: false,
   };
 }
 

@@ -11,6 +11,8 @@ export function createTaskTagService(ports: Pick<typeof BroadcastTap,
   'captureDataOwnerBroadcastScope' | 'isDataOwnerBroadcastScopeCurrent' | 'tapWindowBroadcast'> & {
   broadcastSessionPatched: typeof broadcastSessionPatched;
   broadcastTagsChanged?: (payload: unknown, ownerStamp?: DataOwnerPushStamp) => void;
+  /** Main-process readers of the tag catalog (personal todos resolve tag names through it). */
+  tagCatalogChanged?: (scope: ReturnType<typeof BroadcastTap.captureDataOwnerBroadcastScope>) => void;
 }) {
   const log = createLogger('taskTags');
   const { captureDataOwnerBroadcastScope, isDataOwnerBroadcastScopeCurrent,
@@ -53,6 +55,7 @@ async function executeTaskTags(
   }
   if (['create', 'update', 'delete', 'reorder', 'attach', 'detach'].includes(request.action)) {
     const payload = { tags: result.tags };
+    ports.tagCatalogChanged?.(scope);
     // A closed renderer must not turn an already committed write into a failed request.
     try {
       tapWindowBroadcast('local-db:task-tags:changed', payload, scope.ownerStamp);

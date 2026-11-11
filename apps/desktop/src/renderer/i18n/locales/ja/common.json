@@ -1098,14 +1098,6 @@
     "cancel": "接続を維持",
     "disconnect": "切断"
   },
-  "awayGuard": {
-    "status": "Cindy が作業中です",
-    "hint": "いずれかのキーを押すとロックされます。Touch ID またはパスワードで解除してください。",
-    "lockFailed": {
-      "status": "Cindy はこの Mac をロックできませんでした",
-      "hint": "Control-Command-Q でロックしてください。しばらくするとシステムも自動でロックします。"
-    }
-  },
   "appBadge": {
     "attentionCount": "対応が必要なセッション：{{count}}"
   },
@@ -10404,7 +10396,6 @@
       "offlineCount_other": "オフライン {{count}} 台",
       "showMore": "さらに表示",
       "showLess": "閉じる",
-      "doneCount_other": "完了 {{count}}",
       "recentTasks": "最近のセッション",
       "unread": "未読の結果",
       "outputs": "成果物",
@@ -12013,18 +12004,8 @@
       "failed": "プロジェクトを更新できませんでした。再読み込みして保存状態を確認してください。",
       "noAvailable": "他のプロジェクトは、先にプロジェクト一覧に追加してください。"
     },
-    "automations": {
-      "title": "自動化",
-      "description": "{{name}} のプロジェクトの自動化です。ここでオン／オフを切り替え、編集は自動化ページで行います。",
-      "empty": "{{name}} にはまだ自動化がありません。",
-      "failed": "自動化を読み込めませんでした。",
-      "toggle": "「{{name}}」をオンにする",
-      "manage": "自動化ページで管理",
-      "create": "自動化ページで作成"
-    },
     "todoBoard": {
       "title": "Todo",
-      "suggested": "提案 {{date}}",
       "laterUntil": "{{date}} に再通知",
       "completedOn": "{{date}} に完了",
       "view": {
@@ -12039,10 +12020,16 @@
         "week": "今週",
         "later": "それ以降",
         "none": "期限なし"
-      },
-      "empty": {
-        "done": "完了した Todo はまだありません"
       }
+    },
+    "automations": {
+      "title": "自動化",
+      "description": "{{name}} のプロジェクトの自動化です。ここでオン／オフを切り替え、編集は自動化ページで行います。",
+      "empty": "{{name}} にはまだ自動化がありません。",
+      "failed": "自動化を読み込めませんでした。",
+      "toggle": "「{{name}}」をオンにする",
+      "manage": "自動化ページで管理",
+      "create": "自動化ページで作成"
     }
   },
   "common": {
@@ -19794,6 +19781,102 @@
     "wrap": "行の折り返し",
     "lineNumbers": "行番号"
   },
+  "personalTodos": {
+    "all": "すべて",
+    "add": "ToDoを追加",
+    "details": "ToDoの詳細",
+    "title": "タイトル",
+    "notes": "メモ（任意）",
+    "deadline": "期限（任意）",
+    "deadlineTime": "時刻（任意）",
+    "deferUntil": "再開日時",
+    "save": "保存",
+    "saving": "保存中…",
+    "close": "閉じる",
+    "complete": "完了",
+    "reopen": "再開",
+    "defer": "延期",
+    "restore": "今すぐ再開",
+    "delete": "削除",
+    "deleteConfirm": "このToDoを削除しますか？",
+    "empty": "この表示にはToDoがありません",
+    "saveFailed": "保存できませんでした。入力は保持されています。もう一度保存してください。",
+    "loadFailed": "個人のToDoを読み込めませんでした。",
+    "conflict": "ほかで更新されています",
+    "reloadVersion": "上書きするため最新バージョンを読み込む",
+    "savedNotice": "「{{title}}」を保存しました",
+    "deletedNotice": "「{{title}}」を削除しました。",
+    "rowFailed": "操作に失敗しました",
+    "overwrite": "上書き保存",
+    "deferInPast": "再開時刻は現在より後にしてください",
+    "reminder": {
+      "due": "Todo の期限です",
+      "resumed": "再開する時間です",
+      "summary": "{{count}} 件の Todo が期限です",
+      "label": "リマインダー",
+      "onTime": "期限時刻",
+      "before15m": "15分前",
+      "before1h": "1時間前",
+      "dayOf": "当日 9:00",
+      "dayBefore": "前日 9:00",
+      "off": "通知しない",
+      "dueSoon": "まもなく期限",
+      "dueTomorrow": "明日が期限"
+    },
+    "untagged": "タグなし",
+    "noTag": "なし",
+    "newTag": "新しいタグ…",
+    "tagLimit": "タグの数が上限に達しました",
+    "deferTonight": "今夜",
+    "group": {
+      "label": "グループ",
+      "due": "期限別",
+      "priority": "優先度別",
+      "tag": "タグ別",
+      "none": "グループなし"
+    },
+    "order": {
+      "label": "グループ内の順序",
+      "priority": "優先度が高い順",
+      "due": "期限が早い順",
+      "created": "追加が新しい順"
+    },
+    "priority": {
+      "label": "優先度",
+      "high": "高優先度",
+      "medium": "中優先度",
+      "low": "低優先度",
+      "none": "優先度なし",
+      "short": {
+        "high": "高",
+        "medium": "中",
+        "low": "低"
+      }
+    },
+    "due": {
+      "label": "期限",
+      "today": "今日",
+      "tomorrow": "明日",
+      "nextMonday": "来週月曜",
+      "none": "日付なし",
+      "pick": "日付を選択…",
+      "overdueToday": "期限切れ",
+      "overdue_other": "期限切れ {{count}} 日"
+    },
+    "composer": {
+      "add": "追加",
+      "cancel": "キャンセル",
+      "dismissRecognition": "「{{phrase}}」を認識しない"
+    }
+  },
+  "awayGuard": {
+    "status": "Cindy が作業中です",
+    "hint": "いずれかのキーを押すとロックされます。Touch ID またはパスワードで解除してください。",
+    "lockFailed": {
+      "status": "Cindy はこの Mac をロックできませんでした",
+      "hint": "Control-Command-Q でロックしてください。しばらくするとシステムも自動でロックします。"
+    }
+  },
   "subscriptionAccounts": {
     "unassigned": "アカウント未割り当て",
     "providerManagedAuth": "現在の Codex プロバイダーでは ChatGPT アカウント情報を取得できません。プロバイダーの追加時に「$t(subscriptionAccounts.signIn.anotherAccount)」を選ぶと、別のフォルダーを使用できます。",
@@ -19865,38 +19948,5 @@
     "detail": "要求元：{{device}}\n目的：{{purpose}}\n\n有効にすると、同じアカウントのデバイスからタスクの実行やファイルへのアクセスなど、このコンピューターを操作できます。設定で無効にするまで有効です。",
     "decline": "今はしない",
     "enable": "リモート操作を有効にする"
-  },
-  "personalTodos": {
-    "add": "ToDoを追加",
-    "details": "ToDoの詳細",
-    "title": "タイトル",
-    "notes": "メモ（任意）",
-    "deadline": "期限（任意）",
-    "deadlineTime": "時刻（任意）",
-    "deferUntil": "再開日時",
-    "save": "保存",
-    "saving": "保存中…",
-    "close": "閉じる",
-    "complete": "完了",
-    "reopen": "再開",
-    "defer": "延期",
-    "restore": "今すぐ再開",
-    "delete": "削除",
-    "deleteConfirm": "このToDoを削除しますか？",
-    "empty": "この表示にはToDoがありません",
-    "saveFailed": "保存できませんでした。入力は保持されています。もう一度保存してください。",
-    "loadFailed": "個人のToDoを読み込めませんでした。",
-    "conflict": "ほかで更新されています",
-    "reloadVersion": "上書きするため最新バージョンを読み込む",
-    "savedNotice": "「{{title}}」を保存しました",
-    "deletedNotice": "「{{title}}」を削除しました。",
-    "rowFailed": "操作に失敗しました",
-    "overwrite": "上書き保存",
-    "deferInPast": "再開時刻は現在より後にしてください",
-    "reminder": {
-      "due": "Todo の期限です",
-      "resumed": "再開する時間です",
-      "summary": "{{count}} 件の Todo が期限です"
-    }
   }
 }

@@ -1110,14 +1110,6 @@
     "cancel": "Verbunden bleiben",
     "disconnect": "Trennen"
   },
-  "awayGuard": {
-    "status": "Cindy arbeitet",
-    "hint": "Drücke eine Taste zum Sperren und entsperre dann mit Touch ID oder deinem Passwort.",
-    "lockFailed": {
-      "status": "Cindy konnte diesen Mac nicht sperren",
-      "hint": "Drücke Control-Command-Q zum Sperren. Nach einer Weile sperrt sich der Bildschirm auch von selbst."
-    }
-  },
   "appBadge": {
     "attentionCount": "Aufgaben, die Aufmerksamkeit benötigen: {{count}}"
   },
@@ -10449,8 +10441,6 @@
       "offlineCount_other": "{{count}} offline",
       "showMore": "Mehr anzeigen",
       "showLess": "Weniger anzeigen",
-      "doneCount_one": "{{count}} erledigt",
-      "doneCount_other": "{{count}} erledigt",
       "recentTasks": "Letzte Aufgaben",
       "unread": "Ungelesenes Ergebnis",
       "outputs": "Ergebnisse",
@@ -12060,18 +12050,8 @@
       "failed": "Projekte konnten nicht aktualisiert werden. Lade neu, um den gespeicherten Stand zu prüfen.",
       "noAvailable": "Füge zuerst weitere Projekte aus der Projektliste hinzu."
     },
-    "automations": {
-      "title": "Automatisierungen",
-      "description": "Automatisierungen im Projekt von {{name}}. Hier ein- oder ausschalten, bearbeiten unter Automatisierungen.",
-      "empty": "{{name}} hat noch keine Automatisierungen.",
-      "failed": "Automatisierungen konnten nicht geladen werden.",
-      "toggle": "„{{name}}“ einschalten",
-      "manage": "Unter Automatisierungen verwalten",
-      "create": "Unter Automatisierungen erstellen"
-    },
     "todoBoard": {
       "title": "To-dos",
-      "suggested": "Vorschlag {{date}}",
       "laterUntil": "Wieder am {{date}}",
       "completedOn": "Erledigt am {{date}}",
       "view": {
@@ -12086,10 +12066,16 @@
         "week": "Diese Woche",
         "later": "Nach dieser Woche",
         "none": "Ohne Frist"
-      },
-      "empty": {
-        "done": "Noch keine erledigten To-dos"
       }
+    },
+    "automations": {
+      "title": "Automatisierungen",
+      "description": "Automatisierungen im Projekt von {{name}}. Hier ein- oder ausschalten, bearbeiten unter Automatisierungen.",
+      "empty": "{{name}} hat noch keine Automatisierungen.",
+      "failed": "Automatisierungen konnten nicht geladen werden.",
+      "toggle": "„{{name}}“ einschalten",
+      "manage": "Unter Automatisierungen verwalten",
+      "create": "Unter Automatisierungen erstellen"
     }
   },
   "common": {
@@ -19867,6 +19853,103 @@
     "wrap": "Zeilenumbruch",
     "lineNumbers": "Zeilennummern"
   },
+  "personalTodos": {
+    "all": "Alle",
+    "add": "To-do hinzufügen",
+    "details": "To-do-Details",
+    "title": "Titel",
+    "notes": "Notizen (optional)",
+    "deadline": "Fällig am (optional)",
+    "deadlineTime": "Uhrzeit (optional)",
+    "deferUntil": "Fortsetzen am",
+    "save": "Speichern",
+    "saving": "Wird gespeichert…",
+    "close": "Schließen",
+    "complete": "Abschließen",
+    "reopen": "Wieder öffnen",
+    "defer": "Verschieben",
+    "restore": "Jetzt fortsetzen",
+    "delete": "Löschen",
+    "deleteConfirm": "Dieses To-do löschen?",
+    "empty": "Keine To-dos in dieser Ansicht",
+    "saveFailed": "Speichern fehlgeschlagen. Ihre Eingabe bleibt erhalten. Erneut speichern.",
+    "loadFailed": "Persönliche To-dos konnten nicht geladen werden.",
+    "conflict": "Anderswo aktualisiert",
+    "reloadVersion": "Neueste Version zum Überschreiben laden",
+    "savedNotice": "„{{title}}“ gespeichert",
+    "deletedNotice": "„{{title}}“ gelöscht.",
+    "rowFailed": "Aktion fehlgeschlagen",
+    "overwrite": "Überschreiben und speichern",
+    "deferInPast": "Der Zeitpunkt muss in der Zukunft liegen",
+    "reminder": {
+      "due": "Aufgabe fällig",
+      "resumed": "Zeit, das wieder aufzugreifen",
+      "summary": "{{count}} Aufgaben fällig",
+      "label": "Erinnerung",
+      "onTime": "Pünktlich",
+      "before15m": "15 Min. vor",
+      "before1h": "1 Std. vor",
+      "dayOf": "Selber Tag, 9:00",
+      "dayBefore": "Vortag, 9:00",
+      "off": "Aus",
+      "dueSoon": "Bald fällig",
+      "dueTomorrow": "Morgen fällig"
+    },
+    "untagged": "Ohne Tag",
+    "noTag": "Keiner",
+    "newTag": "Neuer Tag…",
+    "tagLimit": "Tag-Limit erreicht",
+    "deferTonight": "Heute Abend",
+    "group": {
+      "label": "Gruppieren",
+      "due": "Nach Fälligkeit",
+      "priority": "Nach Priorität",
+      "tag": "Nach Tag",
+      "none": "Nicht gruppieren"
+    },
+    "order": {
+      "label": "Reihenfolge in der Gruppe",
+      "priority": "Höchste Priorität zuerst",
+      "due": "Früheste Fälligkeit zuerst",
+      "created": "Zuletzt hinzugefügt zuerst"
+    },
+    "priority": {
+      "label": "Priorität",
+      "high": "Hohe Priorität",
+      "medium": "Mittlere Priorität",
+      "low": "Niedrige Priorität",
+      "none": "Keine Priorität",
+      "short": {
+        "high": "Hoch",
+        "medium": "Mittel",
+        "low": "Niedrig"
+      }
+    },
+    "due": {
+      "label": "Fällig",
+      "today": "Heute",
+      "tomorrow": "Morgen",
+      "nextMonday": "Nächsten Montag",
+      "none": "Kein Datum",
+      "pick": "Datum wählen…",
+      "overdueToday": "Überfällig",
+      "overdue_one": "{{count}} Tag überfällig",
+      "overdue_other": "{{count}} Tage überfällig"
+    },
+    "composer": {
+      "add": "Hinzufügen",
+      "cancel": "Abbrechen",
+      "dismissRecognition": "„{{phrase}}“ nicht erkennen"
+    }
+  },
+  "awayGuard": {
+    "status": "Cindy arbeitet",
+    "hint": "Drücke eine Taste zum Sperren und entsperre dann mit Touch ID oder deinem Passwort.",
+    "lockFailed": {
+      "status": "Cindy konnte diesen Mac nicht sperren",
+      "hint": "Drücke Control-Command-Q zum Sperren. Nach einer Weile sperrt sich der Bildschirm auch von selbst."
+    }
+  },
   "subscriptionAccounts": {
     "unassigned": "Konto nicht zugewiesen",
     "providerManagedAuth": "Der aktuelle Codex-Anbieter stellt keine ChatGPT-Kontoinformationen bereit. Wähle beim Hinzufügen des Anbieters „$t(subscriptionAccounts.signIn.anotherAccount)“, um einen separaten Ordner zu verwenden.",
@@ -19938,38 +20021,5 @@
     "detail": "Anfrage von {{device}}\nZweck: {{purpose}}\n\nGeräte Ihres Kontos können diesen Computer steuern, Aufgaben ausführen und auf Dateien zugreifen. Die Einstellung bleibt aktiv, bis Sie sie in den Einstellungen deaktivieren.",
     "decline": "Jetzt nicht",
     "enable": "Fernsteuerung aktivieren"
-  },
-  "personalTodos": {
-    "add": "To-do hinzufügen",
-    "details": "To-do-Details",
-    "title": "Titel",
-    "notes": "Notizen (optional)",
-    "deadline": "Fällig am (optional)",
-    "deadlineTime": "Uhrzeit (optional)",
-    "deferUntil": "Fortsetzen am",
-    "save": "Speichern",
-    "saving": "Wird gespeichert…",
-    "close": "Schließen",
-    "complete": "Abschließen",
-    "reopen": "Wieder öffnen",
-    "defer": "Verschieben",
-    "restore": "Jetzt fortsetzen",
-    "delete": "Löschen",
-    "deleteConfirm": "Dieses To-do löschen?",
-    "empty": "Keine To-dos in dieser Ansicht",
-    "saveFailed": "Speichern fehlgeschlagen. Ihre Eingabe bleibt erhalten. Erneut speichern.",
-    "loadFailed": "Persönliche To-dos konnten nicht geladen werden.",
-    "conflict": "Anderswo aktualisiert",
-    "reloadVersion": "Neueste Version zum Überschreiben laden",
-    "savedNotice": "„{{title}}“ gespeichert",
-    "deletedNotice": "„{{title}}“ gelöscht.",
-    "rowFailed": "Aktion fehlgeschlagen",
-    "overwrite": "Überschreiben und speichern",
-    "deferInPast": "Der Zeitpunkt muss in der Zukunft liegen",
-    "reminder": {
-      "due": "Aufgabe fällig",
-      "resumed": "Zeit, das wieder aufzugreifen",
-      "summary": "{{count}} Aufgaben fällig"
-    }
   }
 }

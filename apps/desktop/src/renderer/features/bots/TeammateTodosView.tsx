@@ -1,176 +1,34 @@
 import { getDataOwnerGeneration } from '@/contexts/dataOwnerGeneration';
 import { useOptionalDataOwnerGeneration } from '@/contexts/AuthContext';
-import { personalBoardItems, PersonalTodoEditor, usePersonalTodos } from './personalTodos';
+import { PersonalTodoComposer } from './PersonalTodoComposer';
+import { PersonalTodoRow } from './PersonalTodoRow';
+import { PersonalGroupingMenu, PersonalTagChips } from './PersonalTodoToolbar';
+import {
+  ALL_TAGS,
+  effectiveTagFilter,
+  matchesTagFilter,
+  personalCounts,
+  personalSections,
+  personalTagChips,
+  resolvePersonalTag,
+  type PersonalSection,
+  type PersonalTagFilter,
+} from './personalTodoModel';
+import { PRIORITY_KEY, tagDisplayName } from './personalTodoVisuals';
+import { PersonalTodoEditor, usePersonalTodos } from './personalTodos';
+import { usePersonalTaskTags } from './usePersonalTaskTags';
 import type { PersonalTodo, PersonalTodoUpdate } from '../../../shared/personalTodo';
 /**
- * 内置待办页：个人事项直接管理，按截止分组，分进行中、稍后再说、已完成三档。
+ * 内置待办页：只管理当前账号的个人待办（行内新增、分组、标签筛选、详情面板）。
  */
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Check, ChevronDown, Circle } from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  createTodoDueComparator,
-  effectiveTodoDeadline,
-  todoDateLabel,
-  todoDue,
-  todoOverdue,
-  type TeammateTodo,
-} from '@cindy/maker-shared/teammate-todo';
 
 import { Button } from '@/components/ui/button';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { SETTINGS_SECTION_TITLE_CLASS } from '@/components/ui/settings-rows';
 import { cn } from '@/lib/utils';
-import { groupTodoBoardItems, type TodoBoardItem, type TodoBoardView } from './teammateTodoBoard';
-
-function shortDate(value: string, locale: string): string {
-  const date = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(value + 'T12:00:00Z') : new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  return new Intl.DateTimeFormat(locale, {
-    month: 'numeric',
-    day: 'numeric',
-    ...(/^\d{4}-\d{2}-\d{2}$/.test(value) ? { timeZone: 'UTC' } : {}),
-  }).format(date);
-}
-
-/** 期限前的到期红点。 */
-function TodoDueDot() {
-  return (
-    <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-[var(--error-fg)]" />
-  );
-}
-
-function Deadline({ todo, view }: { todo: TeammateTodo; view: TodoBoardView }) {
-  const { t, i18n } = useTranslation();
-  const deadline = effectiveTodoDeadline(todo);
-  const date = todoDateLabel(todo, i18n.language);
-  const label = date && !deadline ? t('bots.todoBoard.suggested', { date }) : date;
-  const overdue = todoOverdue(todo);
-  // 「稍后再说」里的事项还没回到列表，红点只给进行中的。
-  const due = view === 'open' && todoDue(todo);
-  const until =
-    view === 'later' && todo.decision?.until
-      ? t('bots.todoBoard.laterUntil', { date: shortDate(todo.decision.until, i18n.language) })
-      : '';
-  if (!label && !until) return null;
-  return (
-    <span
-      className={cn(
-        'flex shrink-0 items-center gap-1.5 whitespace-nowrap pl-2 text-12',
-        !deadline
-          ? 'text-[var(--text-tertiary)]'
-          : overdue
-            ? 'font-medium text-[var(--error-fg)]'
-            : due
-              ? 'font-medium text-[var(--text-primary)]'
-              : 'text-[var(--text-secondary)]',
-      )}
-    >
-      {due ? <TodoDueDot /> : null}
-      {label ? <span>{label}</span> : null}
-      {label && until ? <span className="font-normal text-[var(--text-tertiary)]">·</span> : null}
-      {until ? <span className="font-normal text-[var(--text-tertiary)]">{until}</span> : null}
-    </span>
-  );
-}
-
-function TodoRow({
-  item,
-  view,
-  onOpen,
-  onUpdate,
-}: {
-  item: TodoBoardItem;
-  view: TodoBoardView;
-  onOpen: (item: TodoBoardItem) => void;
-  onUpdate: (input: PersonalTodoUpdate) => Promise<void>;
-}) {
-  const { t, i18n } = useTranslation();
-  const [busy, setBusy] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const todo = item.personal;
-  const done = todo.status === 'done';
-  const label = `${t(done ? 'personalTodos.reopen' : 'personalTodos.complete')}: ${todo.title}`;
-  return (
-    <div data-testid="todo-board-row">
-      <div className="flex min-h-8 w-full items-center gap-3 rounded-lg px-2 py-1 hover:bg-[var(--surface-hover)] focus-within:ring-2 focus-within:ring-inset focus-within:ring-[var(--focus-ring)]">
-        <button
-          type="button"
-          role="checkbox"
-          aria-checked={done}
-          aria-label={label}
-          aria-busy={busy}
-          disabled={busy}
-          onClick={async () => {
-            setBusy(true);
-            setFailed(false);
-            try {
-              await onUpdate({
-                id: todo.id,
-                expectedRevision: todo.revision,
-                operation: done ? 'reopen' : 'complete',
-              });
-            } catch {
-              setFailed(true);
-            } finally {
-              setBusy(false);
-            }
-          }}
-          className="-mx-0.5 inline-flex size-6 shrink-0 items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
-        >
-          {done ? (
-            <span
-              aria-hidden
-              className={cn(
-                'inline-flex size-5 items-center justify-center rounded-full bg-[var(--surface-chip)] text-[var(--text-primary)]',
-                busy && 'opacity-50',
-              )}
-            >
-              <Check size={12} />
-            </span>
-          ) : (
-            <Circle
-              size={20}
-              aria-hidden
-              className={cn('text-[var(--text-tertiary)]', busy && 'opacity-50')}
-            />
-          )}
-        </button>
-        <button
-          type="button"
-          aria-label={todo.title}
-          onClick={() => onOpen(item)}
-          className="flex min-h-8 min-w-0 flex-1 items-center gap-3 self-stretch rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--focus-ring)]"
-        >
-          <span className="min-w-0 flex-1">
-            <span
-              title={todo.title}
-              className={cn(
-                'block truncate text-13 leading-5',
-                done ? 'text-[var(--text-secondary)]' : 'text-[var(--text-primary)]',
-              )}
-            >
-              {todo.title}
-            </span>
-            {todo.completedAt ? (
-              <span className="block truncate text-12 leading-4 text-[var(--text-tertiary)]">
-                {t('bots.todoBoard.completedOn', {
-                  date: shortDate(todo.completedAt, i18n.language),
-                })}
-              </span>
-            ) : null}
-          </span>
-          {view !== 'done' ? <Deadline todo={item.todo} view={view} /> : null}
-        </button>
-      </div>
-      {failed ? (
-        <p role="alert" className="px-2 text-12 text-[var(--error-fg)]">
-          {t('personalTodos.rowFailed')}
-        </p>
-      ) : null}
-    </div>
-  );
-}
+import type { TodoBoardView } from './teammateTodoBoard';
 
 function Section({
   label,
@@ -198,27 +56,35 @@ export function TeammateTodosView() {
   return <TodoBoard key={dataOwnerId ?? 'local'} />;
 }
 
-function completionTime(item: TodoBoardItem): number {
-  return Date.parse(item.personal.completedAt ?? item.personal.createdAt) || 0;
+/** A label with the number of items it holds, for the segmented controls. */
+function counted(label: string, count: number) {
+  return {
+    label: (
+      <>
+        {label}
+        <span className="ml-1.5 text-12 tabular-nums text-[var(--text-tertiary)]">{count}</span>
+      </>
+    ),
+    'aria-label': `${label} ${count}`,
+  };
 }
 
 function TodoBoard() {
   const { t } = useTranslation();
   const personal = usePersonalTodos();
-  const [editor, setEditor] = useState<PersonalTodo | null | undefined>(undefined);
+  const taskTags = usePersonalTaskTags();
+  const [editor, setEditor] = useState<PersonalTodo | undefined>(undefined);
   useEffect(() => setEditor(undefined), [personal.dataOwnerId]);
   const [view, setView] = useState<TodoBoardView>('open');
-  const [doneOpen, setDoneOpen] = useState(false);
+  const [tagFilter, setTagFilter] = useState<PersonalTagFilter>(ALL_TAGS);
   const [notice, setNotice] = useState<{
     title: string;
     target: TodoBoardView;
     operation?: string;
   } | null>(null);
-  const saved = (
-    todo: PersonalTodo,
-    operation?: PersonalTodoUpdate['operation'],
-    created = false,
-  ) => {
+  const now = new Date();
+  const catalog = taskTags.tags;
+  const saved = (todo: PersonalTodo, operation?: PersonalTodoUpdate['operation']) => {
     const target =
       todo.status === 'done'
         ? 'done'
@@ -227,34 +93,29 @@ function TodoBoard() {
           : 'open';
     setEditor(undefined);
     setNotice({ title: todo.title, target, operation });
-    if (created || operation === 'reopen' || operation === 'restore') {
-      setView(created ? target : 'open');
-    }
+    if (operation === 'reopen' || operation === 'restore') setView('open');
   };
   const updateRow = async (input: PersonalTodoUpdate) =>
     saved(await personal.update(input), input.operation);
+  // A todo added from the composer stays visible: a filter that would hide it is cleared.
+  const created = (todo: PersonalTodo) => {
+    if (!matchesTagFilter(todo, catalog, effectiveTagFilter(tagFilter, catalog)))
+      setTagFilter(ALL_TAGS);
+  };
 
-  const items = useMemo(
-    () =>
-      personalBoardItems(personal.items, view).sort((a, b) =>
-        view === 'done'
-          ? completionTime(b) - completionTime(a)
-          : createTodoDueComparator()(a.todo, b.todo),
-      ),
-    [view, personal.items],
-  );
-  const done = useMemo(
-    () =>
-      view === 'open'
-        ? personalBoardItems(personal.items, 'done').sort(
-            (a, b) => completionTime(b) - completionTime(a),
-          )
-        : [],
-    [view, personal.items],
-  );
-  const groups = useMemo(() => (view === 'done' ? [] : groupTodoBoardItems(items)), [items, view]);
-  const loading = personal.loading;
-  const open = (item: TodoBoardItem) => setEditor(item.personal);
+  const counts = personalCounts(personal.items, now);
+  const effectiveFilter = effectiveTagFilter(tagFilter, catalog);
+  const sections = personalSections({
+    items: personal.items,
+    view,
+    grouping: personal.grouping,
+    order: personal.order,
+    catalog,
+    filter: effectiveFilter,
+    now,
+  });
+  const chips = personalTagChips(personal.items, catalog, effectiveFilter, now);
+  const showTag = personal.grouping !== 'tag' && effectiveFilter.kind === 'all';
 
   const empty = (text: string) => (
     <div
@@ -265,47 +126,44 @@ function TodoBoard() {
     </div>
   );
 
-  let list: ReactNode;
-  if (view === 'done') {
-    list = items.length ? (
-      <Section label={t('bots.todoBoard.view.done')} count={items.length}>
-        {items.map((item) => (
-          <TodoRow
-            key={item.personal.id}
-            item={item}
-            view="done"
-            onOpen={open}
-            onUpdate={updateRow}
-          />
-        ))}
-      </Section>
-    ) : loading ? null : (
-      empty(t('bots.todoBoard.empty.done'))
-    );
-  } else {
-    list = groups.length
-      ? groups.map((group) => (
-          <Section
-            key={group.bucket}
-            label={t(`bots.todoBoard.bucket.${group.bucket}`)}
-            count={group.items.length}
-          >
-            {group.items.map((item) => (
-              <TodoRow
-                key={item.personal.id}
-                item={item}
-                view={view}
-                onOpen={open}
-                onUpdate={updateRow}
-              />
-            ))}
-          </Section>
-        ))
-      : loading
-        ? null
-        : empty(t('personalTodos.empty'));
-  }
+  const sectionLabel = (section: PersonalSection) => {
+    const key = section.key;
+    if (key.kind === 'bucket') return t(`bots.todoBoard.bucket.${key.bucket}`);
+    if (key.kind === 'priority')
+      return key.priority
+        ? t(`personalTodos.priority.short.${PRIORITY_KEY[key.priority]}`)
+        : t('personalTodos.priority.none');
+    if (key.kind === 'tag') return key.tag ? tagDisplayName(key.tag, t) : t('personalTodos.untagged');
+    return view === 'done' || view === 'later' ? t(`bots.todoBoard.view.${view}`) : t('personalTodos.all');
+  };
 
+  const list: ReactNode = sections.length
+    ? sections.map((section) => (
+        <Section key={section.id} label={sectionLabel(section)} count={section.items.length}>
+          {section.items.map((todo) => (
+            <PersonalTodoRow
+              key={todo.id}
+              todo={todo}
+              view={view}
+              tag={showTag ? resolvePersonalTag(todo, catalog) : null}
+              groupBucket={
+                personal.grouping === 'due' && section.key.kind === 'bucket'
+                  ? section.key.bucket
+                  : undefined
+              }
+              selected={editor?.id === todo.id}
+              now={now}
+              onOpen={setEditor}
+              onUpdate={updateRow}
+            />
+          ))}
+        </Section>
+      ))
+    : personal.loading
+      ? null
+      : empty(t('personalTodos.empty'));
+
+  const showEditor = editor !== undefined;
   return (
     <main
       className="h-full overflow-y-auto pl-4 pr-6 [scrollbar-gutter:stable]"
@@ -316,17 +174,15 @@ function TodoBoard() {
           <h1 className={cn(SETTINGS_SECTION_TITLE_CLASS, 'min-w-0 flex-[1_1_12rem]')}>
             {t('bots.todoBoard.title')}
           </h1>
-          <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
-            <SegmentedControl<TodoBoardView>
-              aria-label={t('bots.todoBoard.view.label')}
-              value={view}
-              onValueChange={setView}
-              options={(['open', 'later', 'done'] as const).map((value) => ({
-                value,
-                label: t(`bots.todoBoard.view.${value}`),
-              }))}
-            />
-          </div>
+          <SegmentedControl<TodoBoardView>
+            aria-label={t('bots.todoBoard.view.label')}
+            value={view}
+            onValueChange={setView}
+            options={(['open', 'later', 'done'] as const).map((value) => ({
+              value,
+              ...counted(t(`bots.todoBoard.view.${value}`), counts[value]),
+            }))}
+          />
         </div>
         {notice ? (
           <div
@@ -348,10 +204,23 @@ function TodoBoard() {
             ) : null}
           </div>
         ) : null}
-        <div className="flex flex-wrap items-center justify-end gap-3 px-2 py-4">
-          <Button size="sm" onClick={() => setEditor(null)}>
-            {t('personalTodos.add')}
-          </Button>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-2 px-2 pb-3 pt-4">
+          {taskTags.loaded && chips.tags.length > 0 ? (
+            <PersonalTagChips
+              all={chips.all}
+              none={chips.none}
+              tags={chips.tags}
+              filter={effectiveFilter}
+              onChange={setTagFilter}
+            />
+          ) : null}
+          <span className="flex-1" />
+          <PersonalGroupingMenu
+            grouping={personal.grouping}
+            order={personal.order}
+            onGrouping={personal.selectGrouping}
+            onOrder={personal.selectOrder}
+          />
         </div>
         {personal.failed ? (
           <p role="alert" className="px-4 text-12 text-[var(--error-fg)]">
@@ -363,15 +232,16 @@ function TodoBoard() {
         ) : null}
         <div
           className={cn(
-            'mt-4 grid min-w-0 gap-4',
-            editor !== undefined && 'min-[1100px]:grid-cols-[minmax(0,1fr)_320px]',
+            'mt-1 grid min-w-0 gap-4',
+            showEditor && 'min-[1100px]:grid-cols-[minmax(0,1fr)_340px]',
           )}
         >
-          {editor !== undefined ? (
+          {showEditor ? (
             <div className="min-w-0 min-[1100px]:col-start-2 min-[1100px]:row-start-1">
               <PersonalTodoEditor
-                key={`${personal.dataOwnerId}:${editor?.id ?? 'new'}`}
+                key={`${personal.dataOwnerId}:${editor.id}`}
                 initial={editor}
+                tags={catalog}
                 update={personal.update}
                 onClose={() => setEditor(undefined)}
                 onSaved={saved}
@@ -379,39 +249,17 @@ function TodoBoard() {
             </div>
           ) : null}
           <div className="min-w-0 min-[1100px]:col-start-1 min-[1100px]:row-start-1">
-            {personal.failed && !personal.items.length ? null : list}
-            {view === 'open' && done.length > 0 ? (
-              <div className="mt-1.5 border-t border-[var(--border-default)] px-2 py-1.5">
-                <button
-                  type="button"
-                  aria-expanded={doneOpen}
-                  onClick={() => setDoneOpen((value) => !value)}
-                  className="flex min-h-8 w-full items-center gap-1.5 rounded-lg px-2 text-left text-12 text-[var(--text-tertiary)] outline-none transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--text-secondary)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--focus-ring)]"
-                >
-                  <span>{t('bots.glance.doneCount', { count: done.length })}</span>
-                  <ChevronDown
-                    size={12}
-                    className={cn(
-                      'shrink-0 transition-transform duration-150',
-                      doneOpen && 'rotate-180',
-                    )}
-                  />
-                </button>
-                {doneOpen ? (
-                  <div className="flex flex-col">
-                    {done.map((item) => (
-                      <TodoRow
-                        key={item.personal.id}
-                        item={item}
-                        view="done"
-                        onOpen={open}
-                        onUpdate={updateRow}
-                      />
-                    ))}
-                  </div>
-                ) : null}
-              </div>
+            {view === 'open' ? (
+              <PersonalTodoComposer
+                update={personal.update}
+                tags={catalog}
+                supportedColors={taskTags.supportedColors}
+                createTag={taskTags.create}
+                activeTagId={effectiveFilter.kind === 'tag' ? effectiveFilter.id : null}
+                onCreated={created}
+              />
             ) : null}
+            {personal.failed && !personal.items.length ? null : list}
           </div>
         </div>
       </div>

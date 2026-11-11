@@ -12,6 +12,7 @@ import {
   isDataOwnerBroadcastScopeCurrent,
 } from '../../device-link/broadcast-tap.js';
 import { broadcastSessionPatched } from './sessions';
+import { emitTaskTagCatalogChanged } from './taskTagChanges';
 
 const log = createLogger('taskTags');
 export { TASK_TAG_CHANNEL };
@@ -20,6 +21,7 @@ export const { executeTaskTags } = createTaskTagService({
   isDataOwnerBroadcastScopeCurrent: (...args) => isDataOwnerBroadcastScopeCurrent(...args),
   tapWindowBroadcast: (...args) => tapWindowBroadcast(...args),
   broadcastSessionPatched: (...args) => broadcastSessionPatched(...args),
+  tagCatalogChanged: (scope) => emitTaskTagCatalogChanged(scope),
   broadcastTagsChanged(payload, ownerStamp) {
     for (const window of BrowserWindow.getAllWindows()) {
       try {

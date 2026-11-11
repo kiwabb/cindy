@@ -1515,11 +1515,10 @@ export function compareGenerated(existingMarkdown, nextGeneratedBlock) {
 export function mobileCatalogSurfaces() {
   const rows = [
     ['home', '主机与资源首页', ['index.tsx', 'devices/index.tsx']],
-    ['devices', '主机详情', ['devices/[deviceId].tsx']],
+    ['devices', '主机详情与该电脑的个人待办', ['devices/[deviceId].tsx', 'todos/[deviceId].tsx']],
     ['device-management', '设备管理', ['devices/manage.tsx', 'devices/manage/[deviceId].tsx']],
     ['remote-desktop', '远程桌面', ['devices/desktop/[deviceId].tsx']],
     ['resources', '远程资源列表与详情', ['resources/[collectionId].tsx', 'resources/[collectionId]/[resourceId].tsx']],
-    ['todos', '个人待办', ['todos/[deviceId].tsx']],
     ['mail', '邮件阅读与附件预览', ['mail-preview.tsx']],
     ['plugins', '插件目录、页面与原生交互', ['plugins.tsx']],
     ['companions.direct', '伙伴私聊回看', ['companions/direct/[threadId].tsx']],

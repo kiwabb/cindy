@@ -1098,14 +1098,6 @@
     "cancel": "保持连接",
     "disconnect": "断开连接"
   },
-  "awayGuard": {
-    "status": "Cindy 正在工作",
-    "hint": "按任意键锁屏，用 Touch ID 或密码解锁",
-    "lockFailed": {
-      "status": "Cindy 没能锁住这台电脑",
-      "hint": "按 Control-Command-Q 锁屏，稍后系统也会自动锁屏"
-    }
-  },
   "appBadge": {
     "attentionCount": "需要关注的任务：{{count}}"
   },
@@ -10404,7 +10396,6 @@
       "offlineCount_other": "离线 {{count}} 台",
       "showMore": "显示更多",
       "showLess": "收起",
-      "doneCount_other": "已完成 {{count}}",
       "recentTasks": "近期任务",
       "unread": "未读结果",
       "outputs": "输出内容",
@@ -12013,24 +12004,14 @@
       "failed": "项目未能更新，请重新加载核对保存结果。",
       "noAvailable": "更多项目可先在项目列表中添加。"
     },
-    "automations": {
-      "title": "自动化",
-      "description": "{{name}} 项目里的自动化。在这里开关，编辑请到自动化页面。",
-      "empty": "{{name}} 还没有自动化。",
-      "failed": "自动化读取失败。",
-      "toggle": "启用「{{name}}」",
-      "manage": "在自动化页面管理",
-      "create": "去自动化页面新建"
-    },
     "todoBoard": {
       "title": "待办",
-      "suggested": "建议 {{date}}",
       "laterUntil": "{{date}} 再提醒",
       "completedOn": "完成于 {{date}}",
       "view": {
         "label": "状态",
-        "open": "进行中",
-        "later": "稍后再说",
+        "open": "未完成",
+        "later": "稍后",
         "done": "已完成"
       },
       "bucket": {
@@ -12039,10 +12020,16 @@
         "week": "本周",
         "later": "更晚",
         "none": "无截止"
-      },
-      "empty": {
-        "done": "还没有完成的待办"
       }
+    },
+    "automations": {
+      "title": "自动化",
+      "description": "{{name}} 项目里的自动化。在这里开关，编辑请到自动化页面。",
+      "empty": "{{name}} 还没有自动化。",
+      "failed": "自动化读取失败。",
+      "toggle": "启用「{{name}}」",
+      "manage": "在自动化页面管理",
+      "create": "去自动化页面新建"
     }
   },
   "common": {
@@ -19794,6 +19781,102 @@
     "wrap": "自动换行",
     "lineNumbers": "行号"
   },
+  "personalTodos": {
+    "all": "全部",
+    "add": "新增待办",
+    "details": "待办详情",
+    "title": "标题",
+    "notes": "备注（选填）",
+    "deadline": "截止日期（选填）",
+    "deadlineTime": "截止时间（选填）",
+    "deferUntil": "恢复处理时间",
+    "save": "保存",
+    "saving": "正在保存…",
+    "close": "关闭",
+    "complete": "完成",
+    "reopen": "重新打开",
+    "defer": "稍后处理",
+    "restore": "现在处理",
+    "delete": "删除",
+    "deleteConfirm": "删除这条待办？",
+    "empty": "此视图暂无待办",
+    "saveFailed": "保存失败，输入已保留。请再次保存。",
+    "loadFailed": "个人待办读取失败。",
+    "conflict": "已在别处更新",
+    "reloadVersion": "读取最新版本以覆盖保存",
+    "savedNotice": "已保存「{{title}}」",
+    "deletedNotice": "已删除「{{title}}」。",
+    "rowFailed": "操作失败",
+    "overwrite": "覆盖保存",
+    "deferInPast": "恢复时间需晚于现在",
+    "reminder": {
+      "due": "待办到期",
+      "resumed": "已到恢复处理时间",
+      "summary": "{{count}} 条待办到期",
+      "label": "提醒",
+      "onTime": "准时",
+      "before15m": "提前 15 分钟",
+      "before1h": "提前 1 小时",
+      "dayOf": "当天 9:00",
+      "dayBefore": "前一天 9:00",
+      "off": "不提醒",
+      "dueSoon": "即将到期",
+      "dueTomorrow": "明天到期"
+    },
+    "untagged": "无标签",
+    "noTag": "无",
+    "newTag": "新建标签…",
+    "tagLimit": "标签数量已达上限",
+    "deferTonight": "今晚",
+    "group": {
+      "label": "分组",
+      "due": "按截止时间",
+      "priority": "按优先级",
+      "tag": "按标签",
+      "none": "不分组"
+    },
+    "order": {
+      "label": "组内顺序",
+      "priority": "优先级高的在前",
+      "due": "截止早的在前",
+      "created": "最近添加的在前"
+    },
+    "priority": {
+      "label": "优先级",
+      "high": "高优先级",
+      "medium": "中优先级",
+      "low": "低优先级",
+      "none": "无优先级",
+      "short": {
+        "high": "高",
+        "medium": "中",
+        "low": "低"
+      }
+    },
+    "due": {
+      "label": "截止",
+      "today": "今天",
+      "tomorrow": "明天",
+      "nextMonday": "下周一",
+      "none": "无日期",
+      "pick": "选择日期…",
+      "overdueToday": "已逾期",
+      "overdue_other": "逾期 {{count}} 天"
+    },
+    "composer": {
+      "add": "添加",
+      "cancel": "取消",
+      "dismissRecognition": "不识别“{{phrase}}”"
+    }
+  },
+  "awayGuard": {
+    "status": "Cindy 正在工作",
+    "hint": "按任意键锁屏，用 Touch ID 或密码解锁",
+    "lockFailed": {
+      "status": "Cindy 没能锁住这台电脑",
+      "hint": "按 Control-Command-Q 锁屏，稍后系统也会自动锁屏"
+    }
+  },
   "subscriptionAccounts": {
     "unassigned": "账号待分配",
     "providerManagedAuth": "Codex 当前供应商未提供 ChatGPT 账号信息。请在添加供应商时选择「$t(subscriptionAccounts.signIn.anotherAccount)」，使用独立目录",
@@ -19865,38 +19948,5 @@
     "detail": "请求来自「{{device}}」\n用途：{{purpose}}\n\n开启后，同账号设备可以远程控制这台电脑，包括运行任务和访问文件。此设置持续有效，可随时在设置中关闭。",
     "decline": "暂不开启",
     "enable": "开启远程控制"
-  },
-  "personalTodos": {
-    "add": "新增待办",
-    "details": "待办详情",
-    "title": "标题",
-    "notes": "备注（选填）",
-    "deadline": "截止日期（选填）",
-    "deadlineTime": "截止时间（选填）",
-    "deferUntil": "恢复处理时间",
-    "save": "保存",
-    "saving": "正在保存…",
-    "close": "关闭",
-    "complete": "完成",
-    "reopen": "重新打开",
-    "defer": "稍后处理",
-    "restore": "现在处理",
-    "delete": "删除",
-    "deleteConfirm": "删除这条待办？",
-    "empty": "此视图暂无待办",
-    "saveFailed": "保存失败，输入已保留。请再次保存。",
-    "loadFailed": "个人待办读取失败。",
-    "conflict": "已在别处更新",
-    "reloadVersion": "读取最新版本以覆盖保存",
-    "savedNotice": "已保存「{{title}}」",
-    "deletedNotice": "已删除「{{title}}」。",
-    "rowFailed": "操作失败",
-    "overwrite": "覆盖保存",
-    "deferInPast": "恢复时间需晚于现在",
-    "reminder": {
-      "due": "待办到期",
-      "resumed": "已到恢复处理时间",
-      "summary": "{{count}} 条待办到期"
-    }
   }
 }

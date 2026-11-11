@@ -11,7 +11,7 @@
 
 可达组件、样式来源与 Token / 裸颜色 / 裸圆角统计不入库：需要时运行 `pnpm design:inventory:report`，输出到 `tmp/design-inventory-report.md`；要看某次提交时的数字，在该提交上重跑。
 
-登记 surface 数：60。平台包含 Desktop 与 Mobile；静态入口发现不表示已迁移或已实机验证。
+登记 surface 数：59。平台包含 Desktop 与 Mobile；静态入口发现不表示已迁移或已实机验证。
 
 | ID | 平台 | 标题 | 生产入口 |
 | --- | --- | --- | --- |
@@ -64,7 +64,7 @@
 | `mobile.companions.direct` | mobile | 伙伴私聊回看 | app/companions/direct/[threadId].tsx |
 | `mobile.companions.groups` | mobile | 伙伴群聊与分工 | app/companions/groups/[groupId].tsx |
 | `mobile.device-management` | mobile | 设备管理 | app/devices/manage.tsx / app/devices/manage/[deviceId].tsx |
-| `mobile.devices` | mobile | 主机详情 | app/devices/[deviceId].tsx |
+| `mobile.devices` | mobile | 主机详情与该电脑的个人待办 | app/devices/[deviceId].tsx / app/todos/[deviceId].tsx |
 | `mobile.files` | mobile | 任务文件与预览 | app/files/[sessionId].tsx / app/files/preview/[sessionId].tsx |
 | `mobile.home` | mobile | 主机与资源首页 | app/index.tsx / app/devices/index.tsx |
 | `mobile.mail` | mobile | 邮件阅读与附件预览 | app/mail-preview.tsx |
@@ -74,7 +74,6 @@
 | `mobile.remote-desktop` | mobile | 远程桌面 | app/devices/desktop/[deviceId].tsx |
 | `mobile.resources` | mobile | 远程资源列表与详情 | app/resources/[collectionId].tsx / app/resources/[collectionId]/[resourceId].tsx |
 | `mobile.settings` | mobile | 设置（含调试与日志上传可见入口） | app/settings.tsx / app/settings/developer.tsx / app/settings/device-name.tsx / app/settings/handheld.tsx / app/settings/user-bubble.tsx / app/settings/voice-dictionary.tsx / app/settings/voice-speaker-filter.tsx |
-| `mobile.todos` | mobile | 个人待办 | app/todos/[deviceId].tsx |
 
 ### 生产路由覆盖
 
@@ -165,7 +164,7 @@
 | apps/mobile/app/settings/voice-speaker-filter.tsx | VoiceSpeakerFilterRoute | `mobile.settings` |
 | apps/mobile/app/settings.tsx | SettingsScreen | `mobile.settings` |
 | apps/mobile/app/shared-session.tsx | SharedSessionScreen | `mobile.chat.sharing` |
-| apps/mobile/app/todos/[deviceId].tsx | PersonalTodosScreen | `mobile.todos` |
+| apps/mobile/app/todos/[deviceId].tsx | PersonalTodosScreen | `mobile.devices` |
 
 ### Mobile 布局 / 开发入口排除
 
@@ -261,7 +260,6 @@ Mobile 已由 DS-7 纳入同一台账（2026-09-10 静态入口发现），保�
 | `mobile.remote-desktop` | kirozeng 协调 / Codex 发现维护；页面 owner 待认领 | legacy | — | DS-7 已发现入口；Mobile 独立阶段接管，未迁移 | 2026-09-17 复查入口变化和页面 owner；动态内容、平台实际呈现留 Mobile 独立阶段验证 |
 | `mobile.resources` | kirozeng 协调 / Codex 发现维护；页面 owner 待认领 | legacy | — | DS-7 已发现入口；Mobile 独立阶段接管，未迁移 | 2026-09-17 复查入口变化和页面 owner；动态内容、平台实际呈现留 Mobile 独立阶段验证 |
 | `mobile.settings` | kirozeng 协调 / Codex 发现维护；页面 owner 待认领 | legacy | — | DS-7 已发现入口；Mobile 独立阶段接管，未迁移 | 2026-09-17 复查入口变化和页面 owner；动态内容、平台实际呈现留 Mobile 独立阶段验证 |
-| `mobile.todos` | unassigned | legacy | — | DS-7 发现入口，Mobile 独立阶段接管；未迁移 | 保持现状；发现问题记下一动作，本张不修视觉 |
 
 ### Usage History category colors (2026-09-09)
 

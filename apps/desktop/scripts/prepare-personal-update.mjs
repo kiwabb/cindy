@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import JSZip from 'jszip';
+import { isIsoDateString } from '../src/main/personal-update/contract.mjs';
 import { readPersonalUpdatePolicy } from './ci/personal-update-metadata.mjs';
 import { assertPackagedPersonalIdentity, createPersonalUpdateManifest, hashFile, personalReleaseAssets } from './ci/personal-update-artifacts.mjs';
 
@@ -28,10 +29,12 @@ export async function preparePersonalUpdate({ desktopRoot, artifactDir, appPath 
     sourceMetadata = JSON.parse(fs.readFileSync(path.join(appPath, 'Contents/Resources/cindy-source.json'), 'utf8'));
   }
   assertPackagedPersonalIdentity(sourceMetadata, manifest, policy);
-  fs.writeFileSync(path.join(artifactDir, 'personal-update.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+  // Optional display-only build time, taken from the packaged metadata so the feed and the installed app agree.
+  const published = isIsoDateString(sourceMetadata.builtAt) ? { ...manifest, builtAt: sourceMetadata.builtAt } : manifest;
+  fs.writeFileSync(path.join(artifactDir, 'personal-update.json'), `${JSON.stringify(published, null, 2)}\n`);
   const files = assets.files.filter(name => name !== 'SHA256SUMS');
   fs.writeFileSync(path.join(artifactDir, 'SHA256SUMS'), files.map(name => `${hashFile(path.join(artifactDir, name))}  ${name}\n`).join(''));
-  return manifest;
+  return published;
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

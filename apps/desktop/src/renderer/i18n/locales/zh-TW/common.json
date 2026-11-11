@@ -1098,14 +1098,6 @@
     "cancel": "保持連線",
     "disconnect": "中斷連線"
   },
-  "awayGuard": {
-    "status": "Cindy 正在工作",
-    "hint": "按任意鍵鎖定螢幕，用 Touch ID 或密碼解鎖",
-    "lockFailed": {
-      "status": "Cindy 沒能鎖定這台電腦",
-      "hint": "按 Control-Command-Q 鎖定螢幕，稍後系統也會自動鎖定"
-    }
-  },
   "appBadge": {
     "attentionCount": "需要關注的任務：{{count}}"
   },
@@ -10404,7 +10396,6 @@
       "offlineCount_other": "離線 {{count}} 台",
       "showMore": "顯示更多",
       "showLess": "收起",
-      "doneCount_other": "已完成 {{count}}",
       "recentTasks": "近期任務",
       "unread": "未讀結果",
       "outputs": "輸出內容",
@@ -12013,24 +12004,14 @@
       "failed": "專案未能更新，請重新載入核對儲存結果。",
       "noAvailable": "更多專案可先在專案列表中新增。"
     },
-    "automations": {
-      "title": "自動化",
-      "description": "{{name}} 專案裡的自動化。在這裡開關，編輯請到自動化頁面。",
-      "empty": "{{name}} 還沒有自動化。",
-      "failed": "自動化讀取失敗。",
-      "toggle": "啟用「{{name}}」",
-      "manage": "在自動化頁面管理",
-      "create": "去自動化頁面新建"
-    },
     "todoBoard": {
       "title": "待辦",
-      "suggested": "建議 {{date}}",
       "laterUntil": "{{date}} 再提醒",
       "completedOn": "完成於 {{date}}",
       "view": {
         "label": "狀態",
-        "open": "進行中",
-        "later": "稍後再說",
+        "open": "未完成",
+        "later": "稍後",
         "done": "已完成"
       },
       "bucket": {
@@ -12039,10 +12020,16 @@
         "week": "本週",
         "later": "更晚",
         "none": "無截止"
-      },
-      "empty": {
-        "done": "還沒有完成的待辦"
       }
+    },
+    "automations": {
+      "title": "自動化",
+      "description": "{{name}} 專案裡的自動化。在這裡開關，編輯請到自動化頁面。",
+      "empty": "{{name}} 還沒有自動化。",
+      "failed": "自動化讀取失敗。",
+      "toggle": "啟用「{{name}}」",
+      "manage": "在自動化頁面管理",
+      "create": "去自動化頁面新建"
     }
   },
   "common": {
@@ -19794,6 +19781,102 @@
     "wrap": "自動換行",
     "lineNumbers": "行號"
   },
+  "personalTodos": {
+    "all": "全部",
+    "add": "新增待辦",
+    "details": "待辦詳情",
+    "title": "標題",
+    "notes": "備註（選填）",
+    "deadline": "截止日期（選填）",
+    "deadlineTime": "截止時間（選填）",
+    "deferUntil": "恢復處理時間",
+    "save": "儲存",
+    "saving": "正在儲存…",
+    "close": "關閉",
+    "complete": "完成",
+    "reopen": "重新開啟",
+    "defer": "稍後處理",
+    "restore": "現在處理",
+    "delete": "刪除",
+    "deleteConfirm": "刪除這條待辦？",
+    "empty": "此檢視暫無待辦",
+    "saveFailed": "儲存失敗，輸入已保留。請再次儲存。",
+    "loadFailed": "個人待辦讀取失敗。",
+    "conflict": "已在別處更新",
+    "reloadVersion": "讀取最新版本以覆蓋儲存",
+    "savedNotice": "已儲存「{{title}}」",
+    "deletedNotice": "已刪除「{{title}}」。",
+    "rowFailed": "操作失敗",
+    "overwrite": "覆蓋儲存",
+    "deferInPast": "恢復時間需晚於現在",
+    "reminder": {
+      "due": "待辦到期",
+      "resumed": "已到恢復處理時間",
+      "summary": "{{count}} 則待辦到期",
+      "label": "提醒",
+      "onTime": "準時",
+      "before15m": "提前 15 分鐘",
+      "before1h": "提前 1 小時",
+      "dayOf": "當天 9:00",
+      "dayBefore": "前一天 9:00",
+      "off": "不提醒",
+      "dueSoon": "即將到期",
+      "dueTomorrow": "明天到期"
+    },
+    "untagged": "無標籤",
+    "noTag": "無",
+    "newTag": "新增標籤…",
+    "tagLimit": "標籤數量已達上限",
+    "deferTonight": "今晚",
+    "group": {
+      "label": "分組",
+      "due": "依截止時間",
+      "priority": "依優先順序",
+      "tag": "依標籤",
+      "none": "不分組"
+    },
+    "order": {
+      "label": "組內順序",
+      "priority": "優先順序高的在前",
+      "due": "截止早的在前",
+      "created": "最近新增的在前"
+    },
+    "priority": {
+      "label": "優先順序",
+      "high": "高優先順序",
+      "medium": "中優先順序",
+      "low": "低優先順序",
+      "none": "無優先順序",
+      "short": {
+        "high": "高",
+        "medium": "中",
+        "low": "低"
+      }
+    },
+    "due": {
+      "label": "截止",
+      "today": "今天",
+      "tomorrow": "明天",
+      "nextMonday": "下週一",
+      "none": "無日期",
+      "pick": "選擇日期…",
+      "overdueToday": "已逾期",
+      "overdue_other": "逾期 {{count}} 天"
+    },
+    "composer": {
+      "add": "新增",
+      "cancel": "取消",
+      "dismissRecognition": "不辨識「{{phrase}}」"
+    }
+  },
+  "awayGuard": {
+    "status": "Cindy 正在工作",
+    "hint": "按任意鍵鎖定螢幕，用 Touch ID 或密碼解鎖",
+    "lockFailed": {
+      "status": "Cindy 沒能鎖定這台電腦",
+      "hint": "按 Control-Command-Q 鎖定螢幕，稍後系統也會自動鎖定"
+    }
+  },
   "subscriptionAccounts": {
     "unassigned": "帳號待分配",
     "providerManagedAuth": "Codex 目前的供應商未提供 ChatGPT 帳號資訊。請在新增供應商時選擇「$t(subscriptionAccounts.signIn.anotherAccount)」，使用獨立目錄",
@@ -19865,38 +19948,5 @@
     "detail": "請求來自「{{device}}」\n用途：{{purpose}}\n\n開啟後，同帳號裝置可以遠端控制這台電腦，包括執行任務和存取檔案。此設定持續有效，可隨時在設定中關閉。",
     "decline": "暫不開啟",
     "enable": "開啟遠端控制"
-  },
-  "personalTodos": {
-    "add": "新增待辦",
-    "details": "待辦詳情",
-    "title": "標題",
-    "notes": "備註（選填）",
-    "deadline": "截止日期（選填）",
-    "deadlineTime": "截止時間（選填）",
-    "deferUntil": "恢復處理時間",
-    "save": "儲存",
-    "saving": "正在儲存…",
-    "close": "關閉",
-    "complete": "完成",
-    "reopen": "重新開啟",
-    "defer": "稍後處理",
-    "restore": "現在處理",
-    "delete": "刪除",
-    "deleteConfirm": "刪除這條待辦？",
-    "empty": "此檢視暫無待辦",
-    "saveFailed": "儲存失敗，輸入已保留。請再次儲存。",
-    "loadFailed": "個人待辦讀取失敗。",
-    "conflict": "已在別處更新",
-    "reloadVersion": "讀取最新版本以覆蓋儲存",
-    "savedNotice": "已儲存「{{title}}」",
-    "deletedNotice": "已刪除「{{title}}」。",
-    "rowFailed": "操作失敗",
-    "overwrite": "覆蓋儲存",
-    "deferInPast": "恢復時間需晚於現在",
-    "reminder": {
-      "due": "待辦到期",
-      "resumed": "已到恢復處理時間",
-      "summary": "{{count}} 則待辦到期"
-    }
   }
 }

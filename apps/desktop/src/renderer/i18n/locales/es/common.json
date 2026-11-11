@@ -1127,14 +1127,6 @@
     "cancel": "Mantente conectado",
     "disconnect": "Desconectar"
   },
-  "awayGuard": {
-    "status": "Cindy está trabajando",
-    "hint": "Pulsa cualquier tecla para bloquear y desbloquea con Touch ID o tu contraseña.",
-    "lockFailed": {
-      "status": "Cindy no pudo bloquear esta Mac",
-      "hint": "Pulsa Control-Comando-Q para bloquearla. La pantalla también se bloqueará sola al cabo de un rato."
-    }
-  },
   "appBadge": {
     "attentionCount": "Tareas que requieren atención: {{count}}"
   },
@@ -10532,15 +10524,12 @@
       "offlineCount_other": "{{count}} sin conexión",
       "showMore": "Mostrar más",
       "showLess": "Mostrar menos",
-      "doneCount_one": "{{count}} completado",
-      "doneCount_other": "{{count}} completados",
       "recentTasks": "Tareas recientes",
       "unread": "Resultado no leído",
       "outputs": "Salidas",
       "outputMeta": "{{time}} · {{task}}",
       "openFailed": "No se pudo abrir el archivo",
-      "offlineCount_many": "{{count}} sin conexión",
-      "doneCount_many": "{{count}} completados"
+      "offlineCount_many": "{{count}} sin conexión"
     },
     "remoteSettings": {
       "empty": "Nada aquí todavía.",
@@ -12161,18 +12150,8 @@
       "failed": "No se pudieron actualizar los proyectos. Vuelve a cargar para comprobar el estado guardado.",
       "noAvailable": "Primero agrega más proyectos desde la lista de proyectos."
     },
-    "automations": {
-      "title": "Automatizaciones",
-      "description": "Automatizaciones del proyecto de {{name}}. Actívalas o desactívalas aquí; edítalas en Automatizaciones.",
-      "empty": "{{name}} aún no tiene automatizaciones.",
-      "failed": "No se pudieron cargar las automatizaciones.",
-      "toggle": "Activar “{{name}}”",
-      "manage": "Gestionar en Automatizaciones",
-      "create": "Crear en Automatizaciones"
-    },
     "todoBoard": {
       "title": "Pendientes",
-      "suggested": "Sugerido {{date}}",
       "laterUntil": "Vuelve el {{date}}",
       "completedOn": "Hecho el {{date}}",
       "view": {
@@ -12187,10 +12166,16 @@
         "week": "Esta semana",
         "later": "Más adelante",
         "none": "Sin fecha límite"
-      },
-      "empty": {
-        "done": "Aún no hay pendientes hechos"
       }
+    },
+    "automations": {
+      "title": "Automatizaciones",
+      "description": "Automatizaciones del proyecto de {{name}}. Actívalas o desactívalas aquí; edítalas en Automatizaciones.",
+      "empty": "{{name}} aún no tiene automatizaciones.",
+      "failed": "No se pudieron cargar las automatizaciones.",
+      "toggle": "Activar “{{name}}”",
+      "manage": "Gestionar en Automatizaciones",
+      "create": "Crear en Automatizaciones"
     }
   },
   "common": {
@@ -20055,6 +20040,104 @@
     "wrap": "Ajustar líneas",
     "lineNumbers": "Números de línea"
   },
+  "personalTodos": {
+    "all": "Todos",
+    "add": "Añadir pendiente",
+    "details": "Detalles",
+    "title": "Título",
+    "notes": "Notas (opcional)",
+    "deadline": "Fecha límite (opcional)",
+    "deadlineTime": "Hora (opcional)",
+    "deferUntil": "Retomar el",
+    "save": "Guardar",
+    "saving": "Guardando…",
+    "close": "Cerrar",
+    "complete": "Completar",
+    "reopen": "Reabrir",
+    "defer": "Posponer",
+    "restore": "Retomar ahora",
+    "delete": "Eliminar",
+    "deleteConfirm": "¿Eliminar este pendiente?",
+    "empty": "No hay pendientes en esta vista",
+    "saveFailed": "No se pudo guardar. Tu entrada se conserva. Vuelve a guardar.",
+    "loadFailed": "No se pudieron cargar tus pendientes.",
+    "conflict": "Actualizado en otro lugar",
+    "reloadVersion": "Cargar la versión que se sobrescribirá",
+    "savedNotice": "Se guardó «{{title}}»",
+    "deletedNotice": "Se eliminó «{{title}}».",
+    "rowFailed": "Acción fallida",
+    "overwrite": "Sobrescribir y guardar",
+    "deferInPast": "La hora debe ser posterior a ahora",
+    "reminder": {
+      "due": "Tarea pendiente vence",
+      "resumed": "Es hora de retomarla",
+      "summary": "{{count}} tareas pendientes vencen",
+      "label": "Recordatorio",
+      "onTime": "A la hora",
+      "before15m": "15 min antes",
+      "before1h": "1 h antes",
+      "dayOf": "Mismo día, 9:00",
+      "dayBefore": "Día antes, 9:00",
+      "off": "Ninguno",
+      "dueSoon": "Vence pronto",
+      "dueTomorrow": "Vence mañana"
+    },
+    "untagged": "Sin etiqueta",
+    "noTag": "Ninguna",
+    "newTag": "Nueva etiqueta…",
+    "tagLimit": "Se alcanzó el límite de etiquetas",
+    "deferTonight": "Esta noche",
+    "group": {
+      "label": "Agrupar",
+      "due": "Por fecha límite",
+      "priority": "Por prioridad",
+      "tag": "Por etiqueta",
+      "none": "Sin agrupar"
+    },
+    "order": {
+      "label": "Orden dentro del grupo",
+      "priority": "Mayor prioridad primero",
+      "due": "Fecha límite más próxima primero",
+      "created": "Añadidos recientemente primero"
+    },
+    "priority": {
+      "label": "Prioridad",
+      "high": "Prioridad alta",
+      "medium": "Prioridad media",
+      "low": "Prioridad baja",
+      "none": "Sin prioridad",
+      "short": {
+        "high": "Alta",
+        "medium": "Media",
+        "low": "Baja"
+      }
+    },
+    "due": {
+      "label": "Vence",
+      "today": "Hoy",
+      "tomorrow": "Mañana",
+      "nextMonday": "Próximo lunes",
+      "none": "Sin fecha",
+      "pick": "Elegir fecha…",
+      "overdueToday": "Vencido",
+      "overdue_one": "{{count}} día de retraso",
+      "overdue_many": "{{count}} de días de retraso",
+      "overdue_other": "{{count}} días de retraso"
+    },
+    "composer": {
+      "add": "Añadir",
+      "cancel": "Cancelar",
+      "dismissRecognition": "No reconocer «{{phrase}}»"
+    }
+  },
+  "awayGuard": {
+    "status": "Cindy está trabajando",
+    "hint": "Pulsa cualquier tecla para bloquear y desbloquea con Touch ID o tu contraseña.",
+    "lockFailed": {
+      "status": "Cindy no pudo bloquear esta Mac",
+      "hint": "Pulsa Control-Comando-Q para bloquearla. La pantalla también se bloqueará sola al cabo de un rato."
+    }
+  },
   "subscriptionAccounts": {
     "unassigned": "Cuenta sin asignar",
     "providerManagedAuth": "El proveedor actual de Codex no permite consultar la cuenta de ChatGPT. Al añadir el proveedor, elige «$t(subscriptionAccounts.signIn.anotherAccount)» para usar una carpeta independiente.",
@@ -20126,38 +20209,5 @@
     "detail": "Solicitud de {{device}}\nMotivo: {{purpose}}\n\nLos dispositivos de tu cuenta podrán controlar este ordenador, ejecutar tareas y acceder a archivos. Seguirá activado hasta que lo desactives en Ajustes.",
     "decline": "Ahora no",
     "enable": "Activar control remoto"
-  },
-  "personalTodos": {
-    "add": "Añadir pendiente",
-    "details": "Detalles",
-    "title": "Título",
-    "notes": "Notas (opcional)",
-    "deadline": "Fecha límite (opcional)",
-    "deadlineTime": "Hora (opcional)",
-    "deferUntil": "Retomar el",
-    "save": "Guardar",
-    "saving": "Guardando…",
-    "close": "Cerrar",
-    "complete": "Completar",
-    "reopen": "Reabrir",
-    "defer": "Posponer",
-    "restore": "Retomar ahora",
-    "delete": "Eliminar",
-    "deleteConfirm": "¿Eliminar este pendiente?",
-    "empty": "No hay pendientes en esta vista",
-    "saveFailed": "No se pudo guardar. Tu entrada se conserva. Vuelve a guardar.",
-    "loadFailed": "No se pudieron cargar tus pendientes.",
-    "conflict": "Actualizado en otro lugar",
-    "reloadVersion": "Cargar la versión que se sobrescribirá",
-    "savedNotice": "Se guardó «{{title}}»",
-    "deletedNotice": "Se eliminó «{{title}}».",
-    "rowFailed": "Acción fallida",
-    "overwrite": "Sobrescribir y guardar",
-    "deferInPast": "La hora debe ser posterior a ahora",
-    "reminder": {
-      "due": "Tarea pendiente vence",
-      "resumed": "Es hora de retomarla",
-      "summary": "{{count}} tareas pendientes vencen"
-    }
   }
 }

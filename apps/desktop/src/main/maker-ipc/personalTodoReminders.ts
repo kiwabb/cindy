@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { Notification, powerMonitor } from 'electron';
-import { effectiveTodoDeadline, type TeammateTodo, type TodoDeadline } from '@cindy/maker-shared/teammate-todo';
+import { effectiveTodoDeadline, type TeammateTodo, type TodoDeadline, type TodoReminder } from '@cindy/maker-shared/teammate-todo';
 import { activeOwnerScopeKey, getActiveAppSession, isAppSessionBoundaryPending, ownerScopedUserDataPath } from '../appSessionState.js';
 import { openMainWindowTodos } from '../deepLink.js';
 import { t } from '../i18n.desktop.js';
@@ -25,11 +25,19 @@ const PURGE_INTERVAL_MS = 86_400_000;
 const PURGE_OLDER_THAN_MS = 30 * 86_400_000;
 const PERSONAL_KEY_PREFIX = 'personal:';
 
+const REMINDER_OFFSET_MS: Partial<Record<TodoReminder, number>> = {
+  'before-15m': 15 * 60_000,
+  'before-1h': 3_600_000,
+  'before-1d': 86_400_000,
+};
+
 export type ReminderKind = 'due' | 'resumed';
 export interface DueReminder {
   id: string;
   title: string;
   kind: ReminderKind;
+  /** Deadline reminder setting that produced the toast text; `default` for deferral ends and passed deadlines. */
+  reminder: TodoReminder;
   /** When the strongest trigger came due (epoch ms). */
   at: number;
   /** Fingerprints of every trigger this reminder covers, to be recorded once announced. */
@@ -68,8 +76,11 @@ function deadlineInstant(d: TodoDeadline): number {
 /**
  * Which todos are due for an announcement now. Pure: no clock, no I/O.
  * Open, not deleted/muted, not currently deferred. A trigger is the deadline moment (instants at
- * `at`, dates at 09:00 in the deadline's zone) or the end of a deferral. Its fingerprint is the
- * trigger moment, so editing the deadline re-arms while a re-read never repeats.
+ * `at`, dates at 09:00 in the deadline's zone) shifted earlier by the todo's `reminder` (`off` has
+ * none), or the end of a deferral. Its fingerprint is the trigger moment, so editing the deadline or
+ * the reminder re-arms while a re-read never repeats. An early trigger that is only noticed after
+ * the deadline moment itself has passed is announced as a plain due reminder, and not at all when
+ * the plain due reminder for that deadline was already announced.
  */
 export function dueReminders(params: {
   todos: readonly TeammateTodo[];
@@ -84,10 +95,17 @@ export function dueReminders(params: {
     if (decision && decision.kind !== 'later') continue;
     const until = decision?.until ? Date.parse(decision.until) : NaN;
     if (decision && !(until <= now)) continue; // still deferred
-    const triggers: Array<{ kind: ReminderKind; at: number }> = [];
+    const triggers: Array<{ kind: ReminderKind; at: number; reminder: TodoReminder }> = [];
     const deadline = effectiveTodoDeadline(todo);
-    if (deadline) triggers.push({ kind: 'due', at: deadlineInstant(deadline) });
-    if (decision) triggers.push({ kind: 'resumed', at: until });
+    const setting: TodoReminder = todo.reminder ?? 'default';
+    if (deadline && setting !== 'off') {
+      const moment = deadlineInstant(deadline);
+      const offset = REMINDER_OFFSET_MS[setting] ?? 0;
+      if (!offset) triggers.push({ kind: 'due', at: moment, reminder: 'default' });
+      else if (now < moment) triggers.push({ kind: 'due', at: moment - offset, reminder: setting });
+      else if (!sent[`${todo.id}|due|${moment}`]) triggers.push({ kind: 'due', at: moment - offset, reminder: 'default' });
+    }
+    if (decision) triggers.push({ kind: 'resumed', at: until, reminder: 'default' });
     const fresh = triggers.filter(
       (tr) => Number.isFinite(tr.at) && tr.at <= now && now - tr.at <= MAX_REMINDER_AGE_MS,
     );
@@ -97,7 +115,7 @@ export function dueReminders(params: {
     if (!added.length) continue;
     const lead = added.find((tr) => tr.kind === 'due') ?? added[0];
     const keys = added.map((tr) => ({ key: tr.key, at: tr.at }));
-    out.push({ id: todo.id, title: todo.title, kind: lead.kind, at: lead.at, keys });
+    out.push({ id: todo.id, title: todo.title, kind: lead.kind, reminder: lead.reminder, at: lead.at, keys });
   }
   return out.sort((a, b) => a.at - b.at);
 }
@@ -221,10 +239,16 @@ export function createPersonalTodoReminderRuntime(deps: ReminderRuntimeDeps) {
 
 const liveNotifications = new Set<Notification>();
 
+export function reminderLabelKey(r: Pick<DueReminder, 'kind' | 'reminder'>): string {
+  if (r.kind === 'resumed') return 'personalTodos.reminder.resumed';
+  if (r.reminder === 'before-15m' || r.reminder === 'before-1h') return 'personalTodos.reminder.dueSoon';
+  if (r.reminder === 'before-1d') return 'personalTodos.reminder.dueTomorrow';
+  return 'personalTodos.reminder.due';
+}
+
 function show(toast: ReminderToast): void {
   if (!Notification.isSupported()) return;
-  const label = (r: DueReminder) =>
-    t(r.kind === 'resumed' ? 'personalTodos.reminder.resumed' : 'personalTodos.reminder.due');
+  const label = (r: DueReminder) => t(reminderLabelKey(r));
   const content =
     toast.type === 'single'
       ? { title: toast.reminder.title, body: label(toast.reminder) }

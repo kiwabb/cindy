@@ -21,6 +21,7 @@ import {
   usePersonalTodos,
   type PersonalTodoItem,
 } from '@/session/usePersonalTodos';
+import { personalTodoTagColor, personalTodoTagLabel, priorityRingColor, RING_TINT_ALPHA } from '@/session/personalTodoVisuals';
 import { goBackGuarded } from '@/utils/backGuard';
 import { fontWeight, iconSize, iconStroke, lineHeight, radius, spacing, typeScale, useTheme, useThemedStyles, type ThemeColors } from '@/theme';
 
@@ -71,19 +72,27 @@ function PersonalTodosContent({ deviceId, deviceName }: { deviceId: string; devi
 
   const row = (todo: PersonalTodoItem) => {
     const due = personalTodoDue(todo);
+    // A done row drops the priority color; a tag the catalog no longer has is already absent from `tags`.
+    const ring = todo.status === 'open' ? priorityRingColor(todo.priority, colors) : null;
+    const tag = todo.tags[0];
     return <View key={todo.id} style={styles.row}>
       <Pressable accessibilityRole="button" accessibilityLabel={todo.status === 'open' ? tr('complete') : tr('reopen')}
         hitSlop={8} onPress={() => void toggle(todo)} style={styles.check} testID="personalTodos.toggle">
         {todo.status === 'done'
           ? <Check size={iconSize.lg} strokeWidth={iconStroke.medium} color={colors.textTertiary} />
-          : <Circle size={iconSize.lg} strokeWidth={iconStroke.regular} color={colors.textSecondary} />}
+          : ring
+            ? <Circle size={iconSize.lg} strokeWidth={iconStroke.medium} color={ring} fill={`${ring}${RING_TINT_ALPHA}`} testID={`personalTodos.ring.${todo.priority}`} />
+            : <Circle size={iconSize.lg} strokeWidth={iconStroke.regular} color={colors.textSecondary} />}
       </Pressable>
       <Pressable accessibilityRole="button" onPress={() => { setError(null); setEditing({ kind: 'edit', id: todo.id }); }}
         style={({ pressed }) => [styles.rowBody, pressed && styles.pressed]} testID="personalTodos.row">
         <Text numberOfLines={2} style={[styles.rowTitle, todo.status === 'done' && styles.rowTitleDone]}>{todo.title}</Text>
-        {todo.deadline ? <View style={styles.meta}>
+        {todo.deadline || tag ? <View style={styles.meta}>
           {due ? <View style={styles.dueDot} /> : null}
-          <Text style={styles.rowMeta}>{todo.deadline.date}</Text>
+          {todo.deadline ? <Text style={styles.rowMeta}>{todo.deadline.date}</Text> : null}
+          {tag ? <View testID="personalTodos.tagDot" accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
+            style={[styles.tagDot, { backgroundColor: personalTodoTagColor(tag.color, colors) }]} /> : null}
+          {tag ? <Text numberOfLines={1} style={[styles.rowMeta, styles.tagName]} testID="personalTodos.tagName">{personalTodoTagLabel(tag, t)}</Text> : null}
         </View> : null}
       </Pressable>
     </View>;
@@ -210,6 +219,8 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   rowTitleDone: { color: colors.textSecondary, fontWeight: fontWeight.regular },
   meta: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs + 2 },
   rowMeta: { color: colors.textTertiary, fontSize: typeScale.caption, lineHeight: lineHeight.caption, fontWeight: fontWeight.regular },
+  tagDot: { width: 8, height: 8, borderRadius: radius.pill, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  tagName: { flexShrink: 1 },
   dueDot: { width: 6, height: 6, borderRadius: radius.pill, backgroundColor: colors.statusError },
   foldRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44 },
   error: { color: colors.textSecondary, fontSize: typeScale.footnote, lineHeight: lineHeight.caption, fontWeight: fontWeight.regular, paddingVertical: spacing.sm },

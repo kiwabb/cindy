@@ -1127,14 +1127,6 @@
     "cancel": "Manter ligação",
     "disconnect": "Desligar"
   },
-  "awayGuard": {
-    "status": "O Cindy está a trabalhar",
-    "hint": "Prima qualquer tecla para bloquear e desbloqueie com Touch ID ou a sua palavra-passe.",
-    "lockFailed": {
-      "status": "O Cindy não conseguiu bloquear este Mac",
-      "hint": "Prima Control-Comando-Q para o bloquear. O ecrã também bloqueia sozinho passado algum tempo."
-    }
-  },
   "appBadge": {
     "attentionCount": "Tarefas que precisam de atenção: {{count}}"
   },
@@ -10532,15 +10524,12 @@
       "offlineCount_other": "{{count}} offline",
       "showMore": "Mostrar mais",
       "showLess": "Mostrar menos",
-      "doneCount_one": "{{count}} concluídos",
-      "doneCount_other": "{{count}} concluídos",
       "recentTasks": "Tarefas recentes",
       "unread": "Resultado não lido",
       "outputs": "Resultados",
       "outputMeta": "{{time}} · {{task}}",
       "openFailed": "Não foi possível abrir o ficheiro",
-      "offlineCount_many": "{{count}} offline",
-      "doneCount_many": "{{count}} concluídos"
+      "offlineCount_many": "{{count}} offline"
     },
     "remoteSettings": {
       "empty": "Ainda não há nada aqui.",
@@ -12161,18 +12150,8 @@
       "failed": "Não foi possível atualizar os projetos. Recarregue para verificar o estado guardado.",
       "noAvailable": "Adicione primeiro mais projetos a partir da lista de projetos."
     },
-    "automations": {
-      "title": "Automatizações",
-      "description": "Automatizações do projeto de {{name}}. Ative ou desative aqui; edite em Automatizações.",
-      "empty": "{{name}} ainda não tem automatizações.",
-      "failed": "Não foi possível carregar as automatizações.",
-      "toggle": "Ativar «{{name}}»",
-      "manage": "Gerir em Automatizações",
-      "create": "Criar em Automatizações"
-    },
     "todoBoard": {
       "title": "Afazeres",
-      "suggested": "Sugerido {{date}}",
       "laterUntil": "Volta a {{date}}",
       "completedOn": "Concluído a {{date}}",
       "view": {
@@ -12187,10 +12166,16 @@
         "week": "Esta semana",
         "later": "Mais adiante",
         "none": "Sem prazo"
-      },
-      "empty": {
-        "done": "Ainda não há afazeres concluídos"
       }
+    },
+    "automations": {
+      "title": "Automatizações",
+      "description": "Automatizações do projeto de {{name}}. Ative ou desative aqui; edite em Automatizações.",
+      "empty": "{{name}} ainda não tem automatizações.",
+      "failed": "Não foi possível carregar as automatizações.",
+      "toggle": "Ativar «{{name}}»",
+      "manage": "Gerir em Automatizações",
+      "create": "Criar em Automatizações"
     }
   },
   "common": {
@@ -20055,6 +20040,104 @@
     "wrap": "Moldar linhas",
     "lineNumbers": "Números de linha"
   },
+  "personalTodos": {
+    "all": "Todas",
+    "add": "Adicionar pendência",
+    "details": "Detalhes",
+    "title": "Título",
+    "notes": "Notas (opcional)",
+    "deadline": "Prazo (opcional)",
+    "deadlineTime": "Hora (opcional)",
+    "deferUntil": "Retomar em",
+    "save": "Guardar",
+    "saving": "A guardar…",
+    "close": "Fechar",
+    "complete": "Concluir",
+    "reopen": "Reabrir",
+    "defer": "Adiar",
+    "restore": "Retomar agora",
+    "delete": "Eliminar",
+    "deleteConfirm": "Eliminar esta pendência?",
+    "empty": "Sem pendências nesta vista",
+    "saveFailed": "Não foi possível guardar. A introdução foi mantida. Tente guardar novamente.",
+    "loadFailed": "Não foi possível carregar as pendências.",
+    "conflict": "Atualizado noutro local",
+    "reloadVersion": "Carregar versão para substituir",
+    "savedNotice": "“{{title}}” guardada",
+    "deletedNotice": "“{{title}}” foi eliminada.",
+    "rowFailed": "Falha na ação",
+    "overwrite": "Substituir e guardar",
+    "deferInPast": "A hora deve ser posterior à atual",
+    "reminder": {
+      "due": "Tarefa a vencer",
+      "resumed": "Hora de retomar",
+      "summary": "{{count}} tarefas a vencer",
+      "label": "Lembrete",
+      "onTime": "À hora",
+      "before15m": "15 min antes",
+      "before1h": "1 h antes",
+      "dayOf": "No dia, 9:00",
+      "dayBefore": "Véspera, 9:00",
+      "off": "Nenhum",
+      "dueSoon": "A vencer em breve",
+      "dueTomorrow": "Vence amanhã"
+    },
+    "untagged": "Sem etiqueta",
+    "noTag": "Nenhuma",
+    "newTag": "Nova etiqueta…",
+    "tagLimit": "Limite de etiquetas atingido",
+    "deferTonight": "Esta noite",
+    "group": {
+      "label": "Agrupar",
+      "due": "Por prazo",
+      "priority": "Por prioridade",
+      "tag": "Por etiqueta",
+      "none": "Sem agrupamento"
+    },
+    "order": {
+      "label": "Ordem no grupo",
+      "priority": "Maior prioridade primeiro",
+      "due": "Prazo mais próximo primeiro",
+      "created": "Adicionadas recentemente primeiro"
+    },
+    "priority": {
+      "label": "Prioridade",
+      "high": "Prioridade alta",
+      "medium": "Prioridade média",
+      "low": "Prioridade baixa",
+      "none": "Sem prioridade",
+      "short": {
+        "high": "Alta",
+        "medium": "Média",
+        "low": "Baixa"
+      }
+    },
+    "due": {
+      "label": "Prazo",
+      "today": "Hoje",
+      "tomorrow": "Amanhã",
+      "nextMonday": "Próxima segunda-feira",
+      "none": "Sem data",
+      "pick": "Escolher data…",
+      "overdueToday": "Em atraso",
+      "overdue_one": "{{count}} dia de atraso",
+      "overdue_many": "{{count}} de dias de atraso",
+      "overdue_other": "{{count}} dias de atraso"
+    },
+    "composer": {
+      "add": "Adicionar",
+      "cancel": "Cancelar",
+      "dismissRecognition": "Não reconhecer «{{phrase}}»"
+    }
+  },
+  "awayGuard": {
+    "status": "O Cindy está a trabalhar",
+    "hint": "Prima qualquer tecla para bloquear e desbloqueie com Touch ID ou a sua palavra-passe.",
+    "lockFailed": {
+      "status": "O Cindy não conseguiu bloquear este Mac",
+      "hint": "Prima Control-Comando-Q para o bloquear. O ecrã também bloqueia sozinho passado algum tempo."
+    }
+  },
   "subscriptionAccounts": {
     "unassigned": "Conta por atribuir",
     "providerManagedAuth": "O fornecedor atual do Codex não disponibiliza informações da conta ChatGPT. Ao adicionar o fornecedor, selecione «$t(subscriptionAccounts.signIn.anotherAccount)» para usar uma pasta separada.",
@@ -20126,38 +20209,5 @@
     "detail": "Pedido de {{device}}\nFinalidade: {{purpose}}\n\nOs dispositivos da sua conta poderão controlar este computador, executar tarefas e aceder a ficheiros. A opção mantém-se ativa até a desativar nas definições.",
     "decline": "Agora não",
     "enable": "Ativar controlo remoto"
-  },
-  "personalTodos": {
-    "add": "Adicionar pendência",
-    "details": "Detalhes",
-    "title": "Título",
-    "notes": "Notas (opcional)",
-    "deadline": "Prazo (opcional)",
-    "deadlineTime": "Hora (opcional)",
-    "deferUntil": "Retomar em",
-    "save": "Guardar",
-    "saving": "A guardar…",
-    "close": "Fechar",
-    "complete": "Concluir",
-    "reopen": "Reabrir",
-    "defer": "Adiar",
-    "restore": "Retomar agora",
-    "delete": "Eliminar",
-    "deleteConfirm": "Eliminar esta pendência?",
-    "empty": "Sem pendências nesta vista",
-    "saveFailed": "Não foi possível guardar. A introdução foi mantida. Tente guardar novamente.",
-    "loadFailed": "Não foi possível carregar as pendências.",
-    "conflict": "Atualizado noutro local",
-    "reloadVersion": "Carregar versão para substituir",
-    "savedNotice": "“{{title}}” guardada",
-    "deletedNotice": "“{{title}}” foi eliminada.",
-    "rowFailed": "Falha na ação",
-    "overwrite": "Substituir e guardar",
-    "deferInPast": "A hora deve ser posterior à atual",
-    "reminder": {
-      "due": "Tarefa a vencer",
-      "resumed": "Hora de retomar",
-      "summary": "{{count}} tarefas a vencer"
-    }
   }
 }

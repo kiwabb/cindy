@@ -1098,14 +1098,6 @@
     "cancel": "保连接",
     "disconnect": "断连"
   },
-  "awayGuard": {
-    "status": "Cindy 正劳作",
-    "hint": "按任一键即锁屏，以 Touch ID 或密码解之",
-    "lockFailed": {
-      "status": "Cindy 未能锁此机",
-      "hint": "按 Control-Command-Q 锁屏，稍候系统亦自锁"
-    }
-  },
   "appBadge": {
     "attentionCount": "待察之差事：{{count}}"
   },
@@ -10404,7 +10396,6 @@
       "offlineCount_other": "{{count}} 机失联",
       "showMore": "显更多",
       "showLess": "收",
-      "doneCount_other": "已毕 {{count}}",
       "recentTasks": "近日差事",
       "unread": "未读之果",
       "outputs": "所出",
@@ -12013,18 +12004,8 @@
       "failed": "案未能更新，请重载以核所存之果。",
       "noAvailable": "欲得更多案，可先于案录中增之。"
     },
-    "automations": {
-      "title": "自运",
-      "description": "{{name}} 案中之自运。于此启闭，修改请往自运之页。",
-      "empty": "{{name}} 尚无自运。",
-      "failed": "自运读取未成。",
-      "toggle": "启「{{name}}」",
-      "manage": "于自运之页管理",
-      "create": "往自运之页新建"
-    },
     "todoBoard": {
       "title": "待理",
-      "suggested": "拟 {{date}}",
       "laterUntil": "{{date}} 再告",
       "completedOn": "毕于 {{date}}",
       "view": {
@@ -12039,10 +12020,16 @@
         "week": "本旬",
         "later": "后此",
         "none": "无期"
-      },
-      "empty": {
-        "done": "未有毕者"
       }
+    },
+    "automations": {
+      "title": "自运",
+      "description": "{{name}} 案中之自运。于此启闭，修改请往自运之页。",
+      "empty": "{{name}} 尚无自运。",
+      "failed": "自运读取未成。",
+      "toggle": "启「{{name}}」",
+      "manage": "于自运之页管理",
+      "create": "往自运之页新建"
     }
   },
   "common": {
@@ -19794,6 +19781,102 @@
       }
     }
   },
+  "personalTodos": {
+    "all": "全部",
+    "add": "添待办",
+    "details": "待办详情",
+    "title": "标题",
+    "notes": "备注（可略）",
+    "deadline": "截止日（可略）",
+    "deadlineTime": "截止之时（可略）",
+    "deferUntil": "恢复处理时刻",
+    "save": "保存",
+    "saving": "保存中…",
+    "close": "关闭",
+    "complete": "完成",
+    "reopen": "重开",
+    "defer": "暂缓",
+    "restore": "即刻处理",
+    "delete": "删除",
+    "deleteConfirm": "删此待办？",
+    "empty": "此处暂无待办",
+    "saveFailed": "保存未成，输入仍存。请再保存。",
+    "loadFailed": "个人待办未能读取。",
+    "conflict": "已在别处更新",
+    "reloadVersion": "读取最新版本以覆盖保存",
+    "savedNotice": "已保存「{{title}}」",
+    "deletedNotice": "已删除「{{title}}」。",
+    "rowFailed": "操作失败",
+    "overwrite": "覆盖保存",
+    "deferInPast": "恢复之时须晚于今",
+    "reminder": {
+      "due": "待办届期",
+      "resumed": "复理之时已至",
+      "summary": "待办届期者 {{count}} 条",
+      "label": "提醒",
+      "onTime": "届时",
+      "before15m": "先十五分",
+      "before1h": "先一时",
+      "dayOf": "当日 9:00",
+      "dayBefore": "前一日 9:00",
+      "off": "不提醒",
+      "dueSoon": "将届期",
+      "dueTomorrow": "明日届期"
+    },
+    "untagged": "无标签",
+    "noTag": "无",
+    "newTag": "增标签…",
+    "tagLimit": "标签已满",
+    "deferTonight": "今夕",
+    "group": {
+      "label": "分组",
+      "due": "依期限",
+      "priority": "依缓急",
+      "tag": "依标签",
+      "none": "不分组"
+    },
+    "order": {
+      "label": "组内之序",
+      "priority": "急者居前",
+      "due": "期近者居前",
+      "created": "新添者居前"
+    },
+    "priority": {
+      "label": "缓急",
+      "high": "甚急",
+      "medium": "稍急",
+      "low": "不急",
+      "none": "未定缓急",
+      "short": {
+        "high": "高",
+        "medium": "中",
+        "low": "低"
+      }
+    },
+    "due": {
+      "label": "期限",
+      "today": "今日",
+      "tomorrow": "明日",
+      "nextMonday": "下周一",
+      "none": "无期",
+      "pick": "择日…",
+      "overdueToday": "已逾",
+      "overdue_other": "逾期 {{count}} 日"
+    },
+    "composer": {
+      "add": "添",
+      "cancel": "罢",
+      "dismissRecognition": "不识「{{phrase}}」"
+    }
+  },
+  "awayGuard": {
+    "status": "Cindy 正劳作",
+    "hint": "按任一键即锁屏，以 Touch ID 或密码解之",
+    "lockFailed": {
+      "status": "Cindy 未能锁此机",
+      "hint": "按 Control-Command-Q 锁屏，稍候系统亦自锁"
+    }
+  },
   "subscriptionAccounts": {
     "unassigned": "账号待定",
     "providerManagedAuth": "Codex 目前供方未提供 ChatGPT 账号资讯。请于新增供方时选「$t(subscriptionAccounts.signIn.anotherAccount)」，另用独立目录",
@@ -19865,38 +19948,5 @@
     "detail": "请求来自「{{device}}」\n所为：{{purpose}}\n\n启用后，同账号设备可远控此机，执行任务、访问文件。此设长效，可随时于设置中关闭。",
     "decline": "暂不开启",
     "enable": "开启远程控制"
-  },
-  "personalTodos": {
-    "add": "添待办",
-    "details": "待办详情",
-    "title": "标题",
-    "notes": "备注（可略）",
-    "deadline": "截止日（可略）",
-    "deadlineTime": "截止之时（可略）",
-    "deferUntil": "恢复处理时刻",
-    "save": "保存",
-    "saving": "保存中…",
-    "close": "关闭",
-    "complete": "完成",
-    "reopen": "重开",
-    "defer": "暂缓",
-    "restore": "即刻处理",
-    "delete": "删除",
-    "deleteConfirm": "删此待办？",
-    "empty": "此处暂无待办",
-    "saveFailed": "保存未成，输入仍存。请再保存。",
-    "loadFailed": "个人待办未能读取。",
-    "conflict": "已在别处更新",
-    "reloadVersion": "读取最新版本以覆盖保存",
-    "savedNotice": "已保存「{{title}}」",
-    "deletedNotice": "已删除「{{title}}」。",
-    "rowFailed": "操作失败",
-    "overwrite": "覆盖保存",
-    "deferInPast": "恢复之时须晚于今",
-    "reminder": {
-      "due": "待办届期",
-      "resumed": "复理之时已至",
-      "summary": "待办届期者 {{count}} 条"
-    }
   }
 }

@@ -110,6 +110,7 @@ import { captureBotCreatedTaskResponsibility } from '../maker-ipc/botTaskCreatio
 import { runBotProjectsTool } from '../maker-ipc/botLinkedProjects.js';
 import { captureDataOwnerBroadcastScope } from '../device-link/broadcast-tap.js';
 import {
+  listPersonalTodoTagCatalog,
   notifyPersonalTodosChanged,
   openPersonalTodoStore,
   PersonalTodoOwnerChangedError,
@@ -1243,7 +1244,16 @@ export function createDesktopMcpProviders(deps: DesktopMcpProvidersDeps): LiziMc
           if (operation === 'list') {
             const items = await store.list();
             assertCurrent();
-            return { ok: true, items };
+            // 标签目录读失败不拖垮待办列表:tags 留空并带一句说明。
+            let tags: Array<{ id: string; name: string; color: string }> = [];
+            let tagsError: string | undefined;
+            try {
+              tags = (await listPersonalTodoTagCatalog()).map(({ id, name, color }) => ({ id, name, color }));
+            } catch {
+              tagsError = 'Task tag catalog unavailable; tags are empty for this listing.';
+            }
+            assertCurrent();
+            return { ok: true, items, tags, ...(tagsError ? { tagsError } : {}) };
           }
           const todo = await store.update((input ?? {}) as PersonalTodoUpdate);
           assertCurrent();

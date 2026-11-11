@@ -1110,14 +1110,6 @@
     "cancel": "Keep connected",
     "disconnect": "Disconnect"
   },
-  "awayGuard": {
-    "status": "Cindy is working",
-    "hint": "Press any key to lock, then unlock with Touch ID or your password.",
-    "lockFailed": {
-      "status": "Cindy couldn't lock this Mac",
-      "hint": "Press Control-Command-Q to lock it. The screen will also lock on its own after a while."
-    }
-  },
   "appBadge": {
     "attentionCount": "Tasks needing attention: {{count}}"
   },
@@ -10449,8 +10441,6 @@
       "offlineCount_other": "{{count}} offline",
       "showMore": "Show more",
       "showLess": "Show less",
-      "doneCount_one": "{{count}} done",
-      "doneCount_other": "{{count}} done",
       "recentTasks": "Recent tasks",
       "unread": "Unread result",
       "outputs": "Outputs",
@@ -12060,18 +12050,8 @@
       "failed": "Could not update projects. Reload to check the saved state.",
       "noAvailable": "Add more projects from the project list first."
     },
-    "automations": {
-      "title": "Automations",
-      "description": "Automations in {{name}}'s project. Turn them on or off here; edit them in Automations.",
-      "empty": "{{name}} has no automations yet.",
-      "failed": "Couldn't load automations.",
-      "toggle": "Turn on “{{name}}”",
-      "manage": "Manage in Automations",
-      "create": "Create in Automations"
-    },
     "todoBoard": {
       "title": "Todos",
-      "suggested": "Suggested {{date}}",
       "laterUntil": "Back {{date}}",
       "completedOn": "Done {{date}}",
       "view": {
@@ -12086,10 +12066,16 @@
         "week": "This week",
         "later": "After this week",
         "none": "No deadline"
-      },
-      "empty": {
-        "done": "No completed todos yet"
       }
+    },
+    "automations": {
+      "title": "Automations",
+      "description": "Automations in {{name}}'s project. Turn them on or off here; edit them in Automations.",
+      "empty": "{{name}} has no automations yet.",
+      "failed": "Couldn't load automations.",
+      "toggle": "Turn on “{{name}}”",
+      "manage": "Manage in Automations",
+      "create": "Create in Automations"
     }
   },
   "common": {
@@ -19867,6 +19853,103 @@
     "wrap": "Wrap lines",
     "lineNumbers": "Line numbers"
   },
+  "personalTodos": {
+    "all": "All",
+    "add": "Add todo",
+    "details": "Todo details",
+    "title": "Title",
+    "notes": "Notes (optional)",
+    "deadline": "Due date (optional)",
+    "deadlineTime": "Due time (optional)",
+    "deferUntil": "Resume at",
+    "save": "Save",
+    "saving": "Saving…",
+    "close": "Close",
+    "complete": "Complete",
+    "reopen": "Reopen",
+    "defer": "Defer",
+    "restore": "Resume now",
+    "delete": "Delete",
+    "deleteConfirm": "Delete this todo?",
+    "empty": "No todos in this view",
+    "saveFailed": "Could not save. Your input is preserved. Try saving again.",
+    "loadFailed": "Could not load personal todos.",
+    "conflict": "Updated elsewhere",
+    "reloadVersion": "Load latest version to overwrite these fields",
+    "savedNotice": "Saved “{{title}}”",
+    "deletedNotice": "Deleted “{{title}}”.",
+    "rowFailed": "Action failed",
+    "overwrite": "Overwrite and save",
+    "deferInPast": "Resume time must be in the future",
+    "reminder": {
+      "due": "Todo due",
+      "resumed": "Time to pick this up again",
+      "summary": "{{count}} todos due",
+      "label": "Reminder",
+      "onTime": "On time",
+      "before15m": "15 min before",
+      "before1h": "1 h before",
+      "dayOf": "Day of, 9:00",
+      "dayBefore": "Day before, 9:00",
+      "off": "None",
+      "dueSoon": "Due soon",
+      "dueTomorrow": "Due tomorrow"
+    },
+    "untagged": "No tag",
+    "noTag": "None",
+    "newTag": "New tag…",
+    "tagLimit": "Tag limit reached",
+    "deferTonight": "Tonight",
+    "group": {
+      "label": "Group",
+      "due": "By due date",
+      "priority": "By priority",
+      "tag": "By tag",
+      "none": "No grouping"
+    },
+    "order": {
+      "label": "Order within group",
+      "priority": "Highest priority first",
+      "due": "Earliest due first",
+      "created": "Recently added first"
+    },
+    "priority": {
+      "label": "Priority",
+      "high": "High priority",
+      "medium": "Medium priority",
+      "low": "Low priority",
+      "none": "No priority",
+      "short": {
+        "high": "High",
+        "medium": "Medium",
+        "low": "Low"
+      }
+    },
+    "due": {
+      "label": "Due",
+      "today": "Today",
+      "tomorrow": "Tomorrow",
+      "nextMonday": "Next Monday",
+      "none": "No date",
+      "pick": "Pick a date…",
+      "overdueToday": "Overdue",
+      "overdue_one": "{{count}} day overdue",
+      "overdue_other": "{{count}} days overdue"
+    },
+    "composer": {
+      "add": "Add",
+      "cancel": "Cancel",
+      "dismissRecognition": "Don’t recognize “{{phrase}}”"
+    }
+  },
+  "awayGuard": {
+    "status": "Cindy is working",
+    "hint": "Press any key to lock, then unlock with Touch ID or your password.",
+    "lockFailed": {
+      "status": "Cindy couldn't lock this Mac",
+      "hint": "Press Control-Command-Q to lock it. The screen will also lock on its own after a while."
+    }
+  },
   "subscriptionAccounts": {
     "unassigned": "Account not assigned",
     "providerManagedAuth": "The current Codex provider does not expose a ChatGPT account. When adding the provider, choose “$t(subscriptionAccounts.signIn.anotherAccount)” to use a separate folder.",
@@ -19938,38 +20021,5 @@
     "detail": "Request from {{device}}\nPurpose: {{purpose}}\n\nEnabling this setting lets devices on your account control this computer, including running tasks and accessing files. It stays enabled until you turn it off in Settings.",
     "decline": "Not now",
     "enable": "Enable remote control"
-  },
-  "personalTodos": {
-    "add": "Add todo",
-    "details": "Todo details",
-    "title": "Title",
-    "notes": "Notes (optional)",
-    "deadline": "Due date (optional)",
-    "deadlineTime": "Due time (optional)",
-    "deferUntil": "Resume at",
-    "save": "Save",
-    "saving": "Saving…",
-    "close": "Close",
-    "complete": "Complete",
-    "reopen": "Reopen",
-    "defer": "Defer",
-    "restore": "Resume now",
-    "delete": "Delete",
-    "deleteConfirm": "Delete this todo?",
-    "empty": "No todos in this view",
-    "saveFailed": "Could not save. Your input is preserved. Try saving again.",
-    "loadFailed": "Could not load personal todos.",
-    "conflict": "Updated elsewhere",
-    "reloadVersion": "Load latest version to overwrite these fields",
-    "savedNotice": "Saved “{{title}}”",
-    "deletedNotice": "Deleted “{{title}}”.",
-    "rowFailed": "Action failed",
-    "overwrite": "Overwrite and save",
-    "deferInPast": "Resume time must be in the future",
-    "reminder": {
-      "due": "Todo due",
-      "resumed": "Time to pick this up again",
-      "summary": "{{count}} todos due"
-    }
   }
 }

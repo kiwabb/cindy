@@ -90,7 +90,9 @@ export function UpdateBanner({
   onOpenVersionNotice,
   autoOpenPrerequisiteDialogs = true,
 }: UpdateBannerProps) {
-  const { status, version, errorCode, downloadUrl } = useUpdateStatus();
+  const { status, version, displayVersion, errorCode, downloadUrl } = useUpdateStatus();
+  // What the user reads; `version` stays the key for comparisons, dismiss snapshots and release notes.
+  const shownVersion = displayVersion ?? version;
   const { effectiveLocale } = useLocale();
   // 用户主动关闭态(仅本次进程内存,由 UserInfoSection 的火焰按钮唤回)。
   // 新一版更新到达时 useDeferUpdateBannerWhileBusy 会清掉上一版的决定并重新探针。
@@ -381,8 +383,8 @@ export function UpdateBanner({
       ? version
       : undefined;
 
-  const versionSuffix = version ? ` (v${version})` : '';
-  const versionForAria = version ?? 'latest';
+  const versionSuffix = shownVersion ? ` (v${shownVersion})` : '';
+  const versionForAria = shownVersion ?? 'latest';
 
   // Error states (translocated / spawn_failed) suppress the banner body —
   // the only useful UI in those cases is the modal dialog, and the "Updated
@@ -473,7 +475,7 @@ export function UpdateBanner({
           </Tip>
           <Download className="h-9 w-9 text-sidebar-muted" strokeWidth={1.5} />
           <p className="text-center text-sm font-semibold text-foreground">{t('update.banner.manualTitle')}</p>
-          {version && <p className="text-center text-xs text-sidebar-muted">{version}</p>}
+          {shownVersion && <p className="text-center text-xs text-sidebar-muted">{shownVersion}</p>}
           <Button
             variant="cta"
             size="md"
@@ -637,7 +639,7 @@ export function UpdateBanner({
               ? t('update.banner.confirmTitle')
               : isNativeBuildSwitch
                 ? t('update.banner.nativeBuildTitle')
-                : t('update.banner.title', { version: version ?? '…' })}
+                : t('update.banner.title', { version: shownVersion ?? '…' })}
         </p>
 
         {/* Subtitle + 「查看更新公告」文字链 —— 同一视觉组(gap-1),所以链接读作副标题的
@@ -721,7 +723,7 @@ export function UpdateBanner({
             compact
             ref={relaunchTriggerRef}
             onClick={() => { void handleRelaunchClick(); }}
-            aria-label={t('update.banner.ariaExpanded', { version: version ?? '' })}
+            aria-label={t('update.banner.ariaExpanded', { version: shownVersion ?? '' })}
             className={cn('w-full', UPDATE_BUTTON_TREATMENT)}
           >
             {t('update.banner.button')}

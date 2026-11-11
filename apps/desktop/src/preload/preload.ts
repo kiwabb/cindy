@@ -1154,6 +1154,7 @@ interface ComputerDriverUpdateCheck {
 const appDisplayVersionInfo = ipcRenderer.sendSync('get-app-display-version-info') as {
   display: string;
   detail: string;
+  personal: boolean;
 };
 
 // 运行期端点清单(main 在 createWindow 前解析完成;首帧同步可用)。
@@ -1295,6 +1296,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   preferredSystemLocale: readInitialPreferredSystemLocale(),
   appDisplayVersion: appDisplayVersionInfo.display,
   appDisplayVersionDetail: appDisplayVersionInfo.detail,
+  appDisplayVersionIsPersonal: appDisplayVersionInfo.personal,
   getDeviceId: (): Promise<string> => ipcRenderer.invoke('get-device-id'),
   windowSidebarExpansion: (width: number, shrink?: number, adopt?: boolean): Promise<number> => ipcRenderer.invoke('window-sidebar-expansion', width, shrink, adopt),
   onSidebarWindowUserResize: (callback: () => void) => {
@@ -3081,7 +3083,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     version?: string;
     error?: 'manifest_failed' | 'download_failed';
   }> => Promise.resolve({ hasUpdate: false, action: 'none' }),
-  getUpdateStatus: (): Promise<{ status: string; version?: string; errorCode?: string; downloadUrl?: string }> =>
+  getUpdateStatus: (): Promise<{ status: string; version?: string; displayVersion?: string; errorCode?: string; downloadUrl?: string }> =>
     ipcRenderer.invoke('update-get-status'),
   getAutoUpdateSettings: (): Promise<{
     autoRelaunchOnIdle: boolean;

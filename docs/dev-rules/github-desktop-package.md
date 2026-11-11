@@ -31,7 +31,9 @@ A newer revision whose storage identity differs from the installed one is never 
 
 A client with the personal channel enabled re-checks the feed every 5 minutes (other channels: 30 minutes); the feed is one small release asset, not a GitHub API call. Re-checks keep a `ready` or `manual` banner on screen instead of passing through `checking`. Personal versions (`personal-r<revision>`) have no release notes on the official CDN, so the client does not request them.
 
-The manifest records `schemaVersion`, `repository`, `channel`, `revision`, `sourceCommit`, `platform`, `arch`, `region`, `bundleIdentifier`, `storageIdentity` and `asset` (`url`, `sha256`, `size`). The signed app's `cindy-source.json.personalUpdate` carries the same identity without the self-referential ZIP asset. `build-info.json.personalUpdate` mirrors that identity. A source commit alone cannot describe uncommitted feature files, which is why personal-channel builds require clean committed source.
+The manifest records `schemaVersion`, `repository`, `channel`, `revision`, `sourceCommit`, `platform`, `arch`, `region`, `bundleIdentifier`, `storageIdentity`, `asset` (`url`, `sha256`, `size`) and the optional display-only `builtAt` (ISO build time copied from the packaged `cindy-source.json`; clients drop an invalid value and older clients ignore it). The signed app's `cindy-source.json.personalUpdate` carries the same identity without the self-referential ZIP asset. `build-info.json.personalUpdate` mirrors that identity. A source commit alone cannot describe uncommitted feature files, which is why personal-channel builds require clean committed source.
+
+A personal build is shown to users as `YYYY-MM-DD HH:mm · <sha7>` (build time in the local timezone plus the first 7 characters of the source commit) in the sidebar, About and the update banner, instead of `0.0.0` or `personal-r<revision>`; the sidebar and About tooltips append `· r<revision>`. The `personal-r<revision>` string stays the internal version key, and a manifest without `builtAt` shows only the short commit in the banner.
 
 ## Windows personal channel
 
