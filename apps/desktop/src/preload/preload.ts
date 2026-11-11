@@ -6189,6 +6189,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.on('local-db:personal-todos:changed', wrapped);
         return () => ipcRenderer.removeListener('local-db:personal-todos:changed', wrapped);
       },
+      sync: {
+        status: () => ipcRenderer.invoke('local-db:personal-todos:sync:status'),
+        enable: () => ipcRenderer.invoke('local-db:personal-todos:sync:enable'),
+        disable: () => ipcRenderer.invoke('local-db:personal-todos:sync:disable'),
+        setAsHome: () => ipcRenderer.invoke('local-db:personal-todos:sync:set-home'),
+        conflicts: () => ipcRenderer.invoke('local-db:personal-todos:sync:conflicts'),
+        resolve: (conflictId: string, choice: import('../shared/personalTodo').PersonalTodoSyncChoice) =>
+          ipcRenderer.invoke('local-db:personal-todos:sync:resolve', conflictId, choice),
+        onChanged: (listener: () => void) => {
+          const wrapped = () => listener();
+          ipcRenderer.on('local-db:personal-todos:sync:changed', wrapped);
+          return () => ipcRenderer.removeListener('local-db:personal-todos:sync:changed', wrapped);
+        },
+      },
     },
     bots: {
       generateAvatar: (token: string): Promise<{ avatarImageBase64: string }> =>

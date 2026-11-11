@@ -1,4 +1,4 @@
-import { registerPersonalTodoIpc } from '../../maker-ipc/personalTodoIpc.js';
+import { registerPersonalTodoIpc, registerPersonalTodoSyncIpc } from '../../maker-ipc/personalTodoIpc.js';
 import { emitSessionCreated } from './sessionCreatedBroadcast.js';
 import { isSubagentParentToolUseId } from '@cindy/maker-shared/message-render';
 import { loadBotReadState, loadAcknowledgedBotReadState, readBotReadPosition } from '../../maker-ipc/botReadStateStore.js';
@@ -2853,6 +2853,7 @@ export function registerBotIpc(): void {
     });
   }
   registerPersonalTodoIpc();
+  registerPersonalTodoSyncIpc();
   // Exact per-task responsibility IDs from the current owner, without message bodies.
   ipcMain.handle('local-db:bots:workbench:follow-scopes', async (event) => {
     assertTrustedAppRendererEvent(event);

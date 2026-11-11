@@ -80,6 +80,7 @@ import {
   type RetransmitEstimate,
 } from './transport.js';
 import { PLUGIN_SYNC_CHANNEL } from './pluginSyncProtocol.js';
+import { SHARED_DATASETS_CHANGED_CHANNEL } from './sharedDatasets.js';
 import { RELAY_AUTH_CHANNEL, relayAuthHandshake } from './selfHostedRelayAuth.js';
 import { DIRECT_LINK_CAPABILITY, DIRECT_LINK_SIGNAL, PROVIDER_SHARE_DIRECT_CAPABILITY, DirectLinkNegotiator, parseDirectSignal,
   type DirectRuntime, type DirectDiagnostic, type DirectDiagnosticReason } from './directNegotiation.js';
@@ -6545,6 +6546,8 @@ const UNLINKED_LEGACY_PUSH_CHANNELS = new Set([
   // The Desktop plugin-sync receiver still checks owner, revocation and capability.
   PLUGIN_SYNC_CHANNEL,
   'device-link:voice:dictionary:snapshot',
+  // The home tells replicas to re-read; the receiver checks account and revocation.
+  SHARED_DATASETS_CHANGED_CHANNEL,
 ]);
 
 function isUnlinkedLegacyEnvelope(env: Envelope): boolean {

@@ -80,6 +80,7 @@ export * from "./inputHandoff.js";
 export * from "./inputDelivery.js";
 export * from "./taskMigration.js";
 export * from "./setupSnapshot.js";
+export * from "./sharedDatasets.js";
 export * from "./setupTransfer.js";
 export * from "./remoteAgent.js";
 export * from "./orcaRemoteWorker.js";

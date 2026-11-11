@@ -3,6 +3,7 @@ import { promptRemoteControlConsent } from './remoteControlConsentPrompt.js';
 import { PROVIDER_SHARE_AVAILABILITY_CAPABILITY, readShareAvailabilityCatalog } from './providerShareAvailability.js';
 import { pluginDeviceSync } from '../cindy-brain/index.js';
 import { PLUGIN_SYNC_CHANNEL } from '../cindy-brain/deviceSyncSlot.js';
+import { SHARED_DATASETS_CHANGED_CHANNEL, type SharedDatasetsChangedPush } from '@cindy/device-link';
 import { PluginSyncAccess } from './pluginSyncAccess.js';
 /**
  * device-link host —— 跨设备远程控制的 main 进程接线层。
@@ -347,6 +348,7 @@ export function applyControllerPresenceListSnapshot(
       presenceOnlineByDevice.set(deviceId, true);
       presenceAvailableByDevice.set(deviceId, true);
       presenceControlDisabledByDevice.delete(deviceId);
+      notifyPeerPresenceChanged(deviceId);
     },
     onPeerControlDisabled: (deviceId) => {
       client?.noteRemoteControlDisabled(deviceId);
@@ -354,11 +356,12 @@ export function applyControllerPresenceListSnapshot(
       presenceAvailableByDevice.set(deviceId, false);
       presenceControlDisabledByDevice.add(deviceId);
       retireControlOffRetention(deviceId);
+      notifyPeerPresenceChanged(deviceId);
     },
     onPeerControlEvidence: (deviceId, item) => evidence.set(deviceId, item),
     onPeerBecameOnline: (deviceId, platform) => {
       if (isMobilePlatform(platform)) handleMobilePeerOnline(deviceId);
-      else handleDesktopPeerOnline(deviceId);
+      else { handleDesktopPeerOnline(deviceId); notifyDesktopPeerOnline(deviceId); }
       replayActiveSubscriptions('directory-online', deviceId);
     },
   });
@@ -726,6 +729,65 @@ const remoteControlConsent = new RemoteControlConsent({
 /** The calling task waits for the target's local decision, then may retry its original operation. */
 export function requestRemoteControlConsent(peer: string, purpose: string) {
   return remoteControlConsent.request(peer, purpose);
+}
+
+/** Same-account, unrevoked desktops only: the shared-dataset channel never reaches phones or other accounts. */
+function isSharedDatasetsPeer(deviceId: string): boolean {
+  return !!client && !isAppSessionBoundaryPending() && !isScopedPeer(deviceId) &&
+    deviceId !== client.getSelfDeviceId() && !revokedByRemote.has(deviceId) &&
+    shouldExchangeDictionaryWith({
+      online: true, platform: getControllerPlatform(deviceId), revoked: isDeviceRevoked(deviceId),
+    });
+}
+
+let sharedDatasetsPushReceiver: ((deviceId: string, payload: unknown) => void) | null = null;
+export function setSharedDatasetsPushReceiver(receiver: ((deviceId: string, payload: unknown) => void) | null): void {
+  sharedDatasetsPushReceiver = receiver;
+}
+
+/** Online, eligible desktops a home announces `changed` to. */
+export function listSharedDatasetsPushTargets(): string[] {
+  const targets: string[] = [];
+  for (const [deviceId, online] of presenceOnlineByDevice) {
+    if (online === true && isSharedDatasetsPeer(deviceId)) targets.push(deviceId);
+  }
+  return targets;
+}
+
+export function sendSharedDatasetsChanged(deviceId: string, frame: SharedDatasetsChangedPush): void {
+  if (!client || !isSharedDatasetsPeer(deviceId)) return;
+  client.sendPush(deviceId, SHARED_DATASETS_CHANGED_CHANNEL, frame);
+}
+
+/** Presence only (no server request); the home's online state for status display. */
+export function isDevicePresenceOnline(deviceId: string): boolean {
+  return presenceOnlineByDevice.get(deviceId) === true && !isDeviceRevoked(deviceId);
+}
+
+const desktopPeerOnlineListeners = new Set<(deviceId: string) => void>();
+export function onDesktopPeerOnline(listener: (deviceId: string) => void): () => void {
+  desktopPeerOnlineListeners.add(listener);
+  return () => { desktopPeerOnlineListeners.delete(listener); };
+}
+/**
+ * A peer's reachability changed (came online, went offline, or turned remote control on/off).
+ * Observers only re-read their own status; they must not treat it as proof of any state.
+ */
+const peerPresenceChangedListeners = new Set<(deviceId: string) => void>();
+export function onPeerPresenceChanged(listener: (deviceId: string) => void): () => void {
+  peerPresenceChangedListeners.add(listener);
+  return () => { peerPresenceChangedListeners.delete(listener); };
+}
+function notifyPeerPresenceChanged(deviceId: string): void {
+  for (const listener of peerPresenceChangedListeners) {
+    try { listener(deviceId); } catch { /* An observer never blocks presence handling. */ }
+  }
+}
+
+function notifyDesktopPeerOnline(deviceId: string): void {
+  for (const listener of desktopPeerOnlineListeners) {
+    try { listener(deviceId); } catch { /* An observer never blocks presence handling. */ }
+  }
 }
 
 const pluginSyncAccess = new PluginSyncAccess({
@@ -1103,6 +1165,7 @@ export function initDeviceLinkService(options: DeviceLinkServiceOptions = {}): v
         || change.linkGeneration < connection.getPeerLinkGeneration(change.deviceId)) return;
       presenceOnlineByDevice.set(change.deviceId, false);
       presenceAvailableByDevice.set(change.deviceId, false);
+      notifyPeerPresenceChanged(change.deviceId);
       invalidatePluginOauth(change.deviceId);
       handleControllerOffline(change.deviceId, change);
       remoteControlConsent.peerGone(change.deviceId);
@@ -1240,6 +1303,7 @@ export function initDeviceLinkService(options: DeviceLinkServiceOptions = {}): v
     const wasOnline = presenceOnlineByDevice.get(snap.deviceId);
     presenceAvailableByDevice.set(snap.deviceId, available);
     presenceOnlineByDevice.set(snap.deviceId, online);
+    if (wasOnline !== online || wasAvailable !== available) notifyPeerPresenceChanged(snap.deviceId);
     // 权威 presence 已宣布不可用(离线 / 关被控):「响应性」判定失去意义,清熔断状态
     // 并作废在途结果,让离线态自己的 UI 接管;设备回来后首个请求再超时会重新累计。
     // `!== false` 与重放侧的 `!== true` 对称:视图清空后重连的首帧不可用 presence
@@ -1289,6 +1353,7 @@ export function initDeviceLinkService(options: DeviceLinkServiceOptions = {}): v
       })
     ) {
       handleDesktopPeerOnline(snap.deviceId);
+      notifyDesktopPeerOnline(snap.deviceId);
     }
     // 手机只接收只读投影:push 不属于 relay 的 CONTROL_KINDS,因此不要求桌面
     // 打开「允许被控」。来源平台只用于体验分流,撤销状态仍是实际准入边界。
@@ -1410,6 +1475,12 @@ export function initDeviceLinkService(options: DeviceLinkServiceOptions = {}): v
       ) {
         handleIncomingDictionaryState(env.src, p.payload);
       }
+      return;
+    }
+    // 共享数据集的 changed 通知在 main 消费，不转给 renderer；与词典/插件同步同一条准入：
+    // 同账号桌面、未撤销，手机与分享/共享任务对端一律丢弃。接收端只据此重新拉取，不重放写操作。
+    if (p?.channel === SHARED_DATASETS_CHANGED_CHANNEL) {
+      if (isSharedDatasetsPeer(env.src)) sharedDatasetsPushReceiver?.(env.src, p.payload);
       return;
     }
     if (p?.channel === PLUGIN_SYNC_CHANNEL) {

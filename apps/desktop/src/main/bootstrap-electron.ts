@@ -1282,6 +1282,8 @@ import {
   getProjectAutomationLoader,
 } from './scheduler-host/index.desktop.js';
 import { startPersonalTodoReminders } from './maker-ipc/personalTodoReminders.js';
+import { registerPersonalTodoSharedDataset } from './maker-ipc/personalTodoSharedDataset.js';
+import { startSharedDatasets } from './shared-datasets/runtime.js';
 import { voiceCallCoordinator } from './voice-conversation/callCoordinator.js';
 import { hasVoiceConversationLease } from './voice-conversation/lease.js';
 import {
@@ -10633,6 +10635,10 @@ app.on('ready', async () => {
   // 个人待办到期提醒：自带 60s 定时、待办变更与睡眠唤醒（resume）重算，按账号隔离。
   const personalTodoReminders = startPersonalTodoReminders();
   onQuit('personal-todo-reminders', () => personalTodoReminders.stop(), 'sync');
+  // 共享数据集（多台电脑同步同一份数据）：没有注册数据集、或数据集未开启时不发任何请求、不起定时器。
+  registerPersonalTodoSharedDataset();
+  const stopSharedDatasets = startSharedDatasets();
+  onQuit('shared-datasets', () => stopSharedDatasets(), 'sync');
 
   // 挂起/锁屏时通知 renderer 释放语音输入的保活麦克风(用户已离开,再占着采集
   // 设备只剩隐私指示灯常亮和 idle-sleep assertion 的代价)。

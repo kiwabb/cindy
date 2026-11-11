@@ -60,6 +60,7 @@ export const {
   setRemoteAgentHandler,
   setProviderGroupRemoteHandler,
   setSetupSnapshotRemoteHandler,
+  setSharedDatasetsRemoteHandler,
   setSetupTransferRemoteHandler,
   setRemoteTurnChangeAction,
   setRemoteSubscriptionPoolQuotaReader,

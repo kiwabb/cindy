@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
-import { TodoError, type TodoPatch } from '@cindy/maker-shared/teammate-todo';
+import { TodoError, type TeammateTodo, type TodoPatch } from '@cindy/maker-shared/teammate-todo';
 import {
   PERSONAL_TODO_UPDATE_KEYS,
   projectPersonalTodo,
@@ -29,6 +29,10 @@ function withSubtaskIds(subtasks: PersonalTodoUpdate['subtasks']): TodoPatch['su
 export function createPersonalTodoStore(file: string, assertCurrent = () => {}) {
   const store = createBotTodoStore(file, assertCurrent);
   return {
+    /** Raw stored items incl. deletion tombstones: the shared-datasets layer syncs them as they are. */
+    read: () => store.read(),
+    /** Replica mirror: makes this file equal to the home's snapshot (same-id items replaced, `remove` deleted). */
+    importItems: (items: TeammateTodo[], remove: string[]) => store.importItems(items, remove),
     async list() {
       const state = await store.read();
       return state.items.filter((t) => t.decision?.kind !== 'deleted').map(projectPersonalTodo);

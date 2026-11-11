@@ -2,6 +2,8 @@ import { getDataOwnerGeneration } from '@/contexts/dataOwnerGeneration';
 import { useOptionalDataOwnerGeneration } from '@/contexts/AuthContext';
 import { PersonalTodoComposer } from './PersonalTodoComposer';
 import { PersonalTodoRow } from './PersonalTodoRow';
+import { PersonalTodoSyncBar } from './PersonalTodoSyncBar';
+import { CONFLICT_DRAFT_PREFIX, usePersonalTodoSync } from './usePersonalTodoSync';
 import { PersonalGroupingMenu, PersonalTagChips } from './PersonalTodoToolbar';
 import {
   ALL_TAGS,
@@ -73,6 +75,7 @@ function TodoBoard() {
   const { t } = useTranslation();
   const personal = usePersonalTodos();
   const taskTags = usePersonalTaskTags();
+  const sync = usePersonalTodoSync(() => void personal.refresh());
   const [editor, setEditor] = useState<PersonalTodo | undefined>(undefined);
   useEffect(() => setEditor(undefined), [personal.dataOwnerId]);
   const [view, setView] = useState<TodoBoardView>('open');
@@ -83,7 +86,11 @@ function TodoBoard() {
     operation?: string;
   } | null>(null);
   const now = new Date();
-  const catalog = taskTags.tags;
+  // A replica shows and picks from the main computer's tag catalog (ids in the mirror are its ids).
+  const replicaTags = sync.status?.role === 'replica' ? (sync.status.tags ?? []) : null;
+  const catalog = replicaTags ?? taskTags.tags;
+  // Refused creations stay visible (marked) until the owner chooses; they are not stored on the main computer.
+  const allItems = sync.drafts.length ? [...sync.drafts, ...personal.items] : personal.items;
   const saved = (todo: PersonalTodo, operation?: PersonalTodoUpdate['operation']) => {
     const target =
       todo.status === 'done'
@@ -95,7 +102,12 @@ function TodoBoard() {
     setNotice({ title: todo.title, target, operation });
     if (operation === 'reopen' || operation === 'restore') setView('open');
   };
-  const updateRow = async (input: PersonalTodoUpdate) =>
+  const updateRow = async (input: PersonalTodoUpdate) => {
+    // A refused draft only takes the conflict choices; it has no todo on the main computer to edit.
+    if (input.id?.startsWith(CONFLICT_DRAFT_PREFIX)) throw new Error('CONFLICT_DRAFT');
+    return updateRowSaved(input);
+  };
+  const updateRowSaved = async (input: PersonalTodoUpdate) =>
     saved(await personal.update(input), input.operation);
   // A step ticked on a row saves quietly: no notice, and the open panel (if it is this todo) follows.
   const [stepsSaved, setStepsSaved] = useState<PersonalTodo | undefined>(undefined);
@@ -108,10 +120,10 @@ function TodoBoard() {
       setTagFilter(ALL_TAGS);
   };
 
-  const counts = personalCounts(personal.items, now);
+  const counts = personalCounts(allItems, now);
   const effectiveFilter = effectiveTagFilter(tagFilter, catalog);
   const sections = personalSections({
-    items: personal.items,
+    items: allItems,
     view,
     grouping: personal.grouping,
     order: personal.order,
@@ -119,7 +131,7 @@ function TodoBoard() {
     filter: effectiveFilter,
     now,
   });
-  const chips = personalTagChips(personal.items, catalog, effectiveFilter, now);
+  const chips = personalTagChips(allItems, catalog, effectiveFilter, now);
   const showTag = personal.grouping !== 'tag' && effectiveFilter.kind === 'all';
   const listHasSteps = sections.some((section) =>
     section.items.some((todo) => todo.subtasks.length > 0),
@@ -165,10 +177,19 @@ function TodoBoard() {
               selected={editor?.id === todo.id}
               now={now}
               // Opening the row that is already open closes it again.
-              onOpen={(next) => setEditor((open) => (open?.id === next.id ? undefined : next))}
+              onOpen={(next) =>
+                next.id.startsWith(CONFLICT_DRAFT_PREFIX)
+                  ? undefined
+                  : setEditor((open) => (open?.id === next.id ? undefined : next))
+              }
               onUpdate={updateRow}
               onSteps={updateSteps}
               reserveStepsToggle={listHasSteps}
+              conflict={
+                sync.conflicts.has(todo.id)
+                  ? { busy: sync.busy, onResolve: (choice) => void sync.resolve(todo.id, choice) }
+                  : undefined
+              }
             />
           ))}
         </Section>
@@ -198,6 +219,15 @@ function TodoBoard() {
             }))}
           />
         </div>
+        {sync.status ? (
+          <PersonalTodoSyncBar
+            status={sync.status}
+            busy={sync.busy}
+            failed={sync.failed}
+            onToggle={(on) => void sync.toggle(on)}
+            onSetAsHome={() => void sync.setAsHome()}
+          />
+        ) : null}
         {notice ? (
           <div
             role="status"
@@ -219,7 +249,7 @@ function TodoBoard() {
           </div>
         ) : null}
         <div className="flex flex-wrap items-center gap-x-2 gap-y-2 px-2 pb-3 pt-4">
-          {taskTags.loaded && chips.tags.length > 0 ? (
+          {(replicaTags || taskTags.loaded) && chips.tags.length > 0 ? (
             <PersonalTagChips
               all={chips.all}
               none={chips.none}
@@ -271,12 +301,12 @@ function TodoBoard() {
                 update={personal.update}
                 tags={catalog}
                 supportedColors={taskTags.supportedColors}
-                createTag={taskTags.create}
+                createTag={replicaTags ? undefined : taskTags.create}
                 activeTagId={effectiveFilter.kind === 'tag' ? effectiveFilter.id : null}
                 onCreated={created}
               />
             ) : null}
-            {personal.failed && !personal.items.length ? null : list}
+            {personal.failed && !allItems.length ? null : list}
           </div>
         </div>
       </div>

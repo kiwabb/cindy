@@ -194,4 +194,36 @@ describe('reminder runtime', () => {
     expect(notify).toHaveBeenCalledTimes(1);
     expect(Object.keys(store['cloud:u2:2'])).toHaveLength(1);
   });
+
+  // docs/product-rules/personal-todos.md「多台电脑同步」：提醒只在主力电脑触发，副本不弹也不记已发。
+  it('stays silent on a replica and announces once the computer becomes the main computer', async () => {
+    const now = Date.parse('2026-05-01T08:01:00Z');
+    let active = false;
+    let saved = 0;
+    const notify = vi.fn();
+    const purge = vi.fn(async () => 0);
+    const runtime = createPersonalTodoReminderRuntime({
+      scopeKey: () => 'cloud:u1:1',
+      readTodos: async () => [todo('a', { sourceDeadline: instant('2026-05-01T08:00:00Z') })],
+      loadSent: async () => ({}),
+      saveSent: async () => {
+        saved++;
+      },
+      purge,
+      notify,
+      notificationsEnabled: () => true,
+      remindersActive: async () => active,
+      now: () => now,
+      setInterval: () => 0,
+      clearInterval: () => {},
+      subscribeChanges: () => () => {},
+    });
+    await runtime.evaluate();
+    expect(notify).not.toHaveBeenCalled();
+    expect(saved).toBe(0);
+    expect(purge).not.toHaveBeenCalled();
+    active = true;
+    await runtime.evaluate();
+    expect(notify).toHaveBeenCalledTimes(1);
+  });
 });

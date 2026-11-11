@@ -74,7 +74,8 @@ export function PersonalTodoComposer({
   update: (input: PersonalTodoUpdate) => Promise<PersonalTodo>;
   tags: readonly TaskTag[];
   supportedColors: readonly TaskTagColor[];
-  createTag: (name: string, color: TaskTagColor) => Promise<TaskTag>;
+  /** Absent on a replica: its tags are the main computer's catalog, which cannot be edited here. */
+  createTag?: (name: string, color: TaskTagColor) => Promise<TaskTag>;
   /** The tag the list is filtered to; a new draft starts with it. */
   activeTagId: string | null;
   onCreated: (todo: PersonalTodo) => void;
@@ -212,7 +213,8 @@ export function PersonalTodoComposer({
     if (!newTag || newTag.busy || !newTag.name.trim()) return;
     setNewTag({ ...newTag, busy: true, error: '' });
     try {
-      const created = await createTag(newTag.name.trim(), newTag.color);
+      const created = await createTag?.(newTag.name.trim(), newTag.color);
+      if (!created) return;
       setTagId(created.id);
       setNewTag(null);
     } catch (cause) {
@@ -389,15 +391,19 @@ export function PersonalTodoComposer({
               ))}
               <DropdownMenuRadioItem value={NO_TAG}>{t('personalTodos.untagged')}</DropdownMenuRadioItem>
             </DropdownMenuRadioGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onSelect={() => {
-                setNewTag((current) => current ?? { name: '', color: 'blue', busy: false, error: '' });
-                focusAfterClose.current = () => tagNameInput.current?.focus();
-              }}
-            >
-              {t('personalTodos.newTag')}
-            </DropdownMenuItem>
+            {createTag ? (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onSelect={() => {
+                    setNewTag((current) => current ?? { name: '', color: 'blue', busy: false, error: '' });
+                    focusAfterClose.current = () => tagNameInput.current?.focus();
+                  }}
+                >
+                  {t('personalTodos.newTag')}
+                </DropdownMenuItem>
+              </>
+            ) : null}
           </DropdownMenuContent>
         </DropdownMenu>
         <span className="flex-1" />

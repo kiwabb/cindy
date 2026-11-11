@@ -39,6 +39,7 @@ import {
 } from './orcaRemoteWorker.js';
 import { TASK_MIGRATION_CHANNEL } from './taskMigration.js';
 import { SETUP_SNAPSHOT_CHANNEL, SETUP_SNAPSHOT_TIMEOUT_MS } from './setupSnapshot.js';
+import { SHARED_DATASETS_CHANNEL, SHARED_DATASETS_TIMEOUT_MS } from './sharedDatasets.js';
 import { SETUP_TRANSFER_CHANNEL, SETUP_TRANSFER_TIMEOUT_MS } from './setupTransfer.js';
 import {
   COMPANION_LIVE_CHANNEL,
@@ -406,6 +407,10 @@ const CORE_INVOKE_CHANNELS: readonly string[] = [
   // 不写被控端任何状态；共享任务访客与供应商分享受邀者在 dispatch 再拒一次。老版本无 handler →
   // CHANNEL_NOT_ALLOWED，新电脑提示更新那台电脑。
   SETUP_SNAPSHOT_CHANNEL,
+  // 共享数据集(docs/shared-datasets-plan.md):同账号电脑之间同步一份数据(主力电脑为唯一写入者，
+  // 其它电脑读快照、提交带回执的修改)。被控端 dispatch 拦截执行，只给同账号电脑；老版本无 handler →
+  // CHANNEL_NOT_ALLOWED，对端不被当作副本或主力电脑。
+  SHARED_DATASETS_CHANNEL,
   // 新电脑设置的密钥与 SSH 一步(同一规则页):新电脑请求复制指定连接的密钥、为它的新 SSH 公钥
   // 在这台电脑能连上的服务器上授权。被控端必须由人在本机确认(显示请求电脑、逐项名称与校验码)
   // 后才执行;密钥只以本次请求的临时公钥加密返回。OAuth 登录与私钥不经此通道。同样只给同账号电脑。
@@ -971,6 +976,8 @@ export const INVOKE_TIMEOUT_OVERRIDES_MS: Readonly<Record<string, number>> = {
   [COMPANION_CLOUD_FLUSH_CHANNEL]: COMPANION_CLOUD_HAND_OVER_TIMEOUT_MS,
   // 设置快照要读插件、技能并等那台电脑的窗口回答界面偏好，可能超过默认 30s。
   [SETUP_SNAPSHOT_CHANNEL]: SETUP_SNAPSHOT_TIMEOUT_MS,
+  // 全量快照要读存储并跨中转传输，可能超过默认 30s。
+  [SHARED_DATASETS_CHANNEL]: SHARED_DATASETS_TIMEOUT_MS,
   // 要等那台电脑上的人确认(最多 2 分钟),再逐台连接 SSH 服务器授权新公钥。
   [SETUP_TRANSFER_CHANNEL]: SETUP_TRANSFER_TIMEOUT_MS,
   // listing tier 轻量 DB 读:毫秒级查询,12s 仍等不到只能是链路问题,快速失败喂给熔断器。

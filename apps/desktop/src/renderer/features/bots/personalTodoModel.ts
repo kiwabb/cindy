@@ -12,7 +12,7 @@ import {
 } from '@cindy/maker-shared/teammate-todo';
 import type { TaskTag } from '@cindy/maker-shared';
 
-import type { PersonalTodo, PersonalTodoUpdate } from '../../../shared/personalTodo';
+import type { PersonalTodo, PersonalTodoSyncStatus, PersonalTodoUpdate } from '../../../shared/personalTodo';
 import { dayDiff } from './todoDates';
 import {
   deadlineBucket,
@@ -294,4 +294,33 @@ export function removedSteps(steps: readonly PersonalStep[], id: string): Person
 export function appendedSteps(steps: readonly PersonalStep[], title: string): PersonalStepsInput | null {
   const trimmed = title.trim();
   return trimmed ? [...steps.map(keep), { title: trimmed }] : null;
+}
+
+interface SyncLabel {
+  tone: 'normal' | 'warning';
+  text: string;
+}
+
+/** The status values of a sync-enabled computer; labels and values only. */
+export function personalTodoSyncLabels(
+  status: PersonalTodoSyncStatus,
+  t: (key: string, options?: Record<string, unknown>) => string,
+): SyncLabel[] {
+  if (status.role === 'off') return [];
+  const home: SyncLabel = {
+    tone: 'normal',
+    text: t('personalTodos.sync.mainComputer', {
+      name: status.role === 'home' ? t('personalTodos.sync.thisComputer') : (status.homeName ?? ''),
+    }),
+  };
+  if (status.role === 'home') return [home];
+  const out: SyncLabel[] = [home];
+  const remoteOff = status.lastError === 'REMOTE_DISABLED';
+  if (remoteOff) out.push({ tone: 'warning', text: t('personalTodos.sync.homeRemoteOff') });
+  else if (!status.homeOnline) out.push({ tone: 'warning', text: t('personalTodos.sync.homeOffline') });
+  if (status.pending > 0)
+    out.push({ tone: 'normal', text: t('personalTodos.sync.pending', { count: status.pending }) });
+  else if (status.homeOnline && !remoteOff)
+    out.push({ tone: 'normal', text: t('personalTodos.sync.synced') });
+  return out;
 }

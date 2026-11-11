@@ -63,11 +63,41 @@ function personal(caseName: string): PersonalTodo[] {
   ];
 }
 
+// Multi-computer sync states (fixture data; every action is forbidden).
+const SYNC_CASES = ['sync-home', 'sync-pending', 'sync-offline', 'sync-remote-off', 'sync-conflict-row', 'sync-conflict-draft'];
+function syncStatus(caseName: string) {
+  const base = { role: 'replica' as const, homeName: 'Studio-Mac', homeOnline: true, pending: 0, conflicts: 0, tags: TAGS };
+  if (caseName === 'sync-home') return { ...base, role: 'home' as const, homeName: undefined };
+  if (caseName === 'sync-pending') return { ...base, pending: 3 };
+  if (caseName === 'sync-offline') return { ...base, homeOnline: false, pending: 1 };
+  if (caseName === 'sync-remote-off') return { ...base, pending: 1, lastError: 'REMOTE_DISABLED' };
+  if (caseName === 'sync-conflict-row') return { ...base, conflicts: 1 };
+  return { ...base, conflicts: 1 };
+}
+function syncConflicts(caseName: string) {
+  if (caseName === 'sync-conflict-row') return [{ sequence: 1, code: 'CONFLICT', todoId: 'p2' }];
+  return [{ sequence: 2, code: 'NOT_FOUND', draft: { title: '订会议室并通知参会人', priority: 2, tagIds: ['work'], deadline: deadline(1) } }];
+}
+const syncApi = (caseName: string) =>
+  SYNC_CASES.includes(caseName)
+    ? {
+        sync: {
+          status: async () => syncStatus(caseName),
+          conflicts: async () => syncConflicts(caseName),
+          enable: forbid('sync.enable'),
+          disable: forbid('sync.disable'),
+          setAsHome: forbid('sync.setAsHome'),
+          resolve: forbid('sync.resolve'),
+          onChanged: subscription('personalTodosSync'),
+        },
+      }
+    : {};
+
 mountPage({
   route: '/bots/todos',
   host: (ctx) => ({
     localDb: {
-      personalTodos: { list: async () => personal(ctx.case), update: forbid('personalTodos.update'), onChanged: subscription('personalTodos') },
+      personalTodos: { list: async () => personal(ctx.case), update: forbid('personalTodos.update'), onChanged: subscription('personalTodos'), ...syncApi(ctx.case) },
       taskTags: {
         execute: async () => ({ tags: TAGS, sessions: [], supportedColors: [...TASK_TAG_COLORS] }),
         onChanged: subscription('taskTags'),

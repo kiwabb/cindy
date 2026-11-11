@@ -14,6 +14,12 @@ export default {
   cases: {
     'personal-row': { about: 'UNIT FIXTURE: one personal row, checkbox/opener siblings and keyboard focus. No model, account, writes, or simulated save results.' },
     default: { about: 'Personal todos with priorities, tags, overdue/today/week/later, a snoozed and finished items; composer with a recognised date phrase, grouping menu, details panel. Fixture data only; saving is forbidden' },
+    'sync-home': { about: 'Sync bar: this computer is the main computer (fixture data)' },
+    'sync-pending': { about: 'Sync bar: replica, main computer online, 3 edits pending' },
+    'sync-offline': { about: 'Sync bar: replica, main computer offline' },
+    'sync-remote-off': { about: 'Sync bar: replica, main computer has remote control off' },
+    'sync-conflict-row': { about: 'A refused edit marks its row with the two choices' },
+    'sync-conflict-draft': { about: 'A refused creation shows as a marked draft row' },
     empty: { about: 'No todos: one sentence and the composer' },
   },
   async ready(page) {
@@ -89,6 +95,12 @@ export default {
       const reminder = page.getByRole('radiogroup', { name: await ui.t('personalTodos.reminder.label') });
       assert.equal(await reminder.evaluate((element) => element.scrollWidth <= element.clientWidth), true, 'reminder options fit the panel');
       await ui.capture('details');
+      return;
+    }
+    if (ui.case.startsWith('sync-')) {
+      await page.getByTestId('todo-sync-bar').waitFor();
+      if (ui.case.startsWith('sync-conflict')) await page.getByTestId('todo-sync-conflict').waitFor();
+      await ui.capture(ui.case);
       return;
     }
     await page.getByTestId('todo-board-empty').waitFor();

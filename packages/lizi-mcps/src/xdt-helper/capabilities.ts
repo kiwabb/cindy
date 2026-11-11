@@ -88,7 +88,7 @@ export const CAPABILITIES: readonly CapabilityEntry[] = [
     oneLiner:
       '用户本人能对自己的任务、定时任务、项目、伙伴、个人待办做的操作，Agent 有哪些对应工具、哪些能管到另一台电脑。',
     detail: [
-      '【个人待办】cindy_helper todos 类：list_personal_todos / update_personal_todo 管理用户本人的个人待办（列出、新建、改标题/备注/期限/优先级/标签/提醒、完成/重开、稍后/恢复、删除），仅本机、当前登录账号；其他电脑的清单不在范围内。新建带 creationRequestId，重试复用同一个。',
+      '【个人待办】cindy_helper todos 类：list_personal_todos / update_personal_todo 管理用户本人的个人待办（列出、新建、改标题/备注/期限/优先级/标签/提醒、完成/重开、稍后/恢复、删除），仅本机、当前登录账号；其他电脑的清单不在范围内。新建带 creationRequestId，重试复用同一个。多台电脑同步：get_personal_todo_sync 读本机角色、主力电脑是否在线、待同步条数与冲突，set_personal_todo_sync 开启/关闭同步或把这台设为主力电脑，resolve_personal_todo_conflict 按冲突序号选「用我的」或「保留电脑上的」。在副本电脑上改待办会返回 sync:synced（主力电脑已接收）或 sync:pending（已记在本机，待主力电脑上线接收，不是失败）。',
       '【任务链接】已知任务 id 时调用 history/get_task_digest，返回的 sessionUrl 可直接写成 [任务标题](sessionUrl)。list_sessions、search_chat_history、get_chat_history 的任务元数据也附带 sessionUrl，含所属电脑，支持桌面与手机打开。',
       '【邀请协助当前任务】control 类 create_shared_task_invitation / get_shared_task_state 生成原生共享邀请或查询状态；只针对调用工具的原任务，在任务宿主执行，手机或同账号另一台电脑控制该任务时也适用。访客能读完整历史、附件与工具结果，使用同一 Agent 和既有任务权限；链接可转发，不绑定收件人。工具不发通知、不另建任务，不能指定其他任务。将回执中的 invitationLink 原样交给发送流程；通知插件负责收件人、预览与发送确认。结果未知时先查询状态再决定是否重试，不自动重复。',
       '【机器】cindy_helper 的顶层工具 list_machines（不经 list_tools）：看账号下所有电脑的实时 CPU、可用内存、磁盘、空闲时长和在跑任务，以及这台电脑配置的 SSH 主机；只报事实，放哪台由你决定。',

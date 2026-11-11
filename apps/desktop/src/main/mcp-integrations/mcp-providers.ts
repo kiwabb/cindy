@@ -111,9 +111,13 @@ import { runBotProjectsTool } from '../maker-ipc/botLinkedProjects.js';
 import { captureDataOwnerBroadcastScope } from '../device-link/broadcast-tap.js';
 import {
   listPersonalTodoTagCatalog,
-  notifyPersonalTodosChanged,
   openPersonalTodoStore,
+  listPersonalTodoSyncConflicts,
   PersonalTodoOwnerChangedError,
+  personalTodoSyncActions,
+  personalTodoSyncSummary,
+  readPersonalTodoSyncStatus,
+  writePersonalTodo,
 } from '../maker-ipc/personalTodoAccess.js';
 import type { PersonalTodoUpdate } from '../../shared/personalTodo.js';
 import { TodoError } from '@cindy/maker-shared/teammate-todo';
@@ -1253,18 +1257,54 @@ export function createDesktopMcpProviders(deps: DesktopMcpProvidersDeps): LiziMc
               tagsError = 'Task tag catalog unavailable; tags are empty for this listing.';
             }
             assertCurrent();
-            return { ok: true, items, tags, ...(tagsError ? { tagsError } : {}) };
+            const sync = await personalTodoSyncSummary();
+            return { ok: true, items, tags, ...(tagsError ? { tagsError } : {}), ...(sync ? { sync } : {}) };
           }
-          const todo = await store.update((input ?? {}) as PersonalTodoUpdate);
-          assertCurrent();
-          notifyPersonalTodosChanged(scope);
-          return { ok: true, todo };
+          const written = await writePersonalTodo((input ?? {}) as PersonalTodoUpdate, scope);
+          return { ok: true, todo: written.todo, ...(written.sync ? { sync: written.sync } : {}) };
         } catch (error) {
           if (error instanceof PersonalTodoOwnerChangedError)
             return { ok: false, errorCode: 'OWNER_CHANGED', message: 'Owner changed' };
           if (error instanceof TodoError)
             return { ok: false, errorCode: error.code, message: error.message };
           return { ok: false, errorCode: 'INTERNAL', message: 'Personal todo storage unavailable' };
+        }
+      },
+      // 多台电脑同步的管理:与桌面待办页同一组主进程动作(状态、开关、设为主力电脑、冲突)。
+      personalTodoSync: async (operation, input) => {
+        try {
+          if (operation === 'status') {
+            const { tags: _tags, ...status } = await readPersonalTodoSyncStatus();
+            return { ok: true, status, conflicts: await listPersonalTodoSyncConflicts() };
+          }
+          let conflictId = '';
+          let choice: 'mine' | 'theirs' = 'mine';
+          if (operation === 'resolve') {
+            // A missing or unknown choice is never defaulted: "mine" overwrites the other computer's edit.
+            if (typeof input?.conflictId !== 'string' || !input.conflictId || (input.choice !== 'mine' && input.choice !== 'theirs'))
+              return { ok: false, errorCode: 'INVALID_PARAMS', message: 'conflictId and choice (mine|theirs) are required' };
+            conflictId = input.conflictId;
+            choice = input.choice;
+          }
+          const next =
+            operation === 'enable'
+              ? await personalTodoSyncActions.enable()
+              : operation === 'disable'
+                ? await personalTodoSyncActions.disable()
+                : operation === 'set-home'
+                  ? await personalTodoSyncActions.setAsHome()
+                  : await personalTodoSyncActions.resolve(conflictId, choice);
+          const { tags: _tags, ...status } = next;
+          return { ok: true, status };
+        } catch (error) {
+          if (error instanceof PersonalTodoOwnerChangedError)
+            return { ok: false, errorCode: 'OWNER_CHANGED', message: 'Owner changed' };
+          const code = (error as { code?: unknown } | null)?.code;
+          return {
+            ok: false,
+            errorCode: typeof code === 'string' && /^[A-Z_]+$/.test(code) ? code : 'SYNC_FAILED',
+            message: error instanceof Error ? error.message.slice(0, 200) : 'Sync failed',
+          };
         }
       },
       // Linked projects of the calling teammate; the host derives the teammate from the caller session.
