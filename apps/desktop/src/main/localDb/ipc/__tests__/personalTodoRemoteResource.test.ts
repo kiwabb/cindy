@@ -89,7 +89,7 @@ it('projects only the allowlisted fields and round-trips an update with a change
   expect(Object.keys(items[0]).sort()).toEqual(
     [
       'completedAt', 'createdAt', 'deadline', 'deferredUntil', 'id', 'notes', 'priority',
-      'reminder', 'revision', 'status', 'tags', 'title', 'updatedAt',
+      'reminder', 'revision', 'status', 'subtasks', 'tags', 'title', 'updatedAt',
     ].sort(),
   );
   expect(items[0]).toMatchObject({ title: '交报告', notes: '周五前', status: 'open' });
@@ -144,7 +144,7 @@ it('projects priority, reminder and catalog-resolved tags, and advertises the or
     items: Item[];
     capabilities: unknown;
   };
-  expect(data.capabilities).toEqual({ organize: 1 });
+  expect(data.capabilities).toEqual({ organize: 1, subtasks: 1 });
   expect(data.items[0]).toMatchObject({ priority: 3, reminder: 'before-1h' });
   // Unknown ids are dropped, order kept, nameCustomized only when true, tagIds never on the wire.
   expect(data.items[0].tags).toEqual([
@@ -183,4 +183,26 @@ it('treats a tag catalog change as a new revision and pushes a change for the to
   expect((after.blocks![0].data as { items: Item[] }).items[0].tags).toEqual([
     { id: 'tag-1', name: '大客户', color: 'red', nameCustomized: true },
   ]);
+});
+
+it('projects subtasks, advertises the subtasks marker and round-trips a whole-list replace', async () => {
+  await update({ creationRequestId: 'req-sub', title: '办活动', subtasks: [{ title: '订场地' }, { title: '发通知', done: true }] });
+  let { items } = await read();
+  const steps = items[0].subtasks as Array<{ id: string; title: string; done: boolean }>;
+  expect(steps.map((s) => [s.title, s.done])).toEqual([['订场地', false], ['发通知', true]]);
+  expect(Object.keys(steps[0]).sort()).toEqual(['done', 'id', 'title']);
+  const data = (await remoteResourceRegistry.get(context, { client, ref })).blocks![0].data as { capabilities: unknown };
+  expect(data.capabilities).toMatchObject({ subtasks: 1 });
+
+  const before = await remoteResourceRegistry.get(context, { client, ref });
+  await update({
+    id: items[0].id,
+    expectedRevision: items[0].revision,
+    subtasks: [{ id: steps[0].id, title: '订场地', done: true }, { title: '买饮料' }],
+  });
+  items = (await read()).items;
+  expect((items[0].subtasks as Array<{ title: string; done: boolean }>).map((s) => [s.title, s.done])).toEqual([['订场地', true], ['买饮料', false]]);
+  expect((await remoteResourceRegistry.get(context, { client, ref })).revision).not.toBe(before.revision);
+  await expect(update({ id: items[0].id, subtasks: 'x' })).rejects.toMatchObject({ code: 'INVALID_PARAMS' });
+  await expect(update({ id: items[0].id, subtasks: [{ title: 1 }] })).rejects.toMatchObject({ code: 'INVALID_PARAMS' });
 });

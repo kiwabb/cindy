@@ -42,6 +42,14 @@ export interface PersonalTodoItem {
   reminder: TodoReminder;
   /** Resolved against the host's tag catalog; unknown ids are already dropped. Empty on an older host. */
   tags: PersonalTodoTag[];
+  /** Checklist steps in order. Display only on the phone (never sent back); empty on an older host. */
+  subtasks: PersonalTodoSubtask[];
+}
+
+export interface PersonalTodoSubtask {
+  id: string;
+  title: string;
+  done: boolean;
 }
 
 export interface PersonalTodoUpdateInput {
@@ -87,6 +95,14 @@ function parseTags(value: unknown): PersonalTodoTag[] {
   });
 }
 
+function parseSubtasks(value: unknown): PersonalTodoSubtask[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap(step => {
+    if (!isRecord(step) || typeof step.id !== 'string' || typeof step.title !== 'string') return [];
+    return [{ id: step.id, title: step.title, done: step.done === true }];
+  });
+}
+
 function parseItem(value: unknown): PersonalTodoItem | null {
   if (!isRecord(value)) return null;
   const { id, revision, title, notes, status } = value;
@@ -111,6 +127,7 @@ function parseItem(value: unknown): PersonalTodoItem | null {
     priority: value.priority === 1 || value.priority === 2 || value.priority === 3 ? value.priority : 0,
     reminder: (TODO_REMINDERS as readonly unknown[]).includes(value.reminder) ? value.reminder as TodoReminder : 'default',
     tags: parseTags(value.tags),
+    subtasks: parseSubtasks(value.subtasks),
   };
 }
 

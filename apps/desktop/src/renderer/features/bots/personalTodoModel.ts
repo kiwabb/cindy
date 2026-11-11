@@ -12,7 +12,7 @@ import {
 } from '@cindy/maker-shared/teammate-todo';
 import type { TaskTag } from '@cindy/maker-shared';
 
-import type { PersonalTodo } from '../../../shared/personalTodo';
+import type { PersonalTodo, PersonalTodoUpdate } from '../../../shared/personalTodo';
 import { dayDiff } from './todoDates';
 import {
   deadlineBucket,
@@ -263,4 +263,35 @@ export function personalDueText(
   else if (ahead === 0 || ahead === 1) day = relative(ahead);
   else day = deadline.date <= weekEnd(today) ? weekday() : shortDate();
   return { text: [day, time].filter(Boolean).join(' '), overdue: false };
+}
+
+// ---------------------------------------------------------------- steps
+
+export type PersonalStep = PersonalTodo['subtasks'][number];
+/** The wire shape of a checklist edit: the whole list in order, existing ids kept. */
+export type PersonalStepsInput = NonNullable<PersonalTodoUpdate['subtasks']>;
+
+/** "2/4" for a todo with steps, null for one without. */
+export function stepsProgress(steps: readonly PersonalStep[]): { done: number; total: number; text: string } | null {
+  if (!steps.length) return null;
+  const done = steps.filter((step) => step.done).length;
+  return { done, total: steps.length, text: `${done}/${steps.length}` };
+}
+
+const keep = (step: PersonalStep) => ({ id: step.id, title: step.title, done: step.done });
+
+/** The list with one step's done state flipped. */
+export function toggledSteps(steps: readonly PersonalStep[], id: string): PersonalStepsInput {
+  return steps.map((step) => (step.id === id ? { ...keep(step), done: !step.done } : keep(step)));
+}
+
+/** The list without one step. */
+export function removedSteps(steps: readonly PersonalStep[], id: string): PersonalStepsInput {
+  return steps.filter((step) => step.id !== id).map(keep);
+}
+
+/** The list with a new step at the end; blank titles add nothing (null). */
+export function appendedSteps(steps: readonly PersonalStep[], title: string): PersonalStepsInput | null {
+  const trimmed = title.trim();
+  return trimmed ? [...steps.map(keep), { title: trimmed }] : null;
 }

@@ -166,3 +166,24 @@ it('sends priority / tagIds / reminder only to a host that advertises organize, 
   await act(async () => { await latest.update({ id: 'a', expectedRevision: 1, title: 'y', notes: '' }); });
   expect(h.invokes[2].input).toEqual({ id: 'a', expectedRevision: 1, title: 'y', notes: '' });
 });
+
+it('reads subtasks in order for display, tolerates hosts and entries without them, and a phone edit never sends them', async () => {
+  h.capabilities = { organize: 1, subtasks: 1 };
+  h.items = [
+    item('plan', { subtasks: [{ id: 's1', title: '订场地', done: true }, { id: 's2', title: '发通知', done: false }, { id: 3 }, { id: 's4', title: '买饮料' }] }),
+    item('legacy'),
+    item('odd', { subtasks: 'nope' }),
+  ];
+  await mount('pc-subtasks');
+  const [plan, legacy, odd] = latest.items;
+  expect(plan.subtasks).toEqual([
+    { id: 's1', title: '订场地', done: true },
+    { id: 's2', title: '发通知', done: false },
+    { id: 's4', title: '买饮料', done: false },
+  ]);
+  expect(legacy.subtasks).toEqual([]);
+  expect(odd.subtasks).toEqual([]);
+  // The existing editor sends title / notes / deadline only: the checklist stays as the computer has it.
+  await act(async () => { await latest.update({ id: 'plan', expectedRevision: 1, title: 'y', notes: '' }); });
+  expect(h.invokes[0].input).toEqual({ id: 'plan', expectedRevision: 1, title: 'y', notes: '' });
+});

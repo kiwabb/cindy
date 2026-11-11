@@ -12,6 +12,7 @@ import {
   validTodoPriority,
   validTodoReminder,
   normalizeTodoTagIds,
+  normalizeTodoSubtasks,
   type TodoPatch,
   type TodoState,
   type TeammateTodo,
@@ -189,6 +190,15 @@ export function createBotTodoStore(
           (t.reminder !== undefined && !validTodoReminder(t.reminder))
         )
           throw new TodoError('CORRUPT_STORE');
+        if (t.subtasks !== undefined) {
+          try {
+            const subtasks = normalizeTodoSubtasks(t.subtasks);
+            if (subtasks.some((s, i) => s.title !== t.subtasks![i].title))
+              throw new TodoError('CORRUPT_STORE');
+          } catch {
+            throw new TodoError('CORRUPT_STORE');
+          }
+        }
         if (t.tagIds !== undefined) {
           try {
             if (normalizeTodoTagIds(t.tagIds).length !== t.tagIds.length)

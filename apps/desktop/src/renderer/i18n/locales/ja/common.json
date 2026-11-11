@@ -19786,6 +19786,13 @@
     "details": "ToDoの詳細",
     "title": "タイトル",
     "notes": "メモ（任意）",
+    "steps": {
+      "title": "ステップ",
+      "add": "ステップを追加",
+      "expand": "ステップを表示: {{title}}",
+      "collapse": "ステップを隠す: {{title}}",
+      "remove": "ステップを削除: {{title}}"
+    },
     "deadline": "期限（任意）",
     "deadlineTime": "時刻（任意）",
     "deferUntil": "再開日時",

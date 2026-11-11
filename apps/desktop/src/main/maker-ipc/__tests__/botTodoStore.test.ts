@@ -366,6 +366,35 @@ describe('personal todo account store', () => {
     await writeFile(file, JSON.stringify(corrupt));
     await expect(store.list()).rejects.toMatchObject({ code: 'CORRUPT_STORE' });
   });
+  // Contract for subtasks (2026-11-11): the whole ordered checklist is replaced under the item's
+  // revision; new steps get ids from the store, existing ids survive edits, bad lists write nothing.
+  it('replaces the checklist under the revision, assigns ids to new steps and rejects malformed lists', async () => {
+    const { file } = await fixture();
+    const store = createPersonalTodoStore(file);
+    const created = await store.update({ creationRequestId: 'with-steps', title: 'Checklist unit item', subtasks: [{ title: ' 拉数据 ' }, { title: '写结论', done: true }] });
+    expect(created.subtasks).toEqual([
+      { id: expect.stringMatching(/^[A-Za-z0-9_-]{1,64}$/), title: '拉数据', done: false },
+      { id: expect.stringMatching(/^[A-Za-z0-9_-]{1,64}$/), title: '写结论', done: true },
+    ]);
+    // A lost-reply retry of the same creation is the same item, even though new ids would differ.
+    expect((await store.update({ creationRequestId: 'with-steps', title: 'Checklist unit item', subtasks: [{ title: '拉数据' }, { title: '写结论', done: true }] })).id).toBe(created.id);
+    const [first, second] = created.subtasks;
+    const edited = await store.update({ id: created.id, expectedRevision: created.revision, subtasks: [{ ...second }, { ...first, done: true }, { title: '发给预审' }] });
+    expect(edited.subtasks.map((s) => [s.id === first.id || s.id === second.id ? s.id : 'new', s.title, s.done])).toEqual([
+      [second.id, '写结论', true], [first.id, '拉数据', true], ['new', '发给预审', false],
+    ]);
+    await expect(store.update({ id: edited.id, expectedRevision: created.revision, subtasks: [] })).rejects.toMatchObject({ code: 'CONFLICT' });
+    for (const subtasks of [[{ title: '' }], [{ id: 'a', title: 'x' }, { id: 'a', title: 'y' }], Array.from({ length: 51 }, (_, i) => ({ title: `s${i}` }))])
+      await expect(store.update({ id: edited.id, expectedRevision: edited.revision, subtasks })).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+    expect((await store.list())[0].subtasks).toEqual(edited.subtasks);
+    const raw = JSON.parse(await readFile(file, 'utf8'));
+    delete raw.items[0].subtasks;
+    await writeFile(file, JSON.stringify(raw));
+    expect((await store.list())[0].subtasks).toEqual([]);
+    raw.items[0].subtasks = [{ id: 'x', title: 'ok', done: 'yes' }];
+    await writeFile(file, JSON.stringify(raw));
+    await expect(store.list()).rejects.toMatchObject({ code: 'CORRUPT_STORE' });
+  });
 });
 
 // Unit: a real atomic store commit followed by a lost transport receipt must be replay-safe.

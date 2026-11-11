@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { Check } from 'lucide-react';
+import { Check, ChevronDown, ListChecks } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { TaskTag } from '@cindy/maker-shared';
 
+import { Checkbox } from '@/components/ui/checkbox';
+import { Tip } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import type { PersonalTodo, PersonalTodoUpdate } from '../../../shared/personalTodo';
-import { personalDueText } from './personalTodoModel';
+import { personalDueText, stepsProgress, toggledSteps } from './personalTodoModel';
 import { PRIORITY_KEY, PriorityRing, TagDot, tagDisplayName } from './personalTodoVisuals';
 import type { TodoBoardBucket, TodoBoardView } from './teammateTodoBoard';
 
@@ -29,6 +31,8 @@ export function PersonalTodoRow({
   now,
   onOpen,
   onUpdate,
+  onSteps,
+  reserveStepsToggle = false,
 }: {
   todo: PersonalTodo;
   view: TodoBoardView;
@@ -40,15 +44,41 @@ export function PersonalTodoRow({
   now: Date;
   onOpen: (todo: PersonalTodo) => void;
   onUpdate: (input: PersonalTodoUpdate) => Promise<void>;
+  /** Saves a checklist edit without closing the details panel or announcing a save. */
+  onSteps: (input: PersonalTodoUpdate) => Promise<void>;
+  /** Keep the toggle's slot when another row in the list has steps, so tags and dates line up. */
+  reserveStepsToggle?: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [stepBusy, setStepBusy] = useState(false);
   const done = todo.status === 'done';
   const priority = todo.priority ?? 0;
   const label =
     `${t(done ? 'personalTodos.reopen' : 'personalTodos.complete')}: ${todo.title}` +
     (priority && !done ? ` · ${t(`personalTodos.priority.${PRIORITY_KEY[priority]}`)}` : '');
+  const steps = todo.subtasks;
+  const progress = stepsProgress(steps);
+  const flipStep = async (id: string) => {
+    setStepBusy(true);
+    setFailed(false);
+    try {
+      await onSteps({
+        id: todo.id,
+        expectedRevision: todo.revision,
+        subtasks: toggledSteps(steps, id),
+      });
+    } catch {
+      setFailed(true);
+    } finally {
+      setStepBusy(false);
+    }
+  };
+  const stepsLabel = t(expanded ? 'personalTodos.steps.collapse' : 'personalTodos.steps.expand', {
+    title: todo.title,
+  });
   const due =
     view === 'later'
       ? {
@@ -60,7 +90,9 @@ export function PersonalTodoRow({
       : view === 'done'
         ? {
             text: todo.completedAt
-              ? t('bots.todoBoard.completedOn', { date: shortDate(todo.completedAt, i18n.language) })
+              ? t('bots.todoBoard.completedOn', {
+                  date: shortDate(todo.completedAt, i18n.language),
+                })
               : '',
             overdue: false,
           }
@@ -137,12 +169,19 @@ export function PersonalTodoRow({
             >
               {todo.title}
             </span>
-            {todo.notes ? (
-              <span
-                title={todo.notes}
-                className="block truncate text-12 leading-4 text-[var(--text-secondary)]"
-              >
-                {todo.notes}
+            {progress || todo.notes ? (
+              <span className="flex min-w-0 items-center gap-2 text-12 leading-4 text-[var(--text-secondary)]">
+                {progress ? (
+                  <span className="inline-flex shrink-0 items-center gap-1 tabular-nums">
+                    <ListChecks size={12} aria-hidden />
+                    {progress.text}
+                  </span>
+                ) : null}
+                {todo.notes ? (
+                  <span title={todo.notes} className="min-w-0 truncate">
+                    {todo.notes}
+                  </span>
+                ) : null}
               </span>
             ) : null}
           </span>
@@ -167,7 +206,52 @@ export function PersonalTodoRow({
             </span>
           ) : null}
         </button>
+        {progress ? (
+          <Tip text={stepsLabel}>
+            <button
+              type="button"
+              aria-expanded={expanded}
+              aria-label={stepsLabel}
+              onClick={() => setExpanded((open) => !open)}
+              className="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-[var(--text-secondary)] outline-none transition-colors hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
+            >
+              <ChevronDown
+                size={14}
+                aria-hidden
+                className={cn('transition-transform', expanded && 'rotate-180')}
+              />
+            </button>
+          </Tip>
+        ) : reserveStepsToggle ? (
+          <span aria-hidden className="size-6 shrink-0" />
+        ) : null}
       </div>
+      {expanded && steps.length ? (
+        <ul className="flex flex-col pb-1 pl-11 pr-2">
+          {steps.map((step) => (
+            <li key={step.id}>
+              <label className="flex min-h-7 cursor-pointer items-start gap-2.5 rounded-lg px-2 py-1 hover:bg-[var(--surface-hover)]">
+                <Checkbox
+                  className="mt-0.5"
+                  checked={step.done}
+                  disabled={stepBusy}
+                  onChange={() => void flipStep(step.id)}
+                />
+                <span
+                  className={cn(
+                    'min-w-0 flex-1 break-words text-13 leading-5',
+                    step.done
+                      ? 'text-[var(--text-tertiary)] line-through'
+                      : 'text-[var(--text-primary)]',
+                  )}
+                >
+                  {step.title}
+                </span>
+              </label>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {failed ? (
         <p role="alert" className="px-2 text-12 text-[var(--error-fg)]">
           {t('personalTodos.rowFailed')}

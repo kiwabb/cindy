@@ -87,7 +87,7 @@ const { TeammateTodosView } = await import('../TeammateTodosView');
 const mine = (id: string, patch: Partial<PersonalTodo> = {}): PersonalTodo => ({
   id, revision: 1, title: id, notes: '', deadline: null, status: 'open', deferredUntil: null,
   createdAt: '2026-11-01T00:00:00Z', updatedAt: '2026-11-01T00:00:00Z', priority: 0, tagIds: [],
-  reminder: 'default', ownership: 'self', source: 'manual', ...patch,
+  reminder: 'default', subtasks: [], ownership: 'self', source: 'manual', ...patch,
 });
 const tag = (id: string, name: string, sortOrder: number): TaskTag => ({
   id, name, color: 'blue', favoriteOrder: null, sortOrder, revision: 1,
@@ -624,5 +624,133 @@ describe('personal todo toggles and the shared count', () => {
     h.generation = 2; setDataOwnerGeneration('other-test-owner', 2);
     await act(async () => { component.rerender(<PersonalCount />); });
     expect(screen.getByTestId('personal-count').textContent).toBe('0');
+  });
+});
+
+// 步骤（子清单）：行上展开并直接勾选、详情面板里添加／勾选／删除，都是「立即整表保存」，不关面板、不丢其它草稿；
+// 行上勾选与面板同步，保存时基线版本不冲突；真冲突仍走冲突提示。
+// Bug／规则依据：2026-11-11 个人待办步骤设计稿；最小失败输入：面板里有未保存的标题时添加步骤；同一待办在面板打开时从行上勾选再点保存；输入法组字时按回车。
+// tier：unit（同本文件，主进程 IPC 用内存 fake）。
+describe('personal todo steps', () => {
+  const steps = () => [
+    { id: 's1', title: 'Draft', done: true },
+    { id: 's2', title: 'Review', done: false },
+    { id: 's3', title: 'Send', done: false },
+  ];
+  const withSteps = mine('with-steps', { title: 'Release notes', subtasks: steps() });
+  const flip = (list: ReturnType<typeof steps>, id: string) =>
+    list.map((step) => (step.id === id ? { ...step, done: !step.done } : step));
+
+  it('shows progress, expands inline and saves a ticked step as the whole list at the row revision', async () => {
+    vi.mocked(api().list).mockResolvedValue([withSteps, mine('Plain')]);
+    render(<TeammateTodosView />);
+    await screen.findByRole('button', { name: 'Release notes' });
+    const row = screen.getAllByTestId('todo-board-row').find((node) => node.textContent?.includes('Release notes'))!;
+    expect(within(row).getByText('1/3')).toBeTruthy();
+    // A todo without steps has no expander and no progress.
+    expect(screen.getAllByRole('button', { name: /personalTodos\.steps\./ })).toHaveLength(1);
+    expect(within(row).queryByRole('checkbox', { name: 'Review' })).toBeNull();
+
+    const expander = within(row).getByRole('button', { name: 'personalTodos.steps.expand:Release notes' });
+    expect(expander.getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(expander);
+    expect(
+      within(row).getByRole('button', { name: 'personalTodos.steps.collapse:Release notes' }).getAttribute('aria-expanded'),
+    ).toBe('true');
+    expect((within(row).getByRole('checkbox', { name: 'Draft' }) as HTMLInputElement).checked).toBe(true);
+
+    update().mockResolvedValueOnce({ ...withSteps, revision: 2, subtasks: flip(steps(), 's2') });
+    fireEvent.click(within(row).getByRole('checkbox', { name: 'Review' }));
+    await waitFor(() => expect(update()).toHaveBeenCalledTimes(1));
+    expect(update().mock.lastCall![0]).toEqual({
+      id: 'with-steps',
+      expectedRevision: 1,
+      subtasks: flip(steps(), 's2'),
+    });
+    await waitFor(() => expect(within(row).getByText('2/3')).toBeTruthy());
+    expect((within(row).getByRole('checkbox', { name: 'Review' }) as HTMLInputElement).checked).toBe(true);
+    // A quiet save: no "saved" notice and the todo stays where it was.
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('adds, ticks and removes steps in the panel without closing it or dropping an unsaved title', async () => {
+    vi.mocked(api().list).mockResolvedValue([withSteps]);
+    render(<TeammateTodosView />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Release notes' }));
+    fireEvent.change(editorPanel().getByLabelText('personalTodos.title'), { target: { value: 'Release notes v2' } });
+    const input = editorPanel().getByLabelText('personalTodos.steps.add') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: '  Archive  ' } });
+    // An input method confirming its candidate with Enter adds nothing.
+    fireEvent.keyDown(input, { key: 'Enter', isComposing: true });
+    fireEvent.keyDown(input, { key: 'Enter', keyCode: 229 });
+    expect(update()).not.toHaveBeenCalled();
+
+    const added = [...steps(), { id: 's4', title: 'Archive', done: false }];
+    update().mockResolvedValueOnce({ ...withSteps, revision: 2, subtasks: added });
+    input.focus();
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await waitFor(() => expect(update()).toHaveBeenCalledTimes(1));
+    expect(update().mock.lastCall![0]).toEqual({
+      id: 'with-steps',
+      expectedRevision: 1,
+      subtasks: [...steps(), { title: 'Archive' }],
+    });
+    await waitFor(() => expect(editorPanel().getByRole('checkbox', { name: 'Archive' })).toBeTruthy());
+    expect(input.value).toBe('');
+    expect(document.activeElement).toBe(input);
+    expect((editorPanel().getByLabelText('personalTodos.title') as HTMLInputElement).value).toBe('Release notes v2');
+    expect(screen.queryByLabelText('personalTodos.details')).not.toBeNull();
+
+    // Ticking and removing follow the revision the previous save returned.
+    update().mockResolvedValueOnce({ ...withSteps, revision: 3, subtasks: flip(added, 's3') });
+    fireEvent.click(editorPanel().getByRole('checkbox', { name: 'Send' }));
+    await waitFor(() => expect(update()).toHaveBeenCalledTimes(2));
+    expect(update().mock.lastCall![0]).toEqual({ id: 'with-steps', expectedRevision: 2, subtasks: flip(added, 's3') });
+    await waitFor(() => expect((editorPanel().getByRole('checkbox', { name: 'Send' }) as HTMLInputElement).checked).toBe(true));
+    const rest = flip(added, 's3').filter((step) => step.id !== 's2');
+    update().mockResolvedValueOnce({ ...withSteps, revision: 4, subtasks: rest });
+    fireEvent.click(editorPanel().getByRole('button', { name: 'personalTodos.steps.remove:Review' }));
+    await waitFor(() => expect(update()).toHaveBeenCalledTimes(3));
+    expect(update().mock.lastCall![0]).toEqual({ id: 'with-steps', expectedRevision: 3, subtasks: rest });
+    await waitFor(() => expect(editorPanel().queryByRole('checkbox', { name: 'Review' })).toBeNull());
+
+    // The draft title is still there and 保存 does not report a conflict.
+    update().mockResolvedValueOnce({ ...withSteps, revision: 5, title: 'Release notes v2', subtasks: rest });
+    fireEvent.click(editorPanel().getByRole('button', { name: 'personalTodos.save' }));
+    await waitFor(() => expect(update()).toHaveBeenCalledTimes(4));
+    expect(update().mock.lastCall![0]).toMatchObject({ id: 'with-steps', expectedRevision: 4, title: 'Release notes v2' });
+    expect(update().mock.lastCall![0]).not.toHaveProperty('subtasks');
+  });
+
+  it('follows a step ticked on the row while the same todo is open, and still reports a real conflict', async () => {
+    vi.mocked(api().list).mockResolvedValue([withSteps]);
+    render(<TeammateTodosView />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Release notes' }));
+    const row = screen.getByTestId('todo-board-row');
+    fireEvent.click(within(row).getByRole('button', { name: 'personalTodos.steps.expand:Release notes' }));
+    update().mockResolvedValueOnce({ ...withSteps, revision: 2, subtasks: flip(steps(), 's2') });
+    fireEvent.click(within(row).getByRole('checkbox', { name: 'Review' }));
+    await waitFor(() =>
+      expect((editorPanel().getByRole('checkbox', { name: 'Review' }) as HTMLInputElement).checked).toBe(true),
+    );
+
+    update().mockResolvedValueOnce({ ...withSteps, revision: 3, notes: 'x' });
+    fireEvent.change(editorPanel().getByLabelText('personalTodos.notes'), { target: { value: 'x' } });
+    fireEvent.click(editorPanel().getByRole('button', { name: 'personalTodos.save' }));
+    await waitFor(() => expect(update()).toHaveBeenCalledTimes(2));
+    expect(update().mock.lastCall![0]).toMatchObject({ id: 'with-steps', expectedRevision: 2 });
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('keeps the panel and its drafts when a step save conflicts and offers the existing reload', async () => {
+    vi.mocked(api().list).mockResolvedValue([withSteps]);
+    render(<TeammateTodosView />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Release notes' }));
+    fireEvent.change(editorPanel().getByLabelText('personalTodos.notes'), { target: { value: 'draft notes' } });
+    update().mockRejectedValueOnce(new Error('[ALREADY_EXISTS] CONFLICT'));
+    fireEvent.click(editorPanel().getByRole('checkbox', { name: 'Send' }));
+    expect((await screen.findByRole('alert')).textContent).toBe('personalTodos.conflict');
+    expect(screen.getByRole('button', { name: 'personalTodos.reloadVersion' })).toBeTruthy();
+    expect((editorPanel().getByLabelText('personalTodos.notes') as HTMLTextAreaElement).value).toBe('draft notes');
   });
 });
