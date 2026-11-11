@@ -37,6 +37,7 @@ const updateStatus = vi.hoisted(() => ({
   current: { status: 'ready', version: '1.2.3', errorCode: null } as {
     status: string;
     version?: string;
+    displayVersion?: string;
     errorCode: string | null;
     downloadUrl?: string;
   },
@@ -348,10 +349,12 @@ describe('update banner for a release that needs a manual install', () => {
   });
 
   it('opens the release page, never probes or restarts, and stays dismissed across polls of the same version', async () => {
-    updateStatus.current = manual('personal-r1');
+    updateStatus.current = { ...manual('personal-r1'), displayVersion: '2026-11-11 08:53 · aaaaaaa' };
     const { rerender } = render(<UpdateBanner isCollapsed={false} />);
     expect(screen.getByText('update.banner.manualTitle')).toBeTruthy();
-    expect(screen.getByText('personal-r1')).toBeTruthy();
+    // The user reads the build label; the internal revision key is not shown.
+    expect(screen.getByText('2026-11-11 08:53 · aaaaaaa')).toBeTruthy();
+    expect(screen.queryByText('personal-r1')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'update.banner.manualAria' }));
     expect(openExternal).toHaveBeenCalledWith(URL_R1);
     expect(anyActivityBlockingRelaunch).not.toHaveBeenCalled();

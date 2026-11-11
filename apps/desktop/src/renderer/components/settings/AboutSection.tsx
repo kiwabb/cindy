@@ -3,7 +3,7 @@ import { aboutSettings } from './AboutSection.settings-search';
  * AboutSection — Settings → About tab content.
  *
  * 版本号:
- *   - 应用版本号:仅国内版显示,值由 window.electronAPI.appDisplayVersion 同步注入
+ *   - 应用版本号:国内版与个人渠道构建显示,值由 window.electronAPI.appDisplayVersion 同步注入
  *   - Claude Code / Codex 版本号: spawn 当前应用使用的 binary `--version`,再比较当前通道的
  *     线上版本;菜单样式与 Pi 共用 HarnessVersionMenuRow,更新仍是重启后由启动流程安装
  *   - Pi 版本号与内核更新由 PiKernelVersionRow 管理
@@ -351,7 +351,7 @@ export function AboutSection() {
           'border border-[var(--settings-theme-card-border)]',
         )}
       >
-        {CURRENT_CINDY_REGION === 'cn' && (
+        {(CURRENT_CINDY_REGION === 'cn' || window.electronAPI.appDisplayVersionIsPersonal) && (
           <>
             <InfoRow
               label={t(aboutSettings.appVersionLabel.titleKey)}

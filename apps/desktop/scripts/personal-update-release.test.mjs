@@ -146,6 +146,18 @@ test('ZIP integrity, platform/source and embedded metadata must all agree', t =>
   assert.throws(() => createPersonalUpdateManifest({ buildInfo: info, artifactDir, policy }), /integrity/);
 });
 
+test('display build time is an optional feed field that the verified-ZIP check ignores', t => {
+  const setup = fixture(t);
+  const withTime = { ...setup.manifest, builtAt: '2026-11-11T00:53:59.613+00:00' };
+  const feed = path.join(setup.artifactDir, 'personal-update.json');
+  fs.writeFileSync(feed, JSON.stringify(withTime));
+  const options = { ...setup, env: environment, runGh: fakeGitHub().runGh };
+  assert.deepEqual(publishPersonalUpdate(options), withTime);
+  // A different identity is still rejected even when builtAt is present.
+  fs.writeFileSync(feed, JSON.stringify({ ...withTime, sourceCommit: 'c'.repeat(40) }));
+  assert.throws(() => publishPersonalUpdate({ ...setup, env: environment, runGh: fakeGitHub().runGh }), /does not describe the verified ZIP/);
+});
+
 test('publisher is restricted to the exact fork/main/SHA/run identity', t => {
   const { manifest } = fixture(t);
   assertPublicationContext(manifest, environment);
@@ -394,7 +406,7 @@ test('Windows channel builds its own identity, ZIP name and tag, and reads backs
 
   const zip = new JSZip();
   // PowerShell 5.1 Compress-Archive stores backslash separators.
-  zip.file('resources\\cindy-source.json', JSON.stringify({ sourceCommit, personalUpdate: winIdentity }));
+  zip.file('resources\\cindy-source.json', JSON.stringify({ sourceCommit, builtAt: '2026-11-11T00:53:59.613+00:00', personalUpdate: winIdentity }));
   const zipName = 'cindy-unversioned-x64.zip';
   fs.writeFileSync(path.join(artifactDir, zipName), await zip.generateAsync({ type: 'nodebuffer' }));
   const info = { personalUpdate: winIdentity, commitSha: sourceCommit, platform: 'win32', arch: 'x64', region: 'global', versionless: true,
@@ -403,6 +415,9 @@ test('Windows channel builds its own identity, ZIP name and tag, and reads backs
   fs.writeFileSync(path.join(artifactDir, 'cindy-unversioned-Setup.exe'), 'unit installer bytes');
   const manifest = await preparePersonalUpdate({ desktopRoot, artifactDir });
   assert.equal(manifest.asset.url, `https://github.com/kiwabb/cindy/releases/download/personal-windows-x64-r12301/${zipName}`);
+  // The display build time comes from the packaged metadata and lands in the written feed file.
+  assert.equal(manifest.builtAt, '2026-11-11T00:53:59.613+00:00');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(artifactDir, 'personal-update.json'), 'utf8')).builtAt, manifest.builtAt);
   assert.match(fs.readFileSync(path.join(artifactDir, 'SHA256SUMS'), 'utf8'), /cindy-unversioned-Setup\.exe/);
   fs.writeFileSync(path.join(artifactDir, 'build-info.json'), JSON.stringify({ ...info, files: [{ ...info.files[0], name: 'cindy-unversioned-arm64.zip' }] }));
   await assert.rejects(preparePersonalUpdate({ desktopRoot, artifactDir }), /Windows packaged ZIP/);

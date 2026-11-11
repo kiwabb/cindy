@@ -33,9 +33,12 @@ function gh(args) {
 export function publishPersonalUpdate({ artifactDir, desktopRoot, env = process.env, runGh = gh }) {
   const info = JSON.parse(fs.readFileSync(path.join(artifactDir, 'build-info.json'), 'utf8'));
   const policy = readPersonalUpdatePolicy(desktopRoot, info.platform, info.arch);
-  const candidate = createPersonalUpdateManifest({ buildInfo: info, artifactDir, policy });
-  const supplied = validatePersonalManifest(JSON.parse(fs.readFileSync(path.join(artifactDir, 'personal-update.json'), 'utf8')), policy);
-  if (!isDeepStrictEqual(candidate, supplied)) throw new Error('Published manifest does not describe the verified ZIP');
+  const verified = createPersonalUpdateManifest({ buildInfo: info, artifactDir, policy });
+  const candidate = validatePersonalManifest(JSON.parse(fs.readFileSync(path.join(artifactDir, 'personal-update.json'), 'utf8')), policy);
+  // `builtAt` is display-only and comes from the packaged metadata, so it is not part of the verified-ZIP identity.
+  const suppliedIdentity = { ...candidate };
+  delete suppliedIdentity.builtAt;
+  if (!isDeepStrictEqual(verified, suppliedIdentity)) throw new Error('Published manifest does not describe the verified ZIP');
   assertPublicationContext(candidate, env);
   const repository = policy.repository;
   const tag = `${policy.channel}-r${candidate.revision}`;

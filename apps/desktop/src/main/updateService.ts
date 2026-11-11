@@ -28,6 +28,7 @@ import { isCindyPersonalRuntime } from './cindy-make/versionRuntimeIdentity.js';
 import { personalUpdateContext, checkPersonalManifest, prepareInUtilityProcess,
   readPreparedPersonalUpdate, applyPreparedPersonalUpdate } from './personal-update/runtime.js';
 import { writeAtomicJson } from './personal-update/transaction.js';
+import { formatPersonalBuildVersion } from '../shared/personalBuildVersion.js';
 import os from 'node:os';
 
 import {
@@ -110,6 +111,8 @@ type UpdateStatus = 'idle' | 'checking' | 'downloading' | 'ready' | 'superseding
 interface UpdateStatusPayload {
   status: UpdateStatus;
   version?: string;
+  /** Personal channel only: human-readable build label for `ready`/`manual`; `version` stays the internal key. */
+  displayVersion?: string;
   progress?: number;
   errorCode?: string;
   /** `manual` only: release page of the installer the user must download and run by hand. */
@@ -189,7 +192,18 @@ let readyFilePath: string | undefined;
 /** 当前 staged 补丁对应的渠道代际。延迟清理用它区分「同路径上的新旧包」。 */
 let readyChannelEpoch: number | undefined;
 /** Personal channel: newer release that cannot be applied in place (status `manual`). Never an installable patch. */
-let manualUpdate: { version: string; downloadUrl: string } | undefined;
+let manualUpdate: { version: string; downloadUrl: string; displayVersion: string } | undefined;
+/** Personal channel: internal `personal-r<revision>` → human-readable label (see formatPersonalBuildVersion). */
+const personalDisplayVersions = new Map<string, string>();
+function rememberPersonalDisplayVersion(version: string, manifest: { sourceCommit: string; builtAt?: string }): string {
+  const display = formatPersonalBuildVersion(manifest.sourceCommit, manifest.builtAt);
+  personalDisplayVersions.set(version, display);
+  return display;
+}
+function displayVersionFor(version: string | undefined): { displayVersion: string } | Record<string, never> {
+  const display = version ? personalDisplayVersions.get(version) : undefined;
+  return display ? { displayVersion: display } : {};
+}
 /**
  * 更新渠道代际计数:用户在下载进行中关掉 beta(clearStagedPatch)时 +1,
  * 让 in-flight 的 checkForUpdate 在写回 patch-info / 恢复旧 patch 前察觉
@@ -259,7 +273,8 @@ function setStatus(status: UpdateStatus, extra?: Partial<UpdateStatusPayload>): 
   currentStatus = status;
   if (status !== 'downloading' && status !== 'superseding') downloadingVersion = undefined;
   lastErrorCode = extra?.errorCode;
-  broadcastStatus({ status, ...extra });
+  // Every personal `ready` re-broadcast (relaunch retries, error fallbacks) keeps its label.
+  broadcastStatus({ status, ...(status === 'ready' ? displayVersionFor(extra?.version) : {}), ...extra });
   if (status === 'ready' && !startupUpdateCheckInProgress && !extra?.errorCode) {
     void evaluateAutoRelaunch('status-ready');
   }
@@ -1163,8 +1178,10 @@ async function doCheckPersonalUpdate(): Promise<CheckForUpdateResult> {
       readyFilePath = undefined;
       readyVersion = undefined;
       readyChannelEpoch = undefined;
+      const manualVersion = `personal-r${manifest.revision}`;
       manualUpdate = {
-        version: `personal-r${manifest.revision}`,
+        version: manualVersion,
+        displayVersion: rememberPersonalDisplayVersion(manualVersion, manifest),
         downloadUrl: `https://github.com/${context.policy.repository}/releases/tag/${context.policy.channel}-r${manifest.revision}`,
       };
       log.warn('Personal update needs a manual install', { code: 'PERSONAL_UPDATE_STORAGE_INCOMPATIBLE', version: manualUpdate.version });
@@ -1197,7 +1214,9 @@ async function doCheckPersonalUpdate(): Promise<CheckForUpdateResult> {
     readyFilePath = prepared.path;
     readyVersion = `personal-r${prepared.identity.revision}`;
     readyChannelEpoch = updateChannelEpoch;
-    setStatus('ready', { version: readyVersion });
+    // The manifest describes exactly this revision (checked above), so its build time applies; without
+    // it the label is the short commit only.
+    setStatus('ready', { version: readyVersion, displayVersion: rememberPersonalDisplayVersion(readyVersion, manifest) });
     return 'ready';
   } catch (error) {
     log.warn('Personal update preparation stopped', { code: error instanceof Error ? error.message : 'PERSONAL_UPDATE_FAILED' });
@@ -2531,9 +2550,9 @@ export function initUpdateService(): void {
 
   ipcMain.handle('update-get-status', () => {
     if (currentStatus === 'manual' && manualUpdate) {
-      return { status: currentStatus, version: manualUpdate.version, downloadUrl: manualUpdate.downloadUrl };
+      return { status: currentStatus, version: manualUpdate.version, displayVersion: manualUpdate.displayVersion, downloadUrl: manualUpdate.downloadUrl };
     }
-    return { status: currentStatus, version: readyVersion, errorCode: lastErrorCode };
+    return { status: currentStatus, version: readyVersion, ...(currentStatus === 'ready' ? displayVersionFor(readyVersion) : {}), errorCode: lastErrorCode };
   });
 
   ipcMain.handle('update-auto-settings-get', () => {

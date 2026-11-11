@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { validatePersonalIdentity, validatePersonalManifest, resolvePersonalPolicy, type PersonalManifest, type PersonalIdentity, type PersonalPolicy } from './contract.mjs';
+import { isIsoDateString, validatePersonalIdentity, validatePersonalManifest, resolvePersonalPolicy, type PersonalManifest, type PersonalIdentity, type PersonalPolicy } from './contract.mjs';
 import policyValue from '../../../personal-update-channel.json';
 import { writeAtomicJson, acknowledgePersonalStorageReady, launchPersonalTransaction, resumePersonalTransactionSafely } from './transaction.js';
 import type { PreparationRequest } from './prepareProcess.js';
@@ -50,6 +50,22 @@ export function personalUpdateContext(): PersonalUpdateContext | null {
     if (!windows) return { policy, identity, root };
     const installDir = path.dirname(app.getPath('exe'));
     return { policy, identity, root, get installDirWritable() { return probeInstallDirWritable(installDir); } };
+  } catch { return null; }
+}
+
+/**
+ * Identity of the running packaged personal build, independent of whether the updater is enabled.
+ * Null for community builds and for unpackaged runs.
+ */
+export function readPersonalBuildInfo(): { identity: PersonalIdentity; builtAt?: string } | null {
+  try {
+    if (!app.isPackaged) return null;
+    const policy = resolvePersonalPolicy(policyValue, process.platform, process.arch);
+    if (!policy) return null;
+    const metadata = JSON.parse(fs.readFileSync(path.join(process.resourcesPath, 'cindy-source.json'), 'utf8'));
+    const identity = validatePersonalIdentity(metadata.personalUpdate, policy);
+    if (metadata.sourceCommit !== identity.sourceCommit) return null;
+    return { identity, ...(isIsoDateString(metadata.builtAt) ? { builtAt: metadata.builtAt } : {}) };
   } catch { return null; }
 }
 
