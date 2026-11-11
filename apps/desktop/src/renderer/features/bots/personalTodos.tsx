@@ -7,6 +7,7 @@ import {
 } from './personalTodoCache';
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Trash2, X } from 'lucide-react';
 import { useOptionalDataOwnerGeneration } from '@/contexts/AuthContext';
 import {
   getDataOwnerGeneration,
@@ -211,7 +212,8 @@ export function PersonalTodoEditor({
     const attemptOwner = getDataOwnerGeneration();
     const sendReminder =
       Boolean(deadline) &&
-      (touched.current.reminder || (!offered.includes(reminder) && hasTime !== initialHasTime.current));
+      (touched.current.reminder ||
+        (!offered.includes(reminder) && hasTime !== initialHasTime.current));
     setBusy(true);
     setError('');
     setConflict(false);
@@ -276,278 +278,319 @@ export function PersonalTodoEditor({
           },
         ]
       : []),
-    { key: 'tomorrow', label: t('personalTodos.due.tomorrow'), at: `${quickDate('tomorrow', clock, zone)}T09:00` },
-    { key: 'nextMonday', label: t('personalTodos.due.nextMonday'), at: `${quickDate('nextMonday', clock, zone)}T09:00` },
+    {
+      key: 'tomorrow',
+      label: t('personalTodos.due.tomorrow'),
+      at: `${quickDate('tomorrow', clock, zone)}T09:00`,
+    },
+    {
+      key: 'nextMonday',
+      label: t('personalTodos.due.nextMonday'),
+      at: `${quickDate('nextMonday', clock, zone)}T09:00`,
+    },
   ];
 
   return (
     <aside
       aria-label={t('personalTodos.details')}
-      className="min-w-0 rounded-xl border border-[var(--border-default)] bg-[var(--surface-elevated)] p-4 text-13 text-[var(--text-primary)]"
+      // Esc closes like the × does; an IME candidate window keeps its own Esc.
+      onKeyDown={(event) => {
+        if (event.key !== 'Escape' || event.nativeEvent.isComposing || busy) return;
+        event.stopPropagation();
+        onClose();
+      }}
+      className="flex min-w-0 flex-col rounded-xl border border-[var(--border-default)] bg-[var(--surface-elevated)] text-13 text-[var(--text-primary)] min-[1100px]:max-h-[calc(100vh-14rem)]"
     >
       <form
-        className="flex flex-col gap-4"
+        className="flex min-h-0 flex-1 flex-col"
         onSubmit={(event) => {
           event.preventDefault();
           void act();
         }}
       >
-        <h2 className="font-medium">{t('personalTodos.details')}</h2>
-        <FormField label={t('personalTodos.title')} required>
-          {(props) => (
-            <Input
-              {...props}
-              required
-              maxLength={300}
-              value={title}
-              onChange={setTitle}
+        <div className="flex items-center gap-2 px-4 pb-1 pt-3">
+          <h2 className="min-w-0 flex-1 truncate font-medium">{t('personalTodos.details')}</h2>
+          <Tip text={t('personalTodos.close')}>
+            <button
+              type="button"
+              aria-label={t('personalTodos.close')}
+              onClick={onClose}
               disabled={busy}
-              autoFocus
-            />
-          )}
-        </FormField>
-        <FormField label={t('personalTodos.notes')}>
-          {(props) => (
-            <Textarea
-              {...props}
-              maxLength={4000}
-              value={notes}
-              onChange={setNotes}
-              disabled={busy}
-            />
-          )}
-        </FormField>
-        <Row label={t('personalTodos.priority.label')}>
-          <div role="radiogroup" aria-label={t('personalTodos.priority.label')} className="flex gap-1">
-            {PERSONAL_PRIORITIES.map((value) => {
-              const name = t(`personalTodos.priority.${PRIORITY_KEY[value]}`);
-              return (
-                <Tip key={value} text={name}>
+              className="-mr-1.5 inline-flex size-7 items-center justify-center rounded-full text-[var(--text-secondary)] outline-none transition-colors hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] disabled:opacity-60"
+            >
+              <X size={14} aria-hidden />
+            </button>
+          </Tip>
+        </div>
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4 pt-2">
+          <FormField label={t('personalTodos.title')} required>
+            {(props) => (
+              <Input
+                {...props}
+                required
+                maxLength={300}
+                value={title}
+                onChange={setTitle}
+                disabled={busy}
+                autoFocus
+              />
+            )}
+          </FormField>
+          <FormField label={t('personalTodos.notes')}>
+            {(props) => (
+              <Textarea
+                {...props}
+                maxLength={4000}
+                value={notes}
+                onChange={setNotes}
+                disabled={busy}
+              />
+            )}
+          </FormField>
+          <Row label={t('personalTodos.priority.label')}>
+            <div
+              role="radiogroup"
+              aria-label={t('personalTodos.priority.label')}
+              className="flex gap-1"
+            >
+              {PERSONAL_PRIORITIES.map((value) => {
+                const name = t(`personalTodos.priority.${PRIORITY_KEY[value]}`);
+                return (
+                  <Tip key={value} text={name}>
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={priority === value}
+                      aria-label={name}
+                      disabled={busy}
+                      onClick={() => {
+                        touched.current.priority = true;
+                        setPriority(value);
+                      }}
+                      className={cn(
+                        'inline-flex size-8 items-center justify-center rounded-full outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] disabled:opacity-60',
+                        priority === value
+                          ? 'bg-[var(--surface-chip)]'
+                          : 'hover:bg-[var(--surface-hover)]',
+                      )}
+                    >
+                      <PriorityFlag priority={value} size={15} />
+                    </button>
+                  </Tip>
+                );
+              })}
+            </div>
+          </Row>
+          {tags.length > 0 ? (
+            <Row label={t('taskTags.title')}>
+              <div role="group" aria-label={t('taskTags.title')} className="flex flex-wrap gap-1.5">
+                {tags.map((tag) => (
                   <button
+                    key={tag.id}
                     type="button"
-                    role="radio"
-                    aria-checked={priority === value}
-                    aria-label={name}
+                    aria-pressed={tagId === tag.id}
                     disabled={busy}
                     onClick={() => {
-                      touched.current.priority = true;
-                      setPriority(value);
+                      touched.current.tag = true;
+                      setTagId(tag.id);
                     }}
-                    className={cn(
-                      'inline-flex size-8 items-center justify-center rounded-full outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] disabled:opacity-60',
-                      priority === value ? 'bg-[var(--surface-chip)]' : 'hover:bg-[var(--surface-hover)]',
-                    )}
+                    className={chipClass(tagId === tag.id)}
                   >
-                    <PriorityFlag priority={value} size={15} />
+                    <TagDot color={tag.color} />
+                    <span className="max-w-40 truncate">{tagDisplayName(tag, t)}</span>
                   </button>
-                </Tip>
-              );
-            })}
-          </div>
-        </Row>
-        {tags.length > 0 ? (
-          <Row label={t('taskTags.title')}>
-            <div role="group" aria-label={t('taskTags.title')} className="flex flex-wrap gap-1.5">
-              {tags.map((tag) => (
+                ))}
                 <button
-                  key={tag.id}
                   type="button"
-                  aria-pressed={tagId === tag.id}
+                  aria-pressed={tagId === null}
                   disabled={busy}
                   onClick={() => {
                     touched.current.tag = true;
-                    setTagId(tag.id);
+                    setTagId(null);
                   }}
-                  className={chipClass(tagId === tag.id)}
+                  className={chipClass(tagId === null)}
                 >
-                  <TagDot color={tag.color} />
-                  <span className="max-w-40 truncate">{tagDisplayName(tag, t)}</span>
+                  {t('personalTodos.noTag')}
                 </button>
-              ))}
-              <button
-                type="button"
-                aria-pressed={tagId === null}
-                disabled={busy}
-                onClick={() => {
-                  touched.current.tag = true;
-                  setTagId(null);
-                }}
-                className={chipClass(tagId === null)}
-              >
-                {t('personalTodos.noTag')}
-              </button>
-            </div>
-          </Row>
-        ) : null}
-        <div className="flex flex-wrap items-end gap-3">
-          <FormField label={t('personalTodos.deadline')}>
-            {(props) => (
-              <Input
-                {...props}
-                type="date"
-                value={deadline}
-                onChange={(value) => {
-                  setDeadline(value);
-                  if (!value) setTime('');
-                }}
-                disabled={busy}
-              />
-            )}
-          </FormField>
-          <FormField label={t('personalTodos.deadlineTime')}>
-            {(props) => (
-              <Input
-                {...props}
-                type="time"
-                value={time}
-                onChange={setTime}
-                disabled={busy || !deadline}
-              />
-            )}
-          </FormField>
-        </div>
-        {deadline ? (
-          <Row label={t('personalTodos.reminder.label')}>
-            <SegmentedControl<TodoReminder>
-              aria-label={t('personalTodos.reminder.label')}
-              value={shownReminder}
-              disabled={busy}
-              height={32}
-              optionHeight={28}
-              optionClassName="px-2"
-              onValueChange={(value) => {
-                touched.current.reminder = true;
-                setReminder(value);
-              }}
-              options={offered.map((value) => ({
-                value,
-                label:
-                  value === 'default'
-                    ? t(hasTime ? 'personalTodos.reminder.onTime' : 'personalTodos.reminder.dayOf')
-                    : t(`personalTodos.reminder.${REMINDER_KEY[value]}`),
-              }))}
-            />
-          </Row>
-        ) : null}
-        {current.status === 'open' ? (
-          <>
-            <Row label={t('personalTodos.defer')}>
-              <div className="flex flex-wrap gap-1.5">
-                {deferChips.map((chip) => (
-                  <Button
-                    key={chip.key}
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    compact
-                    disabled={busy}
-                    onClick={() => void act('later', chip.at)}
-                  >
-                    {chip.label}
-                  </Button>
-                ))}
               </div>
             </Row>
-            <FormField label={t('personalTodos.deferUntil')}>
+          ) : null}
+          <div className="flex flex-wrap items-end gap-3">
+            <FormField label={t('personalTodos.deadline')}>
               {(props) => (
                 <Input
                   {...props}
-                  type="datetime-local"
-                  value={until}
-                  onChange={setUntil}
+                  type="date"
+                  value={deadline}
+                  onChange={(value) => {
+                    setDeadline(value);
+                    if (!value) setTime('');
+                  }}
                   disabled={busy}
                 />
               )}
             </FormField>
-          </>
-        ) : null}
-        {error ? (
-          <p role="alert" className="text-12 text-[var(--error-fg)]">
-            {error}
-          </p>
-        ) : null}
-        {conflict ? (
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            disabled={busy}
-            onClick={() => void reloadLatest()}
-          >
-            {t('personalTodos.reloadVersion')}
-          </Button>
-        ) : null}
-        <div className="flex flex-wrap gap-2">
-          <Button type="submit" size="sm" disabled={busy || !title.trim()}>
-            {t(
-              busy
-                ? 'personalTodos.saving'
-                : overwrite
-                  ? 'personalTodos.overwrite'
-                  : 'personalTodos.save',
-            )}
-          </Button>
-          <Button type="button" variant="secondary" size="sm" onClick={onClose} disabled={busy}>
-            {t('personalTodos.close')}
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            disabled={busy}
-            onClick={() => void act(current.status === 'done' ? 'reopen' : 'complete')}
-          >
-            {t(current.status === 'done' ? 'personalTodos.reopen' : 'personalTodos.complete')}
-          </Button>
-          {current.status === 'open' ? (
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              disabled={busy || !untilValid}
-              onClick={() => void act('later')}
-            >
-              {t('personalTodos.defer')}
-            </Button>
-          ) : null}
-          {current.deferredUntil ? (
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              disabled={busy}
-              onClick={() => void act('restore')}
-            >
-              {t('personalTodos.restore')}
-            </Button>
-          ) : null}
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            disabled={busy}
-            onClick={() => setDeleting(true)}
-          >
-            {t('personalTodos.delete')}
-          </Button>
-        </div>
-        {deleting ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <span>{t('personalTodos.deleteConfirm')}</span>
-            <Button type="button" size="sm" disabled={busy} onClick={() => void act('delete')}>
-              {t('personalTodos.delete')}
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              disabled={busy}
-              onClick={() => setDeleting(false)}
-            >
-              {t('personalTodos.close')}
-            </Button>
+            <FormField label={t('personalTodos.deadlineTime')}>
+              {(props) => (
+                <Input
+                  {...props}
+                  type="time"
+                  value={time}
+                  onChange={setTime}
+                  disabled={busy || !deadline}
+                />
+              )}
+            </FormField>
           </div>
-        ) : null}
+          {deadline ? (
+            <Row label={t('personalTodos.reminder.label')}>
+              <SegmentedControl<TodoReminder>
+                aria-label={t('personalTodos.reminder.label')}
+                value={shownReminder}
+                disabled={busy}
+                height={32}
+                optionHeight={28}
+                optionClassName="px-2"
+                onValueChange={(value) => {
+                  touched.current.reminder = true;
+                  setReminder(value);
+                }}
+                options={offered.map((value) => ({
+                  value,
+                  label:
+                    value === 'default'
+                      ? t(
+                          hasTime
+                            ? 'personalTodos.reminder.onTime'
+                            : 'personalTodos.reminder.dayOf',
+                        )
+                      : t(`personalTodos.reminder.${REMINDER_KEY[value]}`),
+                }))}
+              />
+            </Row>
+          ) : null}
+          {current.status === 'open' ? (
+            <>
+              <Row label={t('personalTodos.defer')}>
+                <div className="flex flex-wrap gap-1.5">
+                  {deferChips.map((chip) => (
+                    <Button
+                      key={chip.key}
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      compact
+                      disabled={busy}
+                      onClick={() => void act('later', chip.at)}
+                    >
+                      {chip.label}
+                    </Button>
+                  ))}
+                  {current.deferredUntil ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      compact
+                      disabled={busy}
+                      onClick={() => void act('restore')}
+                    >
+                      {t('personalTodos.restore')}
+                    </Button>
+                  ) : null}
+                </div>
+              </Row>
+              <FormField label={t('personalTodos.deferUntil')}>
+                {(props) => (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      {...props}
+                      type="datetime-local"
+                      value={until}
+                      onChange={setUntil}
+                      disabled={busy}
+                    />
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      disabled={busy || !untilValid}
+                      onClick={() => void act('later')}
+                    >
+                      {t('personalTodos.defer')}
+                    </Button>
+                  </div>
+                )}
+              </FormField>
+            </>
+          ) : null}
+          {error ? (
+            <p role="alert" className="text-12 text-[var(--error-fg)]">
+              {error}
+            </p>
+          ) : null}
+          {conflict ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={busy}
+              onClick={() => void reloadLatest()}
+            >
+              {t('personalTodos.reloadVersion')}
+            </Button>
+          ) : null}
+        </div>
+        <div className="flex flex-col gap-2 border-t border-[var(--border-default)] px-4 py-3">
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" size="sm" disabled={busy || !title.trim()}>
+              {t(
+                busy
+                  ? 'personalTodos.saving'
+                  : overwrite
+                    ? 'personalTodos.overwrite'
+                    : 'personalTodos.save',
+              )}
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={busy}
+              onClick={() => void act(current.status === 'done' ? 'reopen' : 'complete')}
+            >
+              {t(current.status === 'done' ? 'personalTodos.reopen' : 'personalTodos.complete')}
+            </Button>
+            <Tip text={t('personalTodos.delete')}>
+              <button
+                type="button"
+                aria-label={t('personalTodos.delete')}
+                disabled={busy}
+                onClick={() => setDeleting(true)}
+                className="ml-auto inline-flex size-8 items-center justify-center rounded-full text-[var(--text-secondary)] outline-none transition-colors hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] disabled:opacity-60"
+              >
+                <Trash2 size={15} aria-hidden />
+              </button>
+            </Tip>
+          </div>
+          {deleting ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span>{t('personalTodos.deleteConfirm')}</span>
+              <Button type="button" size="sm" disabled={busy} onClick={() => void act('delete')}>
+                {t('personalTodos.delete')}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={busy}
+                onClick={() => setDeleting(false)}
+              >
+                {t('personalTodos.close')}
+              </Button>
+            </div>
+          ) : null}
+        </div>
       </form>
     </aside>
   );

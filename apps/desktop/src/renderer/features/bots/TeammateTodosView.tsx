@@ -133,8 +133,11 @@ function TodoBoard() {
       return key.priority
         ? t(`personalTodos.priority.short.${PRIORITY_KEY[key.priority]}`)
         : t('personalTodos.priority.none');
-    if (key.kind === 'tag') return key.tag ? tagDisplayName(key.tag, t) : t('personalTodos.untagged');
-    return view === 'done' || view === 'later' ? t(`bots.todoBoard.view.${view}`) : t('personalTodos.all');
+    if (key.kind === 'tag')
+      return key.tag ? tagDisplayName(key.tag, t) : t('personalTodos.untagged');
+    return view === 'done' || view === 'later'
+      ? t(`bots.todoBoard.view.${view}`)
+      : t('personalTodos.all');
   };
 
   const list: ReactNode = sections.length
@@ -153,7 +156,8 @@ function TodoBoard() {
               }
               selected={editor?.id === todo.id}
               now={now}
-              onOpen={setEditor}
+              // Opening the row that is already open closes it again.
+              onOpen={(next) => setEditor((open) => (open?.id === next.id ? undefined : next))}
               onUpdate={updateRow}
             />
           ))}
@@ -237,7 +241,9 @@ function TodoBoard() {
           )}
         >
           {showEditor ? (
-            <div className="min-w-0 min-[1100px]:col-start-2 min-[1100px]:row-start-1">
+            // Beside the list the panel stays in view while the list scrolls; its own body scrolls
+            // so the footer actions are always reachable.
+            <div className="min-w-0 min-[1100px]:sticky min-[1100px]:top-4 min-[1100px]:col-start-2 min-[1100px]:row-start-1 min-[1100px]:self-start">
               <PersonalTodoEditor
                 key={`${personal.dataOwnerId}:${editor.id}`}
                 initial={editor}
