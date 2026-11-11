@@ -9150,8 +9150,7 @@
       "downloading": "方取新版，請稍候…",
       "ready": "新版已就，點側邊欄以竟更新，乘風而上。",
       "manifestFailed": "查更新未成，請檢查網路",
-      "downloadFailed": "新版下載未成，稍後再試",
-      "manualDownload": "於應用程式內下載，再擇重新啟動之時。唯系統 .deb 安裝需系統密碼。"
+      "downloadFailed": "新版下載未成，稍後再試"
     },
     "closeConfirm": {
       "title": "果欲離去乎？",

@@ -9261,8 +9261,7 @@
       "downloading": "A transferir a nova versão, aguarde…",
       "ready": "Nova versão pronta — clique na barra lateral para aplicar",
       "manifestFailed": "Falha ao procurar atualizações. Verifique a sua ligação à rede",
-      "downloadFailed": "Falha ao transferir a nova versão. Tente novamente mais tarde",
-      "manualDownload": "Transfira na aplicação e escolha quando reiniciar. Apenas as instalações de sistema com .deb exigem uma palavra-passe do sistema."
+      "downloadFailed": "Falha ao transferir a nova versão. Tente novamente mais tarde"
     },
     "closeConfirm": {
       "title": "Confirmar saída?",

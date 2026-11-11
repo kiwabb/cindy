@@ -9193,8 +9193,7 @@
       "downloading": "Downloading new version, please wait…",
       "ready": "New version ready — click the sidebar to apply",
       "manifestFailed": "Update check failed, please check your network",
-      "downloadFailed": "New version download failed, try again later",
-      "manualDownload": "Download in the app, then choose when to restart. Only system .deb installs require a system password."
+      "downloadFailed": "New version download failed, try again later"
     },
     "closeConfirm": {
       "title": "Confirm exit?",

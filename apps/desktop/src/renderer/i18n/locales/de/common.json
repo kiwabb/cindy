@@ -9193,8 +9193,7 @@
       "downloading": "Neue Version wird heruntergeladen, bitte warten…",
       "ready": "Neue Version bereit — zum Anwenden auf die Seitenleiste klicken",
       "manifestFailed": "Update-Prüfung fehlgeschlagen. Prüfe deine Netzwerkverbindung",
-      "downloadFailed": "Download der neuen Version fehlgeschlagen. Versuch es später erneut",
-      "manualDownload": "Lade das Update in der App herunter und wähle selbst, wann du neu startest. Nur systemweite .deb-Installationen erfordern ein Systempasswort."
+      "downloadFailed": "Download der neuen Version fehlgeschlagen. Versuch es später erneut"
     },
     "closeConfirm": {
       "title": "Wirklich beenden?",

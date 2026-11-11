@@ -9150,8 +9150,7 @@
       "downloading": "正在下載新版本，請稍後…",
       "ready": "新版本已就緒，點選側邊欄完成更新",
       "manifestFailed": "檢查更新失敗，請檢查網路",
-      "downloadFailed": "新版本下載失敗，稍後再試",
-      "manualDownload": "在應用程式內下載，再選擇重新啟動時間。只有系統 .deb 安裝需要系統密碼。"
+      "downloadFailed": "新版本下載失敗，稍後再試"
     },
     "closeConfirm": {
       "title": "確認要離開嗎？",
