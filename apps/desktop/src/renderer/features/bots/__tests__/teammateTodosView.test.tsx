@@ -148,6 +148,33 @@ describe('TeammateTodosView', () => {
     expect(radio('bots.todoBoard.view.open').getAttribute('aria-label')).toBe('bots.todoBoard.view.open 1');
   });
 
+  // Bug 2026-11-11: the only way out of the details panel was a 关闭 button at its far bottom, below
+  // the fold once the panel grew. It must close from its header ×, Esc (not while an IME composes)
+  // and by opening the same row again.
+  it('closes the details panel from its header, Esc and the same row, but not on an IME Esc', async () => {
+    vi.mocked(api().list).mockResolvedValue([mine('Closable')]);
+    render(<TeammateTodosView />);
+    const openRow = () =>
+      fireEvent.click(within(screen.getByTestId('todo-board-row')).getByRole('button', { name: 'Closable' }));
+    const panelOpen = () => screen.queryByLabelText('personalTodos.details') !== null;
+    await screen.findByRole('button', { name: 'Closable' });
+
+    openRow();
+    fireEvent.click(editorPanel().getAllByRole('button', { name: 'personalTodos.close' })[0]);
+    expect(panelOpen()).toBe(false);
+
+    openRow();
+    const notes = editorPanel().getByLabelText('personalTodos.notes');
+    fireEvent.keyDown(notes, { key: 'Escape', isComposing: true });
+    expect(panelOpen()).toBe(true);
+    fireEvent.keyDown(notes, { key: 'Escape' });
+    expect(panelOpen()).toBe(false);
+
+    openRow();
+    openRow();
+    expect(panelOpen()).toBe(false);
+  });
+
   it('shows the composer only under open', async () => {
     vi.mocked(api().list).mockResolvedValue([mine('Snoozed', { deferredUntil: '2026-11-20T00:00:00Z' })]);
     render(<TeammateTodosView />);
