@@ -6598,6 +6598,7 @@
         },
         "path": {
           "direct": "直連",
+          "directTailscale": "直連（Tailscale）",
           "relay": "經「{{name}}」中轉",
           "unlinked": "線上，未建鏈",
           "offline": "離線"

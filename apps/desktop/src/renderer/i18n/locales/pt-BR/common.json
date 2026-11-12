@@ -6708,6 +6708,7 @@
         },
         "path": {
           "direct": "Direto",
+          "directTailscale": "Direto (Tailscale)",
           "relay": "Via {{name}}",
           "unlinked": "Online, sem vínculo",
           "offline": "Offline"

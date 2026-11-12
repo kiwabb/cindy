@@ -1,6 +1,33 @@
 /// <reference lib="dom" />
 import { MAX_FRAME_BYTES } from './protocol.js';
+import { hasTailnetRangeCandidate, isTailnetRangeAddress } from './tailnetPath.js';
 import type { DirectRuntime, DirectRuntimeEvents, DirectRuntimeSession, DirectRuntimeCloseReason } from './directNegotiation.js';
+
+/** Selected-pair addresses inside Tailscale's ranges (local and remote, at most 2); [] when none or unknown. */
+async function tailnetPairAddresses(pc: RTCPeerConnection): Promise<string[]> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      Promise.resolve().then(() => pc.getStats()).then((report) => {
+        const entries = new Map<string, Record<string, unknown>>();
+        report.forEach((entry: Record<string, unknown>, id: string) => entries.set(id, entry));
+        let pairId: unknown;
+        for (const entry of entries.values()) if (entry.type === 'transport' && entry.selectedCandidatePairId) pairId = entry.selectedCandidatePairId;
+        const pair = (pairId ? entries.get(pairId as string) : undefined)
+          ?? [...entries.values()].find((e) => e.type === 'candidate-pair' && e.nominated === true && e.state === 'succeeded');
+        if (!pair) return [];
+        const out: string[] = [];
+        for (const id of [pair.localCandidateId, pair.remoteCandidateId]) {
+          const c = typeof id === 'string' ? entries.get(id) : undefined;
+          const address = c?.address ?? c?.ip;
+          if (typeof address === 'string' && isTailnetRangeAddress(address)) out.push(address);
+        }
+        return out;
+      }).catch(() => [] as string[]),
+      new Promise<string[]>((resolve) => { timer = setTimeout(() => resolve([]), 500); }),
+    ]);
+  } finally { clearTimeout(timer); }
+}
 
 /** Data-only WebRTC, shared by Electron and the isolated Mobile WebView. No STUN/TURN:
  * host candidates try the LAN, and the existing authenticated relay is the fallback.
@@ -11,6 +38,11 @@ export function createDirectRtcRuntime(): DirectRuntime {
     let dc: RTCDataChannel | undefined;
     let closed = false;
     let receiveBytes = 0;
+    // Frames that arrive before the (possibly deferred) open event are held and delivered in order after it.
+    let opened = false;
+    let early: string[] = [];
+    let earlyBytes = 0;
+    let sawTailnetRange = false;
     let parts: Uint8Array[] = [];
     let receiveTimer: ReturnType<typeof setTimeout> | undefined;
     let bufferTimer: ReturnType<typeof setTimeout> | undefined;
@@ -22,6 +54,7 @@ export function createDirectRtcRuntime(): DirectRuntime {
       clearTimeout(receiveTimer);
       clearTimeout(bufferTimer);
       parts = [];
+      early = [];
       dc?.close();
       pc.close();
       events.closed(reason);
@@ -46,7 +79,22 @@ export function createDirectRtcRuntime(): DirectRuntime {
       dc.binaryType = 'arraybuffer';
       // Always report the final zero, including messages smaller than a low-water mark.
       dc.bufferedAmountLowThreshold = 0;
-      dc.onopen = () => { if (!closed) events.open(); };
+      dc.onopen = () => {
+        if (closed) return;
+        const report = (info?: { tailnetAddresses: string[] }) => {
+          if (closed) return;
+          if (info) events.open(info); else events.open();
+          opened = true;
+          const queued = early;
+          early = [];
+          earlyBytes = 0;
+          for (const text of queued) if (!closed) events.message(text);
+        };
+        // Only when an SDP carried an address in Tailscale's ranges is the selected pair inspected (bounded
+        // by 500 ms); every other channel opens synchronously, exactly as before.
+        if (!sawTailnetRange || typeof pc.getStats !== 'function') { report(); return; }
+        void tailnetPairAddresses(pc).then((addresses) => report(addresses.length ? { tailnetAddresses: addresses } : undefined));
+      };
       dc.onclose = () => close();
       dc.onerror = () => close('network-failed');
       dc.onbufferedamountlow = () => {
@@ -69,7 +117,13 @@ export function createDirectRtcRuntime(): DirectRuntime {
           for (const part of parts) { bytes.set(part, offset); offset += part.length; }
           parts = [];
           receiveBytes = 0;
-          events.message(decoder.decode(bytes));
+          const text = decoder.decode(bytes);
+          if (opened) events.message(text);
+          else {
+            earlyBytes += bytes.length;
+            if (earlyBytes > 3 * MAX_FRAME_BYTES) throw new Error();
+            early.push(text);
+          }
         } catch { close(); }
       };
     };
@@ -89,6 +143,7 @@ export function createDirectRtcRuntime(): DirectRuntime {
         changed();
       });
       if (closed || !pc.localDescription?.sdp) throw new Error('DIRECT_CHANNEL_CLOSED');
+      if (hasTailnetRangeCandidate(pc.localDescription.sdp)) sawTailnetRange = true;
       return pc.localDescription.sdp;
     };
     return {
@@ -97,10 +152,14 @@ export function createDirectRtcRuntime(): DirectRuntime {
         return gather(await pc.createOffer());
       },
       async accept(sdp) {
+        if (hasTailnetRangeCandidate(sdp)) sawTailnetRange = true;
         await pc.setRemoteDescription({ type: 'offer', sdp });
         return gather(await pc.createAnswer());
       },
-      async answer(sdp) { await pc.setRemoteDescription({ type: 'answer', sdp }); },
+      async answer(sdp) {
+        if (hasTailnetRangeCandidate(sdp)) sawTailnetRange = true;
+        await pc.setRemoteDescription({ type: 'answer', sdp });
+      },
       send(text) {
         if (closed || dc?.readyState !== 'open') throw new Error('DIRECT_CHANNEL_CLOSED');
         const bytes = encoder.encode(text);

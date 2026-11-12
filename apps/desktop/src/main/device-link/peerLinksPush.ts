@@ -35,7 +35,7 @@ const DEFAULT_DEBOUNCE_MS = 250;
 /** 不含 rttMs 的结构 key：同一组 (deviceId, path, open) 视为同一拓扑。 */
 export function peerLinksStructureKey(snapshot: DeviceLinkPeerLinksSnapshot): string {
   return snapshot.links
-    .map((link) => `${link.deviceId}|${link.path}|${link.open ? 1 : 0}`)
+    .map((link) => `${link.deviceId}|${link.path}|${link.viaTailnet ? 't' : ''}|${link.open ? 1 : 0}`)
     .sort()
     .join('\n');
 }

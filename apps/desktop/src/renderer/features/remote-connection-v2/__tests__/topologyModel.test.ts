@@ -19,6 +19,7 @@ import {
   flowTextOf,
   mergeFlows,
 } from '../topologyModel';
+import { pathLabel } from '../topologyPresentation';
 import { SPECK_H, SPECK_W, groupLines, layoutTopology, samplePath, speckKeyframes } from '../topologyGeometry';
 import { SPACING, SPEED, streamFor } from '../TopologyFlow';
 import { appendPresenceEvent } from '../useRecentPresence';
@@ -132,6 +133,22 @@ describe('buildTopology:状态五档', () => {
       links: [link('z', 'direct', 1), link('y', 'direct', 500), link('x', 'direct', null), link('w', 'direct', 4)],
     });
     expect(later.groups[0]?.rows).toEqual(first.groups[0]?.rows);
+  });
+});
+
+describe('buildTopology:直连(Tailscale)标注', () => {
+  // 标注只来自选中候选对的类别；经 relay 的链路即使带标记也不标，普通直连不变。
+  it('只有直连且 viaTailnet 的链路使用 Tailscale 文案', () => {
+    const t = (key: string) => key;
+    const model = buildTopology({
+      ...base,
+      devices: [device({ deviceId: 'a' }), device({ deviceId: 'b' }), device({ deviceId: 'c' })],
+      links: [{ ...link('a', 'direct', 5), viaTailnet: true }, link('b', 'direct', 5), { ...link('c', 'relay', 80), viaTailnet: true }],
+    });
+    const label = (id: string) => pathLabel(model.nodes.find((n) => n.id === id)!, 'Cindy', t);
+    expect(label('a')).toBe('settings.remoteControl.v2.path.directTailscale');
+    expect(label('b')).toBe('settings.remoteControl.v2.path.direct');
+    expect(label('c')).toBe('settings.remoteControl.v2.path.relay');
   });
 });
 

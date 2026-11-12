@@ -1691,6 +1691,7 @@ export class DeviceLinkClient {
       out.push({
         deviceId,
         path: this.getPeerPath(deviceId),
+        ...(this.getPeerPath(deviceId) === 'direct' && this.directPaths.get(deviceId)?.viaTailnet ? { viaTailnet: true } : {}),
         rttMs: peer.rtt.srttMs === null ? null : Math.round(peer.rtt.srttMs),
         open: this.isPeerLinkReady(peer),
         sentAgoMs: ago(peer.lastBusinessSentAt),

@@ -463,3 +463,44 @@ it.each(['small-then-large', 'progress-under-pressure'])('reports native RTC dra
     }
   } finally { detach(); host.dispose(); }
 });
+
+// Regression (review 2026-11-12): the open event can be deferred by the bounded selected-pair lookup while an
+// early peer already sends frames; the bridge closes on a message before open, which killed healthy LAN channels.
+// The runtime must hold such frames and deliver them in order after open (and not at all when no lookup is needed).
+it.each([['deferred open (Tailscale-range candidate)', '100.101.1.2'], ['immediate open (LAN only)', '172.30.96.5']])(
+  'delivers frames received before the open event in order after it: %s', async (_name, address) => {
+    const frame = (text: string) => { const bytes = new TextEncoder().encode(text); const out = new Uint8Array(bytes.length + 1); out[0] = 1; out.set(bytes, 1); return out.buffer; };
+    class Channel {
+      label = 'device-link-v1'; ordered = true; maxRetransmits = null; maxPacketLifeTime = null;
+      readyState = 'open'; bufferedAmount = 0; bufferedAmountLowThreshold = 0; binaryType = '';
+      onopen?: () => void; onclose?: () => void; onmessage?: (e: { data: ArrayBuffer }) => void;
+      send() {} close() {}
+    }
+    const channel = new Channel();
+    let resolveStats: ((report: Map<string, unknown>) => void) | undefined;
+    vi.stubGlobal('RTCPeerConnection', class {
+      iceGatheringState = 'complete'; localDescription?: { sdp: string };
+      createDataChannel() { return channel; }
+      async createOffer() { return { type: 'offer', sdp: `v=0\r\na=candidate:1 1 udp 1 ${address} 5000 typ host\r\n` }; }
+      async setLocalDescription(value: { sdp: string }) { this.localDescription = value; }
+      getStats() { return new Promise((resolve) => { resolveStats = resolve as typeof resolveStats; }); }
+      close() {}
+    });
+    const bridge = createDirectRuntimeBridge(), events = observers(), order: string[] = [];
+    events.open.mockImplementation(() => { order.push('open'); });
+    events.message.mockImplementation((text: string) => { order.push(text); });
+    const host = createDirectRuntimeHost(createDirectRtcRuntime(), e => bridge.receive(e));
+    const detach = bridge.attach(c => { void host.command(c); });
+    const session = bridge.runtime.create('one', events);
+    try {
+      await session.offer(); channel.onopen?.();
+      channel.onmessage?.({ data: frame('first') }); channel.onmessage?.({ data: frame('second') });
+      if (address.startsWith('100.')) {
+        expect(order).toEqual([]);
+        await vi.waitFor(() => expect(resolveStats).toBeTypeOf('function'));
+        resolveStats!(new Map());
+        await vi.waitFor(() => expect(order).toEqual(['open', 'first', 'second']));
+      } else expect(order).toEqual(['open', 'first', 'second']);
+      expect(events.closed).not.toHaveBeenCalled();
+    } finally { detach(); host.dispose(); }
+  });

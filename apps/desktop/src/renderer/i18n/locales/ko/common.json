@@ -6598,6 +6598,7 @@
         },
         "path": {
           "direct": "직접",
+          "directTailscale": "직접(Tailscale)",
           "relay": "「{{name}}」 경유",
           "unlinked": "온라인, 미연결",
           "offline": "오프라인"
