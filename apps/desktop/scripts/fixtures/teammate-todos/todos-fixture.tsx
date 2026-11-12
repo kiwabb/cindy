@@ -41,13 +41,13 @@ function personal(caseName: string): PersonalTodo[] {
   return [
     mine('p1', '提交季度报销单', { priority: 3, tagIds: ['work'], deadline: deadline(-1) }),
     mine('p2', '准备周会材料', { priority: 3, tagIds: ['work'], deadline: instant(0, 17, 30), notes: '数据截止到周三，附两张对比图', subtasks: [
-      { id: 'a1', title: '汇总各部门数据', done: true },
+      { id: 'a1', title: '汇总各部门数据', done: true, doneAt: new Date(Date.now() - 2 * 3_600_000).toISOString() },
       { id: 'a2', title: '制作两张对比图', done: true },
       { id: 'a3', title: '和负责人确认结论后再发给全体参会人员，并把最终版本放进共享目录', done: false },
       { id: 'a4', title: '打印会议材料', done: false },
     ] }),
     mine('p3', '回复供应商报价邮件', { priority: 2, tagIds: ['work'], deadline: instant(0, 14), subtasks: [
-      { id: 'b1', title: '核对报价单', done: true },
+      { id: 'b1', title: '核对报价单', done: true, doneAt: new Date(Date.now() - 30 * 86_400_000).toISOString() },
       { id: 'b2', title: '确认交期', done: false },
       { id: 'b3', title: '回复邮件', done: false },
     ] }),

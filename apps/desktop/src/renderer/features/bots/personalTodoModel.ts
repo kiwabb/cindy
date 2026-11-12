@@ -278,11 +278,20 @@ export function stepsProgress(steps: readonly PersonalStep[]): { done: number; t
   return { done, total: steps.length, text: `${done}/${steps.length}` };
 }
 
-const keep = (step: PersonalStep) => ({ id: step.id, title: step.title, done: step.done });
+/** A step as sent back: a checked step keeps its check time, an open one carries none. */
+const keep = (step: PersonalStep) => ({
+  id: step.id,
+  title: step.title,
+  done: step.done,
+  ...(step.done && step.doneAt ? { doneAt: step.doneAt } : {}),
+});
 
 /** The list with one step's done state flipped. */
 export function toggledSteps(steps: readonly PersonalStep[], id: string): PersonalStepsInput {
-  return steps.map((step) => (step.id === id ? { ...keep(step), done: !step.done } : keep(step)));
+  // A newly checked step carries no time (the store stamps it); an unchecked one drops its time.
+  return steps.map((step) =>
+    step.id === id ? { id: step.id, title: step.title, done: !step.done } : keep(step),
+  );
 }
 
 /** The list without one step. */
@@ -294,6 +303,32 @@ export function removedSteps(steps: readonly PersonalStep[], id: string): Person
 export function appendedSteps(steps: readonly PersonalStep[], title: string): PersonalStepsInput | null {
   const trimmed = title.trim();
   return trimmed ? [...steps.map(keep), { title: trimmed }] : null;
+}
+
+/**
+ * When a checked step was checked: the time for today, otherwise the month and day (with the year
+ * when it is not this year). `title` is the full local date and time. Null for no or unreadable time.
+ */
+export function stepDoneTime(
+  doneAt: string | undefined,
+  now: Date,
+  locale: string,
+): { text: string; title: string } | null {
+  const at = doneAt ? new Date(doneAt) : null;
+  if (!at || Number.isNaN(at.getTime())) return null;
+  const sameDay = at.toDateString() === now.toDateString();
+  const text = new Intl.DateTimeFormat(
+    locale,
+    sameDay
+      ? { hour: 'numeric', minute: '2-digit' }
+      : {
+          month: 'numeric',
+          day: 'numeric',
+          ...(at.getFullYear() !== now.getFullYear() ? { year: 'numeric' as const } : {}),
+        },
+  ).format(at);
+  const title = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(at);
+  return { text, title };
 }
 
 interface SyncLabel {

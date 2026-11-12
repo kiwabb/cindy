@@ -19787,11 +19787,16 @@
     "title": "제목",
     "notes": "메모(선택)",
     "steps": {
-      "title": "단계",
       "add": "단계 추가",
       "expand": "단계 펼치기: {{title}}",
       "collapse": "단계 접기: {{title}}",
-      "remove": "단계 삭제: {{title}}"
+      "remove": "단계 삭제: {{title}}",
+      "addTo": "단계 추가: {{title}}",
+      "name": "단계 이름",
+      "confirm": "추가",
+      "cancel": "취소",
+      "complete": "완료: {{title}}",
+      "reopen": "다시 열기: {{title}}"
     },
     "deadline": "마감일(선택)",
     "deadlineTime": "시간(선택)",

@@ -21,8 +21,10 @@ import {
 type StoredTodo = TeammateTodo & SharedItem;
 
 /**
- * Stored shape version of the raw items. Peers with another version do not join each other;
- * bump it together with any change to what `TeammateTodo` carries for personal todos.
+ * Stored shape version of the raw items. Peers with another version do not join each other; bump
+ * it when a peer on the previous version could not read, or would corrupt, what this one stores.
+ * An optional field the previous version passes through on read and drops on its own writes is
+ * not such a change (`subtasks[].doneAt`: an older home simply records no step times).
  */
 export const PERSONAL_TODOS_SCHEMA_VERSION = 1;
 
@@ -35,9 +37,17 @@ const CARRY_LATER = 'carryLater';
 
 const deadlineOf = (todo: TeammateTodo) => todo.deadlineOverride?.value ?? todo.sourceDeadline;
 
-/** The checklist as a whole-list replacement (ids kept, so a retried or revised edit does not duplicate steps). */
+/**
+ * The checklist as a whole-list replacement (ids kept, so a retried or revised edit does not
+ * duplicate steps; completion times kept, so the home records when a step was checked here).
+ */
 const stepsOf = (todo: TeammateTodo) =>
-  (todo.subtasks ?? []).map(({ id, title, done }) => ({ id, title, done }));
+  (todo.subtasks ?? []).map(({ id, title, done, doneAt }) => ({
+    id,
+    title,
+    done,
+    ...(doneAt ? { doneAt } : {}),
+  }));
 
 const deferral = (todo: TeammateTodo) => (todo.decision?.kind === 'later' ? (todo.decision.until ?? null) : null);
 

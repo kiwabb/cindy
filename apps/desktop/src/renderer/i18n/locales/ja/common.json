@@ -19787,11 +19787,16 @@
     "title": "タイトル",
     "notes": "メモ（任意）",
     "steps": {
-      "title": "ステップ",
       "add": "ステップを追加",
       "expand": "ステップを表示: {{title}}",
       "collapse": "ステップを隠す: {{title}}",
-      "remove": "ステップを削除: {{title}}"
+      "remove": "ステップを削除: {{title}}",
+      "addTo": "ステップを追加: {{title}}",
+      "name": "ステップ名",
+      "confirm": "追加",
+      "cancel": "キャンセル",
+      "complete": "完了: {{title}}",
+      "reopen": "再開: {{title}}"
     },
     "deadline": "期限（任意）",
     "deadlineTime": "時刻（任意）",

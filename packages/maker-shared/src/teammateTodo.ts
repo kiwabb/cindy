@@ -38,6 +38,8 @@ export interface TodoSubtask {
   id: string;
   title: string;
   done: boolean;
+  /** When the step was checked (ISO). Absent on open steps and on steps checked before times were recorded. */
+  doneAt?: string;
 }
 export const TODO_MAX_SUBTASKS = 50;
 export interface TodoCompletion {
@@ -162,13 +164,52 @@ export function normalizeTodoSubtasks(value: unknown): TodoSubtask[] {
   return value.map((item) => {
     if (!item || typeof item !== 'object' || Array.isArray(item))
       throw invalidInput('subtasks[] must be objects');
-    const { id, title, done } = item as Record<string, unknown>;
+    const { id, title, done, doneAt } = item as Record<string, unknown>;
     if (typeof id !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(id) || ids.has(id))
       throw invalidInput('subtasks[].id must be a unique id of 1-64 letters, digits, _ or -');
     if (typeof done !== 'boolean') throw invalidInput('subtasks[].done must be a boolean');
     ids.add(id);
-    return { id, title: text(title, 300, true, 'subtasks[].title'), done };
+    // A completion time belongs to a checked step only; an unreadable one is dropped, never fatal.
+    return {
+      id,
+      title: text(title, 300, true, 'subtasks[].title'),
+      done,
+      ...(done && isTodoTimestamp(doneAt) ? { doneAt } : {}),
+    };
   });
+}
+/**
+ * Settles each checked step's completion time in a whole-list replacement. A time the caller sent
+ * is kept (never later than `now`); otherwise a step that was already checked keeps what it had
+ * (none for steps checked before times were recorded) and a newly checked one gets `now`. Open
+ * steps carry no time. The store applies it to every write; the write entry applies it earlier so
+ * an edit queued on another computer carries the moment it was made.
+ */
+export function settleTodoSubtaskTimes<T extends { id?: string; done?: boolean; doneAt?: string }>(
+  steps: readonly T[],
+  previous: readonly TodoSubtask[] | undefined,
+  now: Date,
+): T[] {
+  return steps.map((step) => {
+    const { doneAt, ...rest } = step;
+    if (rest.done !== true) return rest as T;
+    if (isTodoTimestamp(doneAt))
+      return {
+        ...rest,
+        doneAt: Date.parse(doneAt) > now.getTime() ? now.toISOString() : doneAt,
+      } as T;
+    const before = rest.id === undefined ? undefined : previous?.find((p) => p.id === rest.id);
+    if (before?.done) return (before.doneAt ? { ...rest, doneAt: before.doneAt } : rest) as T;
+    return { ...rest, doneAt: now.toISOString() } as T;
+  });
+}
+function isTodoTimestamp(value: unknown): value is string {
+  try {
+    validateTodoTimestamp(value);
+    return true;
+  } catch {
+    return false;
+  }
 }
 export function validateTodoTimestamp(s: unknown): string {
   if (
@@ -558,7 +599,8 @@ export function applyTodoPatch(
     t.priority = patch.priority;
   }
   if (patch.tagIds !== undefined) t.tagIds = normalizeTodoTagIds(patch.tagIds);
-  if (patch.subtasks !== undefined) t.subtasks = normalizeTodoSubtasks(patch.subtasks);
+  if (patch.subtasks !== undefined)
+    t.subtasks = settleTodoSubtaskTimes(normalizeTodoSubtasks(patch.subtasks), old?.subtasks, now);
   if (patch.reminder !== undefined) {
     if (!validTodoReminder(patch.reminder))
       throw invalidInput(`reminder must be one of ${TODO_REMINDERS.join(', ')}`);

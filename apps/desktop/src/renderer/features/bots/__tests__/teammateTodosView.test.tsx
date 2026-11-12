@@ -627,7 +627,7 @@ describe('personal todo toggles and the shared count', () => {
   });
 });
 
-// 步骤（子清单）：行上展开并直接勾选、详情面板里添加／勾选／删除，都是「立即整表保存」，不关面板、不丢其它草稿；
+// 步骤（子清单）：行最左的展开键（无步骤的行是悬停＋）、行上直接勾选与添加、详情面板里添加／勾选／删除，都是「立即整表保存」，不关面板、不丢其它草稿；
 // 行上勾选与面板同步，保存时基线版本不冲突；真冲突仍走冲突提示。
 // Bug／规则依据：2026-11-11 个人待办步骤设计稿；最小失败输入：面板里有未保存的标题时添加步骤；同一待办在面板打开时从行上勾选再点保存；输入法组字时按回车。
 // tier：unit（同本文件，主进程 IPC 用内存 fake）。
@@ -647,9 +647,10 @@ describe('personal todo steps', () => {
     await screen.findByRole('button', { name: 'Release notes' });
     const row = screen.getAllByTestId('todo-board-row').find((node) => node.textContent?.includes('Release notes'))!;
     expect(within(row).getByText('1/3')).toBeTruthy();
-    // A todo without steps has no expander and no progress.
-    expect(screen.getAllByRole('button', { name: /personalTodos\.steps\./ })).toHaveLength(1);
-    expect(within(row).queryByRole('checkbox', { name: 'Review' })).toBeNull();
+    // Only a todo with steps has an expander (and progress); a plain one has the ghost add button instead.
+    expect(screen.getAllByRole('button', { name: /personalTodos\.steps\.(expand|collapse)/ })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'personalTodos.steps.addTo:Plain' })).toHaveLength(1);
+    expect(within(row).queryByRole('checkbox', { name: 'personalTodos.steps.complete:Review' })).toBeNull();
 
     const expander = within(row).getByRole('button', { name: 'personalTodos.steps.expand:Release notes' });
     expect(expander.getAttribute('aria-expanded')).toBe('false');
@@ -657,10 +658,10 @@ describe('personal todo steps', () => {
     expect(
       within(row).getByRole('button', { name: 'personalTodos.steps.collapse:Release notes' }).getAttribute('aria-expanded'),
     ).toBe('true');
-    expect((within(row).getByRole('checkbox', { name: 'Draft' }) as HTMLInputElement).checked).toBe(true);
+    expect(within(row).getByRole('checkbox', { name: 'personalTodos.steps.reopen:Draft' }).getAttribute('aria-checked')).toBe('true');
 
     update().mockResolvedValueOnce({ ...withSteps, revision: 2, subtasks: flip(steps(), 's2') });
-    fireEvent.click(within(row).getByRole('checkbox', { name: 'Review' }));
+    fireEvent.click(within(row).getByRole('checkbox', { name: 'personalTodos.steps.complete:Review' }));
     await waitFor(() => expect(update()).toHaveBeenCalledTimes(1));
     expect(update().mock.lastCall![0]).toEqual({
       id: 'with-steps',
@@ -668,7 +669,7 @@ describe('personal todo steps', () => {
       subtasks: flip(steps(), 's2'),
     });
     await waitFor(() => expect(within(row).getByText('2/3')).toBeTruthy());
-    expect((within(row).getByRole('checkbox', { name: 'Review' }) as HTMLInputElement).checked).toBe(true);
+    expect(within(row).getByRole('checkbox', { name: 'personalTodos.steps.reopen:Review' }).getAttribute('aria-checked')).toBe('true');
     // A quiet save: no "saved" notice and the todo stays where it was.
     expect(screen.queryByRole('status')).toBeNull();
   });
@@ -678,7 +679,8 @@ describe('personal todo steps', () => {
     render(<TeammateTodosView />);
     fireEvent.click(await screen.findByRole('button', { name: 'Release notes' }));
     fireEvent.change(editorPanel().getByLabelText('personalTodos.title'), { target: { value: 'Release notes v2' } });
-    const input = editorPanel().getByLabelText('personalTodos.steps.add') as HTMLInputElement;
+    fireEvent.click(editorPanel().getByRole('button', { name: 'personalTodos.steps.add' }));
+    const input = editorPanel().getByLabelText('personalTodos.steps.name') as HTMLInputElement;
     fireEvent.change(input, { target: { value: '  Archive  ' } });
     // An input method confirming its candidate with Enter adds nothing.
     fireEvent.keyDown(input, { key: 'Enter', isComposing: true });
@@ -695,7 +697,8 @@ describe('personal todo steps', () => {
       expectedRevision: 1,
       subtasks: [...steps(), { title: 'Archive' }],
     });
-    await waitFor(() => expect(editorPanel().getByRole('checkbox', { name: 'Archive' })).toBeTruthy());
+    await waitFor(() => expect(editorPanel().getByRole('checkbox', { name: 'personalTodos.steps.complete:Archive' })).toBeTruthy());
+    // Enter keeps the field open for the next step.
     expect(input.value).toBe('');
     expect(document.activeElement).toBe(input);
     expect((editorPanel().getByLabelText('personalTodos.title') as HTMLInputElement).value).toBe('Release notes v2');
@@ -703,16 +706,18 @@ describe('personal todo steps', () => {
 
     // Ticking and removing follow the revision the previous save returned.
     update().mockResolvedValueOnce({ ...withSteps, revision: 3, subtasks: flip(added, 's3') });
-    fireEvent.click(editorPanel().getByRole('checkbox', { name: 'Send' }));
+    fireEvent.click(editorPanel().getByRole('checkbox', { name: 'personalTodos.steps.complete:Send' }));
     await waitFor(() => expect(update()).toHaveBeenCalledTimes(2));
     expect(update().mock.lastCall![0]).toEqual({ id: 'with-steps', expectedRevision: 2, subtasks: flip(added, 's3') });
-    await waitFor(() => expect((editorPanel().getByRole('checkbox', { name: 'Send' }) as HTMLInputElement).checked).toBe(true));
+    await waitFor(() =>
+      expect(editorPanel().getByRole('checkbox', { name: 'personalTodos.steps.reopen:Send' }).getAttribute('aria-checked')).toBe('true'),
+    );
     const rest = flip(added, 's3').filter((step) => step.id !== 's2');
     update().mockResolvedValueOnce({ ...withSteps, revision: 4, subtasks: rest });
     fireEvent.click(editorPanel().getByRole('button', { name: 'personalTodos.steps.remove:Review' }));
     await waitFor(() => expect(update()).toHaveBeenCalledTimes(3));
     expect(update().mock.lastCall![0]).toEqual({ id: 'with-steps', expectedRevision: 3, subtasks: rest });
-    await waitFor(() => expect(editorPanel().queryByRole('checkbox', { name: 'Review' })).toBeNull());
+    await waitFor(() => expect(editorPanel().queryByRole('checkbox', { name: 'personalTodos.steps.complete:Review' })).toBeNull());
 
     // The draft title is still there and 保存 does not report a conflict.
     update().mockResolvedValueOnce({ ...withSteps, revision: 5, title: 'Release notes v2', subtasks: rest });
@@ -729,9 +734,9 @@ describe('personal todo steps', () => {
     const row = screen.getByTestId('todo-board-row');
     fireEvent.click(within(row).getByRole('button', { name: 'personalTodos.steps.expand:Release notes' }));
     update().mockResolvedValueOnce({ ...withSteps, revision: 2, subtasks: flip(steps(), 's2') });
-    fireEvent.click(within(row).getByRole('checkbox', { name: 'Review' }));
+    fireEvent.click(within(row).getByRole('checkbox', { name: 'personalTodos.steps.complete:Review' }));
     await waitFor(() =>
-      expect((editorPanel().getByRole('checkbox', { name: 'Review' }) as HTMLInputElement).checked).toBe(true),
+      expect(editorPanel().getByRole('checkbox', { name: 'personalTodos.steps.reopen:Review' }).getAttribute('aria-checked')).toBe('true'),
     );
 
     update().mockResolvedValueOnce({ ...withSteps, revision: 3, notes: 'x' });
@@ -748,9 +753,106 @@ describe('personal todo steps', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Release notes' }));
     fireEvent.change(editorPanel().getByLabelText('personalTodos.notes'), { target: { value: 'draft notes' } });
     update().mockRejectedValueOnce(new Error('[ALREADY_EXISTS] CONFLICT'));
-    fireEvent.click(editorPanel().getByRole('checkbox', { name: 'Send' }));
+    fireEvent.click(editorPanel().getByRole('checkbox', { name: 'personalTodos.steps.complete:Send' }));
     expect((await screen.findByRole('alert')).textContent).toBe('personalTodos.conflict');
     expect(screen.getByRole('button', { name: 'personalTodos.reloadVersion' })).toBeTruthy();
     expect((editorPanel().getByLabelText('personalTodos.notes') as HTMLTextAreaElement).value).toBe('draft notes');
+  });
+
+  // Bug: pressing 保存 right after typing a step left the field (saving the step) and the click was lost.
+  it('saves the panel on top of a step its field saved when 保存 was pressed straight after typing', async () => {
+    vi.mocked(api().list).mockResolvedValue([withSteps]);
+    render(<TeammateTodosView />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Release notes' }));
+    fireEvent.change(editorPanel().getByLabelText('personalTodos.notes'), { target: { value: 'n' } });
+    fireEvent.click(editorPanel().getByRole('button', { name: 'personalTodos.steps.add' }));
+    const input = editorPanel().getByLabelText('personalTodos.steps.name');
+    fireEvent.change(input, { target: { value: 'Archive' } });
+    let finishStep!: (todo: typeof withSteps) => void;
+    update().mockImplementationOnce(() => new Promise((resolve) => { finishStep = resolve; }));
+    update().mockResolvedValueOnce({ ...withSteps, revision: 3, notes: 'n' });
+    // The press leaves the field first (its step starts saving), then the click lands.
+    fireEvent.blur(input);
+    fireEvent.click(editorPanel().getByRole('button', { name: 'personalTodos.save' }));
+    finishStep({ ...withSteps, revision: 2, subtasks: [...steps(), { id: 's4', title: 'Archive', done: false }] });
+    await waitFor(() => expect(update()).toHaveBeenCalledTimes(2));
+    expect(update().mock.calls[0][0]).toEqual({ id: 'with-steps', expectedRevision: 1, subtasks: [...steps(), { title: 'Archive' }] });
+    expect(update().mock.lastCall![0]).toMatchObject({ id: 'with-steps', expectedRevision: 2, notes: 'n' });
+    expect(update().mock.lastCall![0]).not.toHaveProperty('subtasks');
+  });
+
+  it('adds steps from a row without any: Enter and 添加 keep the field open, leaving it adds and closes, Esc cancels', async () => {
+    const plain = mine('Plain');
+    vi.mocked(api().list).mockResolvedValue([plain]);
+    render(<TeammateTodosView />);
+    fireEvent.click(await screen.findByRole('button', { name: 'personalTodos.steps.addTo:Plain' }));
+    const input = screen.getByLabelText('personalTodos.steps.name') as HTMLInputElement;
+    expect(document.activeElement).toBe(input);
+
+    // Enter adds and keeps the field for the next step.
+    const one = [{ id: 'n1', title: 'One', done: false }];
+    update().mockResolvedValueOnce({ ...plain, revision: 2, subtasks: one });
+    fireEvent.change(input, { target: { value: 'One' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await waitFor(() => expect(update()).toHaveBeenCalledTimes(1));
+    expect(update().mock.lastCall![0]).toEqual({ id: 'Plain', expectedRevision: 1, subtasks: [{ title: 'One' }] });
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: 'personalTodos.steps.complete:One' })).toBeTruthy());
+    expect(screen.getByLabelText('personalTodos.steps.name')).toBe(input);
+    expect(input.value).toBe('');
+
+    // 添加 adds on press, so the field keeps its focus.
+    const two = [...one, { id: 'n2', title: 'Two', done: false }];
+    update().mockResolvedValueOnce({ ...plain, revision: 3, subtasks: two });
+    fireEvent.change(input, { target: { value: 'Two' } });
+    fireEvent.mouseDown(screen.getByRole('button', { name: 'personalTodos.steps.confirm' }));
+    await waitFor(() => expect(update()).toHaveBeenCalledTimes(2));
+    expect(update().mock.lastCall![0]).toEqual({ id: 'Plain', expectedRevision: 2, subtasks: [...one, { title: 'Two' }] });
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: 'personalTodos.steps.complete:Two' })).toBeTruthy());
+    expect(screen.getByLabelText('personalTodos.steps.name')).toBe(input);
+
+    // Leaving the field with text adds the step and closes it.
+    update().mockResolvedValueOnce({ ...plain, revision: 4, subtasks: [...two, { id: 'n3', title: 'Three', done: false }] });
+    fireEvent.change(input, { target: { value: 'Three' } });
+    fireEvent.blur(input);
+    await waitFor(() => expect(update()).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(screen.queryByLabelText('personalTodos.steps.name')).toBeNull());
+    expect(screen.getByRole('checkbox', { name: 'personalTodos.steps.complete:Three' })).toBeTruthy();
+
+    // Esc drops the draft.
+    fireEvent.click(screen.getByRole('button', { name: 'personalTodos.steps.add' }));
+    fireEvent.change(screen.getByLabelText('personalTodos.steps.name'), { target: { value: 'Never' } });
+    fireEvent.keyDown(screen.getByLabelText('personalTodos.steps.name'), { key: 'Escape' });
+    expect(screen.queryByLabelText('personalTodos.steps.name')).toBeNull();
+    expect(update()).toHaveBeenCalledTimes(3);
+  });
+
+  it('folds a row without steps back when its add field is left empty', async () => {
+    vi.mocked(api().list).mockResolvedValue([mine('Plain')]);
+    render(<TeammateTodosView />);
+    fireEvent.click(await screen.findByRole('button', { name: 'personalTodos.steps.addTo:Plain' }));
+    fireEvent.blur(screen.getByLabelText('personalTodos.steps.name'));
+    expect(screen.queryByLabelText('personalTodos.steps.name')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'personalTodos.steps.add' })).toBeNull();
+    expect(update()).not.toHaveBeenCalled();
+  });
+
+  it('shows when a checked step was checked and nothing for an open or undated one', async () => {
+    const at = (offsetMs: number) => new Date(Date.now() - offsetMs).toISOString();
+    vi.mocked(api().list).mockResolvedValue([
+      mine('Dated', {
+        subtasks: [
+          { id: 'd1', title: 'Today', done: true, doneAt: at(1000) },
+          { id: 'd2', title: 'Legacy', done: true },
+          { id: 'd3', title: 'Open', done: false },
+          { id: 'd4', title: 'Older', done: true, doneAt: at(40 * 86_400_000) },
+        ],
+      }),
+    ]);
+    render(<TeammateTodosView />);
+    fireEvent.click(await screen.findByRole('button', { name: 'personalTodos.steps.expand:Dated' }));
+    const row = within(screen.getByTestId('todo-board-row'));
+    expect(row.getAllByText(/^\d{1,2}:\d{2}\s?[AP]M$/)).toHaveLength(1);
+    const lines = row.getAllByRole('listitem');
+    expect(lines.map((line) => line.querySelector('[title]') !== null)).toEqual([true, false, false, true]);
   });
 });
