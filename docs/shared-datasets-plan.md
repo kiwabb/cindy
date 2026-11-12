@@ -99,10 +99,13 @@
 1. **读取本机状态**：调用 Tailscale 的本机接口（LocalAPI，或 `tailscale status --json`），只读本机的 tailnet 地址、
    对端地址和对端在线状态。不写入任何配置，不调用 `serve`、`funnel` 或 `up`。
 2. **增加候选地址**：
-   - V1 直连：确认 WebRTC 的 host 候选包含 `100.x` 地址（P0 验证）。如果不包含，就把 tailnet 地址补进候选。
+   - V1 直连：P0 实测 host 候选已经包含 `100.x` 地址（[记录](verification/2026-11-12-tailscale-direct-candidates.md)），
+     问题反过来：只走 DERP 的 tailnet 候选比 Cindy 中转还慢（约 440 ms 对 80 ms）。所以 Desktop 只在 Tailscale 报告真直连
+     （对应节点 `CurAddr` 非空）时保留 tailnet 候选，否则从 SDP 里剔除；规则正本见
+     [`device-link-lan-first-direct.md`](dev-rules/protocol-compatibility/device-link-lan-first-direct.md)「Tailscale 候选策略」。
    - V2：把对端的 tailnet 地址作为 agent-net 的一个候选端点，走正常的 Noise 握手。
    - 握手的身份仍是设备证书或主人签名。Tailscale 给出的对端名字只用于显示，不作为准入依据。
-3. **显示路径**：拓扑页把这条链路标为「直连（Tailscale）」。`remote-desktop.md` 已有约定：在 Tailscale 上不代表一定是直连，
+3. **显示路径**：拓扑页把这条链路标为「直连（Tailscale）」（选中的候选对用了 tailnet 地址时，P3 已实现）。`remote-desktop.md` 已有约定：在 Tailscale 上不代表一定是直连，
    以实际选中的候选为准。
 
 没装 Tailscale、Tailscale 没登录，或两台设备不在同一个 tailnet，都完全沿用原有路径。不提示，也不报错。
@@ -282,13 +285,13 @@ interface DatasetStore<Item, Update> {
 | P0 验证 | ① 两台装了 Tailscale 的电脑分处不同网络时，V1 直连是否选中 `100.x` 的 host 候选（看 `getStats` 选中的候选对）；② agent-net 能否以 tailnet 地址为端点完成握手；③ 重新确认 Tailscale 在中国大陆 iOS 上的可用性 | 实测记录写入 `docs/verification/`；只在模拟环境里通过不算数 |
 | P1 共享数据集层与个人待办 | `SharedDatasetDefinition`、`maker:shared-datasets:*`、主力电脑的登记和更换、副本快照与增量拉取、通过 ingest 幂等提交、冲突界面、Agent 工具改为可在副本上使用、协议兼容文档 | 两台电脑经官方中转和经自建中转各跑一遍：新建、编辑、完成、删除、冲突、换主力电脑；阻断对端后恢复；旧版对端混用 |
 | P2 离线待发队列 | 按 Q4 的裁决实现；序号单调、重启后保留；冲突展示 | 主力电脑断网期间在副本上修改 10 条，恢复后只生效一次，冲突逐条展示 |
-| P3 Tailscale 线路 | 读取 LocalAPI；把 tailnet 地址加入 V1 候选（如果 P0 证明需要）和 V2 端点；拓扑页标注 | 两台电脑不在同一局域网、不经过中转（阻断中转的数据转发）时能够同步；没装 Tailscale 时行为不变 |
+| P3 Tailscale 线路（V1 部分 2026-11-12 已实现：只读 CLI、候选策略、拓扑标注；V2 端点未做，agent-net 不变） | 读取 LocalAPI；把 tailnet 地址加入 V1 候选（如果 P0 证明需要）和 V2 端点；拓扑页标注 | 两台电脑不在同一局域网、不经过中转（阻断中转的数据转发）时能够同步；没装 Tailscale 时行为不变 |
 | P4 手机 | manifest 告诉手机主力电脑；主力电脑离线时显示只读副本；以后再做手机端待发队列 | 手机连到非主力电脑时，看到的是主力电脑上的那份 |
 | P5 第二个数据集 | 例如任务标签目录。用来验证接口足够通用 | 接入只需要提供一个定义，不改同步层 |
 
 ## 11. 未确认事项
 
-- V1 直连只收集 host 候选，这些候选里是否包含 Tailscale 网卡地址，没有从代码里确认（`directRtcRuntime.ts` 只写了 host 候选，
-  具体取决于 Chromium 和 Electron 枚举网卡的行为）。P0 实测确认。
+- ~~V1 直连的 host 候选是否包含 Tailscale 网卡地址~~：2026-11-12 已实测确认包含（见验证记录）。
+- agent-net V2 的 tailnet 端点与对端列表发现，P3 本次不做；Tailscale 上没有组播的问题仍待 V2 处理。
 - OpenClaw 的结论只来自它的官方文档页，没有读源码。
 - Tailscale 在中国大陆的现状沿用 10-28 文档的结论，没有重新查。

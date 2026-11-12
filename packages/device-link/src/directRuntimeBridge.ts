@@ -11,7 +11,7 @@ export type DirectRuntimeCommand = { id: string; connection: string } & (
 );
 export type DirectRuntimeEvent =
   | { type: 'reply'; id: string; ok: boolean; value?: string }
-  | { type: 'open' | 'closed'; connection: string; reason?: DirectRuntimeCloseReason }
+  | { type: 'open' | 'closed'; connection: string; reason?: DirectRuntimeCloseReason; tailnetAddresses?: string[] }
   | { type: 'message'; connection: string; text: string }
   | { type: 'buffer'; connection: string; sequence: number; buffered: number };
 
@@ -91,7 +91,12 @@ export function createDirectRuntimeBridge(options: { maxPeers?: number; reserved
       if (typeof e.connection !== 'string') return;
       const s = sessions.get(e.connection);
       if (!s) return;
-      if (e.type === 'open') { if (!s.open) { s.open = true; s.events.open(); } }
+      if (e.type === 'open') {
+        if (!s.open) { s.open = true; const a = e.tailnetAddresses;
+          if (Array.isArray(a) && a.length > 0 && a.length <= 2 && a.every((x) => typeof x === 'string' && x.length <= 64)) s.events.open({ tailnetAddresses: a as string[] });
+          else s.events.open();
+        }
+      }
       else if (e.type === 'closed') close(e.connection, false,
         e.reason === 'network-failed' ? 'network-failed' : 'channel-closed');
       else if (e.type === 'message') {
@@ -122,7 +127,7 @@ export function createDirectRuntimeHost(runtime: DirectRuntime, emit: (event: Di
         if (c.action === 'offer' || c.action === 'accept') {
           if (s || sessions.size >= DIRECT_LINK_DESKTOP_MAX_PEERS) throw new Error();
           const session = runtime.create(c.connection, {
-            open: () => emit({ type: 'open', connection: c.connection }),
+            open: (info) => emit({ type: 'open', connection: c.connection, ...(info?.tailnetAddresses ? { tailnetAddresses: info.tailnetAddresses } : {}) }),
             message: (text) => emit({ type: 'message', connection: c.connection, text }),
             drained: () => { const current = sessions.get(c.connection); if (current) emit({ type: 'buffer', connection: c.connection, sequence: current.sequence, buffered: current.session.bufferedAmount }); },
             closed: (reason) => { if (sessions.has(c.connection)) { sessions.delete(c.connection); emit({ type: 'closed', connection: c.connection, reason }); } },

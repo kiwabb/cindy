@@ -56,6 +56,34 @@ Electron 进程的 IPC/WebRTC smoke，以及 Desktop、Mobile 和共享包类型
 重组有字节、分片数和超时边界；在原可靠层接收之前重组，序号、去重与 ACK 语义不变。
 桥接在途字节与 SCTP bufferedAmount 一起参与背压，平台静默失效同样会触发原有中继回退。
 
+## Tailscale 候选策略（2026-11-12，过滤仅 Desktop）
+
+不改 wire、能力位、信令 channel 与服务端；只改本机对经过它的 SDP 里 `a=candidate` 行的取舍。
+
+- **何时生效**：本机 Tailscale 正在运行且 `status --json` 可读；否则什么都不做（不剔除、不关闭）。SDP 里没有
+  `100.64.0.0/10`／`fd7a:115c:a1e0::/48` 段候选时不读状态。一个地址只有出现在 Tailscale 报告的 `Self`／`Peer`
+  `TailscaleIPs` 里才算 tailnet，恰好用这些地址段的局域网不受影响；局域网候选和 mDNS 名永远原样保留。
+- **入站（accept／answer）**：拥有该地址的对端节点 `CurAddr` 非空且在线才保留，否则在 `setRemoteDescription` 前剔除。
+  至少保留一条才算「获批」。
+- **出站**：offer 对端未知，其它对端的状态不能代表它，所以总是带上本机 tailnet 候选，由 answer 决定；answer 仅在入站获批
+  时才暴露本机 tailnet 候选；offer 收到 answer 后按其候选重新判定。
+- **读取**：只执行 `status --json`（Windows 只从 `%ProgramFiles%`／`%ProgramW6432%` 下的安装目录找，不用裸名；macOS 为
+  App 包、`/usr/local/bin`、`/opt/homebrew/bin` 与 PATH；Linux 为 PATH），输出上限 4 MB，每次刷新至多一个进程，成功与失败
+  都缓存 30 秒，并发共用；不落盘、不轮询，日志只记数量，不记地址和主机名。状态读不到时不生效，不阻塞协商。
+- **兜底与冷却**：剔除 SDP 行不能阻止不过滤的对端（旧 Desktop、手机）经本机 tailnet 套接字配对。runtime 仅在 SDP 含
+  Tailscale 地址段候选时，于通道打开时用 `getStats` 取选中候选对中落在该地址段的地址（500 ms 超时，只在 runtime、
+  桥接与 Desktop 策略之间的本机事件里传递，不进日志、wire 或拓扑），策略层用 Tailscale 报告的地址判定。未获批准的
+  tailnet 候选对在可靠层之前关闭（诊断原因 `tailnet-unapproved`），业务走 relay；该 peer 冷却 10 分钟，冷却内双方
+  tailnet 候选都被剔除，局域网直连照常建立。取不到数据按非 tailnet 处理，绝不关闭局域网链路。
+- **open 前的帧**：open 事件可能被上述查询推迟；runtime 与策略层把 open 之前收到的帧按序暂存（有字节／条数上限），
+  open 之后依次交付，桥接「open 前收到消息即关闭」的守卫保持不变。
+- **拓扑**：已获批的 tailnet 直连在本机拓扑页标为「直连（Tailscale）」；该标记经本机 `peer-links` 快照的可选字段
+  `viaTailnet` 传递，见 [`device-link-peer-links-snapshot.md`](device-link-peer-links-snapshot.md)，不进 wire。
+- **手机**：不过滤、不显示标签、不读 Tailscale；共用的 WebView runtime 带有 open 前帧暂存和含 Tailscale 地址段候选时的
+  选中候选对查询，结果不影响选路，随下一次 Mobile JS 更新发布。agent-net V2 不改，tailnet 端点留待 V2。
+- **未验证**：Chromium 在默认路由策略下是否把 Tailscale 地址以 mDNS 名隐藏——被隐藏的候选不是 IP，策略无法识别、
+  按局域网候选原样保留；真实 Tailscale 真直连的端到端通道也没有两台不同网络的机器实测。
+
 旧端不声明能力，双方仍走 relay；只升级一端不会启用直连。Desktop 与 Mobile 均接入，
 同账号远程供应商沿用这条共享路径；跨账号供应商分享和共享任务继续由 relay 逐帧授权。
 不改数据库、服务端、Mobile 原生依赖或配置。Mobile 使用现有 WebView，iOS 的 WebKit

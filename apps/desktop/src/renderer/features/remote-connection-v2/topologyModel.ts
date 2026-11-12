@@ -51,6 +51,8 @@ export interface TopologyNode {
   status: TopologyStatus;
   /** 本机到它的数据路径;没建链 / 离线为 null。 */
   path: 'direct' | 'relay' | null;
+  /** 直连的候选对走 Tailscale 地址。 */
+  viaTailnet?: boolean;
   rttMs: number | null;
   /** 最近有没有业务消息在这条链路上走、往哪边走;没有为 null。只有直连 / 经中转的设备会有。 */
   flow: TopologyFlow | null;
@@ -146,6 +148,7 @@ function deriveNode(
     isMobile,
     status,
     path,
+    ...(path === 'direct' && link?.viaTailnet ? { viaTailnet: true } : {}),
     encrypted: open ? link.encrypted : undefined,
     rttMs: open ? link.rttMs : null,
     flow: open && (status === 'direct' || status === 'relay') ? flowOf(link) : null,

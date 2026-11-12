@@ -6598,6 +6598,7 @@
         },
         "path": {
           "direct": "直接",
+          "directTailscale": "直接（Tailscale）",
           "relay": "「{{name}}」経由",
           "unlinked": "オンライン、未接続",
           "offline": "オフライン"

@@ -14,6 +14,7 @@ export * from "./routedClient.js";
 export * from "./directPath.js";
 export * from "./directNegotiation.js";
 export * from "./directRuntimeBridge.js";
+export * from "./tailnetPath.js";
 export * from "./directRtcRuntime.js";
 export { DIRECT_LINK_RUNTIME_SOURCE } from "./directRuntimeSource.js";
 export * from "./transport.js";

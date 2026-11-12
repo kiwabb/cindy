@@ -291,6 +291,29 @@ relay 以 close 1013 `inbound backpressure` 主动断连，此时任何「立即
   新版 Mobile 仅在前台保留，退后台释放；未支持或未启用保留的旧端沿用原有断线复位。
   仅保留 RPC 数据通道，不承诺独立文件或远程桌面通道存活。
   不新增服务端依赖、wire 字段或 Mobile 原生依赖/配置。
+- **Tailscale 地址只在真直连时作候选**（2026-11-12，仅 Desktop 过滤；Mobile 见下）：Tailscale 网卡地址会作为 host
+  候选出现，但两台之间只走 DERP 时比 Cindy 中转还慢（实测约 440 ms 对 80 ms，
+  见 [`verification/2026-11-12-tailscale-direct-candidates.md`](../verification/2026-11-12-tailscale-direct-candidates.md)）。
+  Desktop main 在 `withTailnetCandidatePolicy`（`packages/device-link/src/tailnetPath.ts`）里过滤经过它的全部 SDP。
+  只有本机 Tailscale 正在运行且可读（只读 `tailscale status --json`，缓存 30 秒，只在 SDP 里出现 Tailscale 地址段候选时
+  才读，不轮询）时才生效，否则什么都不做；一个地址只有出现在 Tailscale 自己报告的 `Self`／`Peer` 的 `TailscaleIPs`
+  里才算 tailnet，所以恰好用 `100.64.0.0/10` 的局域网（运营商 CGNAT、NetBird、公司网）、局域网候选与 mDNS 名都不受影响。
+  入站候选：拥有该地址的节点 `CurAddr` 非空才保留，否则剔除。offer 一方事先不知道对端，也不能用不相干对端的状态
+  代替，所以 offer 总是带上本机 tailnet 候选，由 answer 一方按上面的规则决定；answer 仅在入站候选被保留时才暴露
+  本机 tailnet 候选，offer 收到 answer 后同样按其候选重新判定。仅剔除 SDP 行拦不住不过滤的对端（旧 Desktop、手机）
+  经本机 tailnet 套接字（含 peer-reflexive）形成候选对，所以通道打开时若选中的候选对含 Tailscale 报告的地址而未获批准，
+  就在可靠层看到之前关闭（诊断原因 `tailnet-unapproved`，不与 `channel-closed` 混用），该 peer 进入 10 分钟冷却：冷却内
+  双方的 tailnet 候选都被剔除，局域网直连仍能建立，冷却结束才再次允许 tailnet（最多每 10 分钟一次这样的往返，而不是
+  按 5–60 秒退避无限重试；网络变化不会提前解除冷却）。通道打开事件现在只在 SDP 含 Tailscale 地址段候选时才等待
+  选中候选对查询（最多 500 ms，Desktop 策略最多再等 2 秒读取状态），期间对端发来的帧由 runtime 与策略层按序暂存、
+  open 之后依次交付，不再触发桥接「open 前收到消息即关闭」；其余通道照旧同步 open。不改 wire、不加通道；新旧端互通，
+  只改本机候选选择。**Mobile**：不过滤、不显示标签、不读 Tailscale，但共用的 WebView runtime 带上了同一份改动
+  （open 前帧暂存、含 Tailscale 地址段候选时的选中候选对查询，结果只到本地事件、不上报、不影响选路），随下一次 Mobile
+  JS 更新发布，无原生依赖变化；旧版 Mobile 不受影响。故障半径三问：① 单个 peer 的一次直连协商；② 只剔除这次 SDP 的
+  tailnet 候选或关闭这一条未获批准的通道，其余 peer、relay 与局域网直连不动，Tailscale 读取失败等同「不生效」，从不
+  阻塞协商超过上述上限；③ 回归见 `packages/device-link/src/__tests__/tailnetPath.test.ts`、`directRuntimeBridge.test.ts`
+  「frames received before the open event」与 Desktop `tailscaleStatus.test.ts`。`CurAddr` 对空闲对端可能为空，所以 tailnet
+  直连只在 Tailscale 自己已有直连路径时启用，这是有意的保守取舍。
 - **容量恢复的故障半径三问**：① 单 peer 的直连准入满额／协商失败；② 仅该 peer 排队、
   释放直连资源并改用既有 relay，不重开控制 link、不重连共享 socket、不改任务分配或授权；
   只有无在途工作且长期无活动的通道才可在容量压力下让位；③ `directRuntimeBridge.test.ts`

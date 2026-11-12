@@ -22,7 +22,7 @@ export function pathLabel(node: TopologyNode, relayName: string, t: T): string {
   if (node.status === 'offline') return t('settings.remoteControl.v2.path.offline');
   if (node.attention === 'unresponsive') return t('settings.remoteControl.v2.attention.unresponsive');
   if (node.attention === 'peer-control-off') return t('settings.remoteControl.myDevices.peerControlOff');
-  if (node.path === 'direct') return t('settings.remoteControl.v2.path.direct');
+  if (node.path === 'direct') return t(node.viaTailnet ? 'settings.remoteControl.v2.path.directTailscale' : 'settings.remoteControl.v2.path.direct');
   if (node.path === 'relay') return t('settings.remoteControl.v2.path.relay', { name: relayName });
   return t('settings.remoteControl.v2.path.unlinked');
 }

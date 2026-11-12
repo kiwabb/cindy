@@ -1,9 +1,10 @@
 import { ipcMain } from 'electron';
-import { createDirectRuntimeBridge, type DirectRuntime, type DirectRuntimeSession,
+import { createDirectRuntimeBridge, withTailnetCandidatePolicy, type DirectRuntime, type DirectRuntimeSession,
   type DirectRuntimeEvents, DIRECT_LINK_DESKTOP_MAX_PEERS, DIRECT_LINK_DESKTOP_RESERVED_PEERS } from '@cindy/device-link';
 import { DIRECT_LINK_LOCAL } from '../../shared/directLink';
 import { DesktopCaptureWindow } from '../remote-desktop/captureWindow';
 import { createLogger } from '../logger';
+import { readTailscaleStatus } from './tailscaleStatus';
 
 const log = createLogger('device-link:direct');
 const bridge = createDirectRuntimeBridge({ maxPeers: DIRECT_LINK_DESKTOP_MAX_PEERS,
@@ -61,7 +62,7 @@ function ensureStarted(): Promise<void> {
 }
 
 /** Startup is deferred until a capable, authorized peer actually needs a LAN path. */
-export const desktopDirectRuntime: DirectRuntime = {
+const hostRuntime: DirectRuntime = {
   capacity: bridge.runtime.capacity,
   create(id: string, events: DirectRuntimeEvents, options): DirectRuntimeSession {
     const generation = epoch;
@@ -84,3 +85,9 @@ export const desktopDirectRuntime: DirectRuntime = {
   },
   suspend,
 };
+
+/** Tailnet candidates are kept only for a true direct Tailscale path; LAN candidates are untouched. */
+export const desktopDirectRuntime: DirectRuntime = withTailnetCandidatePolicy(hostRuntime, readTailscaleStatus, {
+  // Counts only: addresses and hostnames never reach the log.
+  diagnostic: (event, count) => log.info(`tailnet candidate policy ${event} count=${count}`),
+});

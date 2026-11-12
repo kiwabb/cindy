@@ -11,7 +11,8 @@ export const DIRECT_LINK_SIGNAL = 'device-link:direct-signal';
 export const DIRECT_LINK_TIMEOUT_MS = 15_000;
 export const DIRECT_LINK_MAX_SDP = 128 * 1024;
 
-export type DirectRuntimeCloseReason = 'channel-closed' | 'network-failed' | 'runtime-timeout' | 'runtime-failed' | 'runtime-unavailable';
+export type DirectRuntimeCloseReason = 'channel-closed' | 'network-failed' | 'runtime-timeout' | 'runtime-failed' | 'runtime-unavailable'
+  | 'tailnet-unapproved';
 export type DirectDiagnosticReason = DirectRuntimeCloseReason | 'connected' | 'capacity-full' | 'queue-full'
   | 'negotiation-timeout' | 'idle-retired' | 'send-failed' | 'ack-timeout' | 'buffer-timeout';
 export interface DirectDiagnostic {
@@ -24,8 +25,15 @@ export interface DirectDiagnostic {
   share: number;
   reserved: number;
 }
+/** Local-only facts about the opened channel; never put on the wire. */
+export interface DirectOpenInfo {
+  /** Set by the Desktop policy only: the selected ICE pair uses an address Tailscale itself reports. */
+  viaTailnet?: boolean;
+  /** Runtime to host, local only, never logged or sent: selected-pair addresses inside Tailscale's ranges (at most 2). */
+  tailnetAddresses?: string[];
+}
 export interface DirectRuntimeEvents {
-  open(): void;
+  open(info?: DirectOpenInfo): void;
   message(text: string): void;
   drained(): void;
   closed(reason?: DirectRuntimeCloseReason): void;
@@ -40,7 +48,7 @@ export interface DirectRuntimeSession {
 }
 /** Browser WebRTC is injected by each host; no Electron/React dependency here. */
 export interface DirectRuntime {
-  create(id: string, events: DirectRuntimeEvents, options?: { kind: DirectPeerKind }): DirectRuntimeSession;
+  create(id: string, events: DirectRuntimeEvents, options?: { kind: DirectPeerKind; peer?: string }): DirectRuntimeSession;
   /** One shared admission pool per native process, not one pool per relay client. */
   capacity?: DirectCapacityPool;
   /** Release the platform process when the authenticated relay generation ends. */
@@ -262,7 +270,7 @@ export class DirectLinkNegotiator {
     try {
       if (!this.deps.runtime.capacity) release = this.localCapacity.acquire(id, this.kind(peerId));
       const session = this.deps.runtime.create(id, {
-        open: () => {
+        open: (info) => {
           if (!this.current(peerId, peer, attempt) || attempt.opened) return;
           clearTimeout(attempt.timer);
           attempt.opened = true;
@@ -273,6 +281,7 @@ export class DirectLinkNegotiator {
           const channel: DeviceLinkDirectChannel = {
             send: (text) => { peer.touched = Date.now(); session.send(text); },
             get bufferedAmount() { return session.bufferedAmount; },
+            ...(info?.viaTailnet ? { viaTailnet: true } : {}),
             close: (reason) => this.fail(peerId, peer, attempt, true,
               reason === 'send-failed' || reason === 'ack-timeout' || reason === 'buffer-timeout' ? reason : 'channel-closed'),
           };
@@ -282,7 +291,7 @@ export class DirectLinkNegotiator {
         message: (text) => { if (this.current(peerId, peer, attempt)) { peer.touched = Date.now(); attempt.handle?.receive(text); } },
         drained: () => { if (this.current(peerId, peer, attempt)) attempt.handle?.drained(); },
         closed: (reason) => this.fail(peerId, peer, attempt, true, reason),
-      }, { kind: this.kind(peerId) });
+      }, { kind: this.kind(peerId), peer: peerId });
       attempt = { id, localStream: streams.local, remoteStream: streams.remote, session, opened: false, release };
       peer.attempt = attempt;
       attempt.timer = setTimeout(() => this.fail(peerId, peer, attempt, true, 'negotiation-timeout'),

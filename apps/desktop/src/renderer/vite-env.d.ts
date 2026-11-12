@@ -164,6 +164,8 @@ interface DeviceLinkPeerLinkView {
   deviceId: string;
   encrypted?: boolean;
   path: 'direct' | 'relay';
+  /** direct link whose selected candidate pair uses a Tailscale address; absent otherwise */
+  viaTailnet?: boolean;
   /** 可靠帧 ACK 的平滑往返;首个 ACK 之前为 null,闲置时是最近测得的值 */
   rttMs: number | null;
   /** link-open / link-accept 双向都已就绪 */
