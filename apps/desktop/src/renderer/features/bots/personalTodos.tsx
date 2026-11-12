@@ -184,6 +184,7 @@ export function PersonalTodoEditor({
   const [addingStep, setAddingStep] = useState(false);
   const [stepsBusy, setStepsBusy] = useState(false);
   const stepSave = useRef<Promise<boolean> | null>(null);
+  const stepFlush = useRef<(() => Promise<boolean> | null) | null>(null);
   useEffect(() => {
     if (stepsSaved && stepsSaved.id === current.id && stepsSaved.revision === current.revision + 1)
       setCurrent(stepsSaved);
@@ -229,9 +230,11 @@ export function PersonalTodoEditor({
 
   const act = async (operation?: PersonalTodoUpdate['operation'], deferTo?: string) => {
     if (busy || !isDataOwnerIdCurrent(owner)) return;
-    // Pressing a footer button leaves a typed step's field, which saves that step first; this
-    // action then goes on top of it instead of being lost to the step save.
+    // A step still typed in its field is saved first and this action goes on top of it; if that
+    // step cannot be saved, the panel stays open with it and the error.
+    const typed = stepFlush.current?.() ?? null;
     if (stepSave.current) await stepSave.current;
+    if (typed && !(await typed)) return;
     const base = currentRef.current;
     const resume = deferTo ?? until;
     const resumeMs = Date.parse(resume);
@@ -416,8 +419,9 @@ export function PersonalTodoEditor({
               adding={addingStep}
               full={steps.length >= TODO_MAX_SUBTASKS}
               onStart={() => setAddingStep(true)}
-              onAdd={(title) => saveSteps(appendedSteps(steps, title))}
+              onAdd={(title) => saveSteps(appendedSteps(currentRef.current.subtasks, title))}
               onClose={() => setAddingStep(false)}
+              flushRef={stepFlush}
             />
           </div>
           <FormField label={t('personalTodos.notes')}>

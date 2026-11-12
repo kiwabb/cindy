@@ -2,7 +2,7 @@
  * The checklist of a personal todo, shared by the list row and the details panel: the step lines
  * (check, title, check time, remove) and the add row (a text button that opens an inline field).
  */
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { Check, Plus, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -109,7 +109,8 @@ export function StepList({
 
 /**
  * Under the step lines: 「＋ 添加步骤」 opens a field. Enter or 添加 adds and keeps the field open;
- * leaving the field with text adds and closes, leaving it empty just closes; Esc cancels.
+ * leaving the field with text adds and closes (after the click that left it), leaving it empty
+ * just closes; Esc cancels.
  * `onAdd` resolves true when the step was saved. `onClose(added)` is called whenever the field closes.
  */
 export function StepAdder({
@@ -119,6 +120,7 @@ export function StepAdder({
   onStart,
   onClose,
   onAdd,
+  flushRef,
 }: {
   adding: boolean;
   /** The checklist is at its limit. */
@@ -128,27 +130,82 @@ export function StepAdder({
   onStart: () => void;
   onClose: (added: boolean) => void;
   onAdd: (title: string) => Promise<boolean>;
+  /**
+   * Set while the field is open: saves what is typed now (or joins the save already running) so a
+   * panel action can go on top of it; null when there is nothing to save.
+   */
+  flushRef?: MutableRefObject<(() => Promise<boolean> | null) | null>;
 }) {
   const { t } = useTranslation();
   const [draft, setDraft] = useState('');
-  const sending = useRef(false);
+  // Latest text and callbacks, also for a commit that runs after the press that left the field.
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  const latest = useRef({ onAdd, onClose });
+  latest.current = { onAdd, onClose };
+  // One save at a time; a second request (Enter, 添加, leaving, a panel action) joins it.
+  const inflight = useRef<Promise<boolean> | null>(null);
+  // Whether this opening of the field added any step (a row without steps folds back otherwise).
+  const added = useRef(false);
+  const pressed = useRef(false);
   const hasText = draft.trim() !== '';
 
-  const submit = async (): Promise<boolean> => {
-    const title = draft.trim();
-    if (!title || sending.current) return false;
-    sending.current = true;
-    try {
-      const saved = await onAdd(title);
-      if (saved) setDraft((current) => (current.trim() === title ? '' : current));
-      return saved;
-    } finally {
-      sending.current = false;
-    }
+  useEffect(() => {
+    if (!adding) return;
+    added.current = false;
+    const down = () => {
+      pressed.current = true;
+    };
+    const up = () => {
+      pressed.current = false;
+    };
+    window.addEventListener('pointerdown', down, true);
+    window.addEventListener('pointerup', up, true);
+    window.addEventListener('pointercancel', up, true);
+    return () => {
+      pressed.current = false;
+      window.removeEventListener('pointerdown', down, true);
+      window.removeEventListener('pointerup', up, true);
+      window.removeEventListener('pointercancel', up, true);
+    };
+  }, [adding]);
+
+  const submit = (): Promise<boolean> => {
+    if (inflight.current) return inflight.current;
+    const title = draftRef.current.trim();
+    if (!title) return Promise.resolve(false);
+    const run = (async () => {
+      try {
+        const saved = await latest.current.onAdd(title);
+        if (saved) {
+          added.current = true;
+          if (draftRef.current.trim() === title) {
+            draftRef.current = '';
+            setDraft('');
+          }
+        }
+        return saved;
+      } finally {
+        inflight.current = null;
+      }
+    })();
+    inflight.current = run;
+    return run;
   };
+  if (flushRef)
+    flushRef.current = adding
+      ? () => inflight.current ?? (draftRef.current.trim() ? submit() : null)
+      : null;
   const cancel = () => {
     setDraft('');
-    onClose(false);
+    latest.current.onClose(added.current);
+  };
+  // Leaving the field adds what was typed and closes it; left empty, it just closes. A failed
+  // save keeps the field open with its text.
+  const leave = async () => {
+    if (inflight.current) await inflight.current;
+    if (draftRef.current.trim() && !(await submit())) return;
+    latest.current.onClose(added.current);
   };
 
   if (!adding)
@@ -194,10 +251,16 @@ export function StepAdder({
           }
         }}
         onBlur={() => {
-          if (!hasText) return onClose(false);
-          void submit().then((saved) => {
-            if (saved) onClose(true);
-          });
+          if (!pressed.current) return void leave();
+          // A press elsewhere took the focus: add after its click, so the click lands where it
+          // was aimed instead of on whatever the added step pushes under the pointer.
+          const after = () => {
+            window.removeEventListener('pointerup', after, true);
+            window.removeEventListener('pointercancel', after, true);
+            setTimeout(() => void leave(), 0);
+          };
+          window.addEventListener('pointerup', after, true);
+          window.addEventListener('pointercancel', after, true);
         }}
       />
       <Button

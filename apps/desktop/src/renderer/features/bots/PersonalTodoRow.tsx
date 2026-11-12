@@ -136,7 +136,7 @@ export function PersonalTodoRow({
                 setExpanded((open) => !open);
                 setAdding(false);
               }}
-              className="-mr-1 inline-flex size-5 shrink-0 items-center justify-center rounded-full text-[var(--text-secondary)] outline-none transition-colors hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
+              className="-my-0.5 -ml-0.5 -mr-1.5 inline-flex size-6 shrink-0 items-center justify-center rounded-full text-[var(--text-secondary)] outline-none transition-colors hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
             >
               <ChevronRight
                 size={12}
@@ -147,7 +147,7 @@ export function PersonalTodoRow({
             </button>
           </Tip>
         ) : readOnly ? (
-          <span aria-hidden className="-mr-1 size-5 shrink-0" />
+          <span aria-hidden className="-ml-0.5 -mr-1.5 size-6 shrink-0" />
         ) : (
           <Tip text={addLabel}>
             <button
@@ -157,7 +157,7 @@ export function PersonalTodoRow({
                 setExpanded(true);
                 setAdding(true);
               }}
-              className="-mr-1 inline-flex size-5 shrink-0 items-center justify-center rounded-full text-[var(--text-tertiary)] opacity-0 outline-none transition-opacity hover:bg-[var(--surface-hover)] focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] group-hover/row:opacity-100"
+              className="-my-0.5 -ml-0.5 -mr-1.5 inline-flex size-6 shrink-0 items-center justify-center rounded-full text-[var(--text-tertiary)] opacity-0 outline-none transition-opacity hover:bg-[var(--surface-hover)] focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] group-hover/row:opacity-100"
             >
               <Plus size={12} strokeWidth={2.2} aria-hidden />
             </button>

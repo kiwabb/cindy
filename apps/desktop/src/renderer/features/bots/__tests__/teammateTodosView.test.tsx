@@ -759,8 +759,10 @@ describe('personal todo steps', () => {
     expect((editorPanel().getByLabelText('personalTodos.notes') as HTMLTextAreaElement).value).toBe('draft notes');
   });
 
-  // Bug: pressing 保存 right after typing a step left the field (saving the step) and the click was lost.
-  it('saves the panel on top of a step its field saved when 保存 was pressed straight after typing', async () => {
+  // Bug: pressing 保存 right after typing a step left the field, the added step pushed the footer
+  // down before the release and the click was lost. The field now adds after the click, and the
+  // panel action saves the typed step first.
+  it('saves a typed step and then the panel when 保存 is pressed straight after typing', async () => {
     vi.mocked(api().list).mockResolvedValue([withSteps]);
     render(<TeammateTodosView />);
     fireEvent.click(await screen.findByRole('button', { name: 'Release notes' }));
@@ -771,14 +773,22 @@ describe('personal todo steps', () => {
     let finishStep!: (todo: typeof withSteps) => void;
     update().mockImplementationOnce(() => new Promise((resolve) => { finishStep = resolve; }));
     update().mockResolvedValueOnce({ ...withSteps, revision: 3, notes: 'n' });
-    // The press leaves the field first (its step starts saving), then the click lands.
+    // A real press: pointer down, the field loses focus, pointer up, then the click.
+    const save = editorPanel().getByRole('button', { name: 'personalTodos.save' });
+    fireEvent.pointerDown(save);
     fireEvent.blur(input);
-    fireEvent.click(editorPanel().getByRole('button', { name: 'personalTodos.save' }));
+    expect(update()).not.toHaveBeenCalled();
+    fireEvent.pointerUp(save);
+    fireEvent.click(save);
+    await waitFor(() => expect(update()).toHaveBeenCalledTimes(1));
+    expect(update().mock.calls[0][0]).toEqual({ id: 'with-steps', expectedRevision: 1, subtasks: [...steps(), { title: 'Archive' }] });
     finishStep({ ...withSteps, revision: 2, subtasks: [...steps(), { id: 's4', title: 'Archive', done: false }] });
     await waitFor(() => expect(update()).toHaveBeenCalledTimes(2));
-    expect(update().mock.calls[0][0]).toEqual({ id: 'with-steps', expectedRevision: 1, subtasks: [...steps(), { title: 'Archive' }] });
     expect(update().mock.lastCall![0]).toMatchObject({ id: 'with-steps', expectedRevision: 2, notes: 'n' });
     expect(update().mock.lastCall![0]).not.toHaveProperty('subtasks');
+    // The field's own commit after the click does not add the step a second time.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(update()).toHaveBeenCalledTimes(2);
   });
 
   it('adds steps from a row without any: Enter and 添加 keep the field open, leaving it adds and closes, Esc cancels', async () => {
