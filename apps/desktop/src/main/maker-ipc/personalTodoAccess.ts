@@ -11,6 +11,7 @@ import {
   type DataOwnerBroadcastScope,
 } from '../device-link/broadcast-tap.js';
 import type { TaskTag } from '@cindy/maker-shared';
+import { settleTodoSubtaskTimes } from '@cindy/maker-shared/teammate-todo';
 import { executeTaskTags } from '../localDb/ipc/taskTags.js';
 import type {
   PersonalTodo,
@@ -128,10 +129,11 @@ export interface PersonalTodoWriteResult {
  * queues it for the home instead, so there is never a second writer.
  */
 export async function writePersonalTodo(
-  input: PersonalTodoUpdate,
+  request: PersonalTodoUpdate,
   scope = captureDataOwnerBroadcastScope(),
 ): Promise<PersonalTodoWriteResult> {
   const { store, assertCurrent } = openPersonalTodoStore();
+  const input = await withStepTimes(request, store);
   // Role check and write happen under the sync layer's own lock, so a demotion cannot slip in
   // between and wipe the edit from the mirror.
   const outcome = await writeSharedDataset(
@@ -150,6 +152,27 @@ export async function writePersonalTodo(
   return queued.synced
     ? { todo: { ...todo, id: queued.synced.id, revision: queued.synced.revision }, sync: 'synced' }
     : { todo, sync: 'pending' };
+}
+
+/**
+ * Fixes step completion times before the edit can be queued for the main computer, so an edit
+ * replayed there later still records when the step was checked here (the store applies the same
+ * rule again; a malformed list is left for its validation to reject).
+ */
+async function withStepTimes(
+  input: PersonalTodoUpdate,
+  store: ReturnType<typeof openPersonalTodoStore>['store'],
+): Promise<PersonalTodoUpdate> {
+  const steps = input.subtasks;
+  if (
+    !Array.isArray(steps) ||
+    steps.some((step) => !step || typeof step !== 'object' || Array.isArray(step))
+  )
+    return input;
+  const previous = input.id
+    ? (await store.read()).items.find((todo) => todo.id === input.id)?.subtasks
+    : undefined;
+  return { ...input, subtasks: settleTodoSubtaskTimes(steps, previous, new Date()) };
 }
 
 export interface PersonalTodoSyncSummary {

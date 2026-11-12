@@ -34,7 +34,7 @@ export default {
       assert.equal(await checkbox.getAttribute('aria-checked'), 'false');
       await checkbox.focus();
       await ui.capture('personal-row-keyboard-focus-unit-fixture');
-      await row.getByRole('button', { name: '[fixture] Personal row — layout only' }).click();
+      await row.getByRole('button', { name: '[fixture] Personal row — layout only', exact: true }).click();
       await ui.capture('personal-existing-details-unit-fixture');
       return;
     }
@@ -85,12 +85,21 @@ export default {
       const stepsRow = page.getByTestId('todo-board-row').filter({ hasText: '回复供应商报价邮件' });
       await stepsRow.getByText('1/3').waitFor();
       await stepsRow.getByRole('button', { name: await ui.t('personalTodos.steps.expand', { title: '回复供应商报价邮件' }), exact: true }).click();
-      await stepsRow.getByRole('checkbox', { name: '确认交期' }).waitFor();
+      await stepsRow.getByRole('checkbox', { name: await ui.t('personalTodos.steps.complete', { title: '确认交期' }) }).waitFor();
       await ui.capture('steps-inline');
+      // The add row opens a field; a row without steps shows a ghost add button on hover.
+      await stepsRow.getByRole('button', { name: await ui.t('personalTodos.steps.add'), exact: true }).click();
+      await stepsRow.getByRole('textbox', { name: await ui.t('personalTodos.steps.name'), exact: true }).fill('发送确认邮件');
+      await ui.capture('steps-adding');
+      await stepsRow.getByRole('button', { name: await ui.t('personalTodos.steps.cancel'), exact: true }).dispatchEvent('mousedown');
+      const plainRow = page.getByTestId('todo-board-row').filter({ hasText: '预约体检' });
+      await plainRow.hover();
+      await plainRow.getByRole('button', { name: await ui.t('personalTodos.steps.addTo', { title: '预约体检' }), exact: true }).waitFor();
+      await ui.capture('steps-ghost-add');
 
       await page.getByRole('button', { name: '准备周会材料', exact: true }).click();
       await page.getByRole('complementary').waitFor();
-      await page.getByRole('complementary').getByRole('checkbox', { name: '打印会议材料' }).waitFor();
+      await page.getByRole('complementary').getByRole('checkbox', { name: await ui.t('personalTodos.steps.complete', { title: '打印会议材料' }) }).waitFor();
       // The reminder control must fit the panel in every language (long labels would otherwise scroll).
       const reminder = page.getByRole('radiogroup', { name: await ui.t('personalTodos.reminder.label') });
       assert.equal(await reminder.evaluate((element) => element.scrollWidth <= element.clientWidth), true, 'reminder options fit the panel');

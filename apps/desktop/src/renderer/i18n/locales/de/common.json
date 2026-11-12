@@ -19859,11 +19859,16 @@
     "title": "Titel",
     "notes": "Notizen (optional)",
     "steps": {
-      "title": "Schritte",
       "add": "Schritt hinzufügen",
       "expand": "Schritte anzeigen: {{title}}",
       "collapse": "Schritte ausblenden: {{title}}",
-      "remove": "Schritt entfernen: {{title}}"
+      "remove": "Schritt entfernen: {{title}}",
+      "addTo": "Schritt hinzufügen: {{title}}",
+      "name": "Name des Schritts",
+      "confirm": "Hinzufügen",
+      "cancel": "Abbrechen",
+      "complete": "Abschließen: {{title}}",
+      "reopen": "Wieder öffnen: {{title}}"
     },
     "deadline": "Fällig am (optional)",
     "deadlineTime": "Uhrzeit (optional)",

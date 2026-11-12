@@ -374,7 +374,7 @@ describe('personal todo account store', () => {
     const created = await store.update({ creationRequestId: 'with-steps', title: 'Checklist unit item', subtasks: [{ title: ' 拉数据 ' }, { title: '写结论', done: true }] });
     expect(created.subtasks).toEqual([
       { id: expect.stringMatching(/^[A-Za-z0-9_-]{1,64}$/), title: '拉数据', done: false },
-      { id: expect.stringMatching(/^[A-Za-z0-9_-]{1,64}$/), title: '写结论', done: true },
+      { id: expect.stringMatching(/^[A-Za-z0-9_-]{1,64}$/), title: '写结论', done: true, doneAt: expect.any(String) },
     ]);
     // A lost-reply retry of the same creation is the same item, even though new ids would differ.
     expect((await store.update({ creationRequestId: 'with-steps', title: 'Checklist unit item', subtasks: [{ title: '拉数据' }, { title: '写结论', done: true }] })).id).toBe(created.id);
@@ -394,6 +394,46 @@ describe('personal todo account store', () => {
     raw.items[0].subtasks = [{ id: 'x', title: 'ok', done: 'yes' }];
     await writeFile(file, JSON.stringify(raw));
     await expect(store.list()).rejects.toMatchObject({ code: 'CORRUPT_STORE' });
+  });
+  // Contract for step completion times (2026-11-12): checking a step records when; a whole-list
+  // replace that omits the time (Agent, phone, older peers) keeps it, unchecking clears it, steps
+  // checked before times were recorded stay without one, and a time sent with the edit wins.
+  it('records when each step was checked across whole-list replaces', async () => {
+    const { file } = await fixture();
+    const store = createPersonalTodoStore(file);
+    // A time stamped by a write falls inside that call (the store lock reads the real clock).
+    const timed = async (write: () => Promise<Awaited<ReturnType<typeof store.update>>>) => {
+      const from = new Date().toISOString();
+      const todo = await write();
+      return { todo, inside: (at?: string) => !!at && at >= from && at <= new Date().toISOString() };
+    };
+    const plain = ({ id, title, done }: { id: string; title: string; done: boolean }) => ({ id, title, done });
+    const one = await timed(() => store.update({ creationRequestId: 'timed', title: 'Timed steps', subtasks: [{ title: 'a', done: true }, { title: 'b' }, { title: 'c' }] }));
+    const [a, b, c] = one.todo.subtasks;
+    expect(one.inside(a.doneAt)).toBe(true);
+    expect(b).not.toHaveProperty('doneAt');
+    // Agent / phone / older peers send no time: a checked step keeps its own, a newly checked one gets the edit's.
+    const two = await timed(() => store.update({ id: one.todo.id, expectedRevision: one.todo.revision, subtasks: [plain(a), { ...plain(b), done: true }, plain(c)] }));
+    expect(two.todo.subtasks[0].doneAt).toBe(a.doneAt);
+    expect(two.inside(two.todo.subtasks[1].doneAt)).toBe(true);
+    const unchecked = await store.update({ id: two.todo.id, expectedRevision: two.todo.revision, subtasks: [{ ...two.todo.subtasks[0], done: false }, two.todo.subtasks[1], two.todo.subtasks[2]] });
+    expect(unchecked.subtasks[0]).not.toHaveProperty('doneAt');
+    // Rechecked now; a future time is clamped to now; a past time sent with the edit (checked on another computer) is kept.
+    const three = await timed(() => store.update({ id: unchecked.id, expectedRevision: unchecked.revision, subtasks: [
+      { ...plain(unchecked.subtasks[0]), done: true },
+      { ...unchecked.subtasks[1], doneAt: '2999-01-01T00:00:00.000Z' },
+      { ...plain(c), done: true, doneAt: '2020-01-03T20:00:00.000Z' },
+    ] }));
+    expect(three.inside(three.todo.subtasks[0].doneAt) && three.inside(three.todo.subtasks[1].doneAt)).toBe(true);
+    expect(three.todo.subtasks[2].doneAt).toBe('2020-01-03T20:00:00.000Z');
+    // A step checked before times were recorded is not stamped by a later edit.
+    const raw = JSON.parse(await readFile(file, 'utf8'));
+    delete raw.items[0].subtasks[0].doneAt;
+    await writeFile(file, JSON.stringify(raw));
+    const legacy = (await store.list())[0];
+    const kept = await store.update({ id: legacy.id, expectedRevision: legacy.revision, subtasks: legacy.subtasks.map(plain) });
+    expect(kept.subtasks[0]).not.toHaveProperty('doneAt');
+    expect(kept.subtasks[2].doneAt).toBe('2020-01-03T20:00:00.000Z');
   });
 });
 

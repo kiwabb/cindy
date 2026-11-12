@@ -20046,11 +20046,16 @@
     "title": "Título",
     "notes": "Notas (opcional)",
     "steps": {
-      "title": "Passos",
       "add": "Adicionar passo",
       "expand": "Mostrar passos: {{title}}",
       "collapse": "Ocultar passos: {{title}}",
-      "remove": "Remover passo: {{title}}"
+      "remove": "Remover passo: {{title}}",
+      "addTo": "Adicionar passo: {{title}}",
+      "name": "Nome do passo",
+      "confirm": "Adicionar",
+      "cancel": "Cancelar",
+      "complete": "Concluir: {{title}}",
+      "reopen": "Reabrir: {{title}}"
     },
     "deadline": "Prazo (opcional)",
     "deadlineTime": "Hora (opcional)",

@@ -19787,11 +19787,16 @@
     "title": "标题",
     "notes": "备注（可略）",
     "steps": {
-      "title": "步骤",
       "add": "添一步",
       "expand": "展步骤：{{title}}",
       "collapse": "收步骤：{{title}}",
-      "remove": "删步骤：{{title}}"
+      "remove": "删步骤：{{title}}",
+      "addTo": "添一步：{{title}}",
+      "name": "步骤名",
+      "confirm": "添",
+      "cancel": "罢",
+      "complete": "完成：{{title}}",
+      "reopen": "重开：{{title}}"
     },
     "deadline": "截止日（可略）",
     "deadlineTime": "截止之时（可略）",

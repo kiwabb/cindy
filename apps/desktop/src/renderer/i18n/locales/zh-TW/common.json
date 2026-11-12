@@ -19787,11 +19787,16 @@
     "title": "標題",
     "notes": "備註（選填）",
     "steps": {
-      "title": "步驟",
       "add": "新增步驟",
       "expand": "展開步驟：{{title}}",
       "collapse": "收合步驟：{{title}}",
-      "remove": "刪除步驟：{{title}}"
+      "remove": "刪除步驟：{{title}}",
+      "addTo": "新增步驟：{{title}}",
+      "name": "步驟名稱",
+      "confirm": "新增",
+      "cancel": "取消",
+      "complete": "完成：{{title}}",
+      "reopen": "重新開啟：{{title}}"
     },
     "deadline": "截止日期（選填）",
     "deadlineTime": "截止時間（選填）",

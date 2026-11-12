@@ -184,7 +184,6 @@ function TodoBoard() {
               }
               onUpdate={updateRow}
               onSteps={updateSteps}
-              reserveStepsToggle={listHasSteps}
               conflict={
                 sync.conflicts.has(todo.id)
                   ? { busy: sync.busy, onResolve: (choice) => void sync.resolve(todo.id, choice) }

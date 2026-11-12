@@ -1,14 +1,23 @@
 import { useState } from 'react';
-import { Check, ChevronDown, ListChecks, TriangleAlert } from 'lucide-react';
+import { Check, ChevronRight, ListChecks, Plus, TriangleAlert } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { TaskTag } from '@cindy/maker-shared';
 
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Tip } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import type { PersonalTodo, PersonalTodoUpdate } from '../../../shared/personalTodo';
-import { personalDueText, stepsProgress, toggledSteps } from './personalTodoModel';
+import { TODO_MAX_SUBTASKS } from '@cindy/maker-shared/teammate-todo';
+import { StepAdder, StepList } from './PersonalTodoSteps';
+import {
+  appendedSteps,
+  personalDueText,
+  removedSteps,
+  stepsProgress,
+  toggledSteps,
+  type PersonalStepsInput,
+} from './personalTodoModel';
+import { CONFLICT_DRAFT_PREFIX } from './usePersonalTodoSync';
 import { PRIORITY_KEY, PriorityRing, TagDot, tagDisplayName } from './personalTodoVisuals';
 import type { TodoBoardBucket, TodoBoardView } from './teammateTodoBoard';
 
@@ -33,7 +42,6 @@ export function PersonalTodoRow({
   onOpen,
   onUpdate,
   onSteps,
-  reserveStepsToggle = false,
   conflict,
 }: {
   todo: PersonalTodo;
@@ -48,8 +56,6 @@ export function PersonalTodoRow({
   onUpdate: (input: PersonalTodoUpdate) => Promise<void>;
   /** Saves a checklist edit without closing the details panel or announcing a save. */
   onSteps: (input: PersonalTodoUpdate) => Promise<void>;
-  /** Keep the toggle's slot when another row in the list has steps, so tags and dates line up. */
-  reserveStepsToggle?: boolean;
   /** Multi-computer sync: an edit made here that the main computer refused, with the owner's choices. */
   conflict?: { busy: boolean; onResolve: (choice: 'mine' | 'theirs') => void };
 }) {
@@ -57,6 +63,7 @@ export function PersonalTodoRow({
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [stepBusy, setStepBusy] = useState(false);
   const done = todo.status === 'done';
   const priority = todo.priority ?? 0;
@@ -65,17 +72,18 @@ export function PersonalTodoRow({
     (priority && !done ? ` · ${t(`personalTodos.priority.${PRIORITY_KEY[priority]}`)}` : '');
   const steps = todo.subtasks;
   const progress = stepsProgress(steps);
-  const flipStep = async (id: string) => {
+  // A sync conflict draft has no todo on the main computer to edit; its steps are only shown.
+  const readOnly = todo.id.startsWith(CONFLICT_DRAFT_PREFIX);
+  const saveSteps = async (subtasks: PersonalStepsInput | null): Promise<boolean> => {
+    if (!subtasks || stepBusy || readOnly) return false;
     setStepBusy(true);
     setFailed(false);
     try {
-      await onSteps({
-        id: todo.id,
-        expectedRevision: todo.revision,
-        subtasks: toggledSteps(steps, id),
-      });
+      await onSteps({ id: todo.id, expectedRevision: todo.revision, subtasks });
+      return true;
     } catch {
       setFailed(true);
+      return false;
     } finally {
       setStepBusy(false);
     }
@@ -83,6 +91,7 @@ export function PersonalTodoRow({
   const stepsLabel = t(expanded ? 'personalTodos.steps.collapse' : 'personalTodos.steps.expand', {
     title: todo.title,
   });
+  const addLabel = t('personalTodos.steps.addTo', { title: todo.title });
   const due =
     view === 'later'
       ? {
@@ -113,10 +122,47 @@ export function PersonalTodoRow({
     <div data-testid="todo-board-row">
       <div
         className={cn(
-          'flex min-h-10 w-full items-center gap-3 rounded-lg px-2 py-1.5 focus-within:ring-2 focus-within:ring-inset focus-within:ring-[var(--focus-ring)]',
+          'group/row flex min-h-10 w-full items-center gap-3 rounded-lg px-2 py-1.5 focus-within:ring-2 focus-within:ring-inset focus-within:ring-[var(--focus-ring)]',
           selected ? 'bg-[var(--surface-chip)]' : 'hover:bg-[var(--surface-hover)]',
         )}
       >
+        {progress ? (
+          <Tip text={stepsLabel}>
+            <button
+              type="button"
+              aria-expanded={expanded}
+              aria-label={stepsLabel}
+              onClick={() => {
+                setExpanded((open) => !open);
+                setAdding(false);
+              }}
+              className="-my-0.5 -ml-0.5 -mr-1.5 inline-flex size-6 shrink-0 items-center justify-center rounded-full text-[var(--text-secondary)] outline-none transition-colors hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
+            >
+              <ChevronRight
+                size={12}
+                strokeWidth={2.2}
+                aria-hidden
+                className={cn('transition-transform', expanded && 'rotate-90')}
+              />
+            </button>
+          </Tip>
+        ) : readOnly ? (
+          <span aria-hidden className="-ml-0.5 -mr-1.5 size-6 shrink-0" />
+        ) : (
+          <Tip text={addLabel}>
+            <button
+              type="button"
+              aria-label={addLabel}
+              onClick={() => {
+                setExpanded(true);
+                setAdding(true);
+              }}
+              className="-my-0.5 -ml-0.5 -mr-1.5 inline-flex size-6 shrink-0 items-center justify-center rounded-full text-[var(--text-tertiary)] opacity-0 outline-none transition-opacity hover:bg-[var(--surface-hover)] focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] group-hover/row:opacity-100"
+            >
+              <Plus size={12} strokeWidth={2.2} aria-hidden />
+            </button>
+          </Tip>
+        )}
         <button
           type="button"
           role="checkbox"
@@ -210,52 +256,33 @@ export function PersonalTodoRow({
             </span>
           ) : null}
         </button>
-        {progress ? (
-          <Tip text={stepsLabel}>
-            <button
-              type="button"
-              aria-expanded={expanded}
-              aria-label={stepsLabel}
-              onClick={() => setExpanded((open) => !open)}
-              className="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-[var(--text-secondary)] outline-none transition-colors hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
-            >
-              <ChevronDown
-                size={14}
-                aria-hidden
-                className={cn('transition-transform', expanded && 'rotate-180')}
-              />
-            </button>
-          </Tip>
-        ) : reserveStepsToggle ? (
-          <span aria-hidden className="size-6 shrink-0" />
-        ) : null}
       </div>
-      {expanded && steps.length ? (
-        <ul className="flex flex-col pb-1 pl-11 pr-2">
-          {steps.map((step) => (
-            <li key={step.id}>
-              <label className="flex min-h-7 cursor-pointer items-start gap-2.5 rounded-lg px-2 py-1 hover:bg-[var(--surface-hover)]">
-                <Checkbox
-                  className="mt-0.5"
-                  checked={step.done}
-                  disabled={stepBusy}
-                  onChange={() => void flipStep(step.id)}
-                />
-                <span
-                  className={cn(
-                    'min-w-0 flex-1 break-words text-13 leading-5',
-                    step.done
-                      ? 'text-[var(--text-tertiary)] line-through'
-                      : 'text-[var(--text-primary)]',
-                  )}
-                >
-                  {step.title}
-                </span>
-              </label>
-            </li>
-          ))}
-        </ul>
-) : null}
+      {expanded ? (
+        <div className="flex flex-col pb-2 pl-16 pr-2.5">
+          <StepList
+            steps={steps}
+            now={now}
+            disabled={stepBusy}
+            readOnly={readOnly}
+            onToggle={(id) => void saveSteps(toggledSteps(steps, id))}
+            onRemove={(id) => void saveSteps(removedSteps(steps, id))}
+          />
+          {readOnly ? null : (
+            <StepAdder
+              adding={adding}
+              full={steps.length >= TODO_MAX_SUBTASKS}
+              cancellable
+              onStart={() => setAdding(true)}
+              onAdd={(title) => saveSteps(appendedSteps(steps, title))}
+              onClose={(added) => {
+                setAdding(false);
+                // Nothing was added to a row that had no steps: fold it back.
+                if (!added && !steps.length) setExpanded(false);
+              }}
+            />
+          )}
+        </div>
+      ) : null}
       {conflict ? (
         <div
           data-testid="todo-sync-conflict"

@@ -20046,11 +20046,16 @@
     "title": "Titre",
     "notes": "Notes (facultatif)",
     "steps": {
-      "title": "Étapes",
       "add": "Ajouter une étape",
       "expand": "Afficher les étapes : {{title}}",
       "collapse": "Masquer les étapes : {{title}}",
-      "remove": "Supprimer l’étape : {{title}}"
+      "remove": "Supprimer l’étape : {{title}}",
+      "addTo": "Ajouter une étape : {{title}}",
+      "name": "Nom de l’étape",
+      "confirm": "Ajouter",
+      "cancel": "Annuler",
+      "complete": "Terminer : {{title}}",
+      "reopen": "Rouvrir : {{title}}"
     },
     "deadline": "Échéance (facultatif)",
     "deadlineTime": "Heure (facultatif)",

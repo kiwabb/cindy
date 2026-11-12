@@ -25,3 +25,7 @@
 - `data.items[]` 追加 `subtasks: [{ id, title, done }]`（显式字段，保持顺序，最多 50 步，无子任务为 `[]`），并计入资源 revision。块 `data.capabilities` 追加 `subtasks: 1`（与 `organize: 1` 并列）。动作 `update` 追加可选输入 `subtasks`：`[{ id?, title, done? }]` 整体替换有序清单，仍受 `expectedRevision` 保护；形状不合法 → `INVALID_PARAMS`，内容（条数、长度）由主机存储校验，新步骤的 id 由存储分配。
 - 兼容矩阵：旧主机 × 新手机：无 `subtasks` 字段与标记，手机按无子任务显示，永不发送 `subtasks`；新主机 × 旧手机：多出的 `subtasks` 与标记被旧手机的白名单解析忽略，旧手机的更新不含 `subtasks`，整体替换语义下主机保留原清单；新主机 × 新手机：行里显示完成数/总数；旧主机 × 旧手机：不变。已发布的桌面拒绝未知更新字段，所以今后手机编辑器只有读到 `capabilities.subtasks >= 1` 才可发送该字段。本期手机只展示进度，不提供子任务编辑，且任何手机写入都不带 `subtasks`（保留）。
 - 自建中转仍无需同步修改：新增的只是既有 `get` 响应、`invoke` 输入里的可选字段与 `capabilities` 标记，位于中转看不到的加密 payload 内，不涉及帧格式、认证、版本或部署程序。
+
+## 步骤勾选时间（2026-11-12，线上协议不变）
+
+- 主机存储给已勾的步骤记 `doneAt`，但本资源的投影与 `update` 输入白名单都不变：`subtasks[]` 仍只有 `{ id, title, done }`，手机不显示勾选时间。手机写入不带时间，由主机按「已勾的保留原时间、新勾的记为本次修改时间」记录。资源 revision 本就随条目 revision 变化，不受影响。

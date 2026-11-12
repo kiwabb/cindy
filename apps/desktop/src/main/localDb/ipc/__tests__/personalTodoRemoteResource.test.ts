@@ -8,7 +8,7 @@
  * - tier：unit（真实 registry 与待办文件，electron / 账号边界用内存替身）。
  */
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { copyFile, mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -254,6 +254,36 @@ it('on a replica queues the phone write for the main computer instead of writing
   expect(env.catalog.some((tag) => tag.id === 'home-tag')).toBe(false);
 });
 
+// 步骤完成时间（docs/product-rules/personal-todos.md）：副本上勾的步骤进待发队列时就带上勾选时间，
+// 主力电脑稍后补交时记下的是这个时间，不是补交时间；已勾的步骤保留原来的时间。
+it('on a replica queues a checked step with the moment it was checked, which the home keeps on a later flush', async () => {
+  await update({ creationRequestId: 'req-timed', title: '副本勾步骤', subtasks: [{ title: '一步', done: true }, { title: '二步' }] });
+  const before = (await read()).items[0];
+  const steps = before.subtasks as Array<{ id: string; title: string; done: boolean }>;
+  const firstDoneAt = (await openPersonalTodoStore().store.list())[0].subtasks[0].doneAt;
+  // The home's file as it was before the replica edit; the replica's own file is its mirror.
+  const home = await mkdtemp(path.join(os.tmpdir(), 'personal-todo-home-'));
+  await copyFile(path.join(env.dir, 'personal-todos.v1.json'), path.join(home, 'personal-todos.v1.json'));
+  env.role = 'replica';
+  // Like the engine: queue the edit as given, then apply that same edit to the mirror.
+  env.enqueue.mockImplementation(async (_dataset: string, queued: Record<string, unknown>) => personalTodosDataset.applySubmit(queued));
+  const editedFrom = new Date().toISOString();
+  await update({ id: before.id, expectedRevision: before.revision, subtasks: steps.map((s) => ({ id: s.id, title: s.title, done: true })) });
+  // The phone sends no times; the queued edit carries them (the earlier step keeps its own).
+  const queued = env.enqueue.mock.calls[0][1] as { subtasks: Array<{ doneAt?: string }> };
+  expect(queued.subtasks[0].doneAt).toBe(firstDoneAt);
+  expect(queued.subtasks[1].doneAt! >= editedFrom).toBe(true);
+  const mirror = (await openPersonalTodoStore().store.list())[0];
+  expect(mirror.subtasks.map((s) => s.doneAt)).toEqual(queued.subtasks.map((s) => s.doneAt));
+  // The main computer applies the queued edit later and records the same moments.
+  const replicaDir = env.dir;
+  env.dir = home;
+  const applied = (await personalTodosDataset.applySubmit(queued)) as unknown as { subtasks: Array<{ doneAt?: string }> };
+  expect(applied.subtasks.map((s) => s.doneAt)).toEqual(queued.subtasks.map((s) => s.doneAt));
+  env.dir = replicaDir;
+  await rm(home, { recursive: true, force: true });
+});
+
 // 加入同步/降级时带过去的待办：已完成保持完成、稍后保持稍后（不重开）、已删除不带（docs/product-rules/personal-todos.md「多台电脑同步」）。
 it('carries completed and deferred todos over faithfully and skips deleted ones', async () => {
   const later = new Date(Date.now() + 86_400_000).toISOString();
@@ -284,6 +314,8 @@ it('carries completed and deferred todos over faithfully and skips deleted ones'
   expect(after.get('稍后')).toMatchObject({ status: 'open', deferredUntil: later });
   expect(after.get('进行中')).toMatchObject({ status: 'open', deferredUntil: null });
   expect(after.get('进行中')?.subtasks.map((s) => [s.title, s.done])).toEqual([['一步', false], ['二步', true]]);
+  // The step keeps the moment it was checked on the computer it came from.
+  expect(after.get('进行中')?.subtasks[1].doneAt).toBe(raw.find((r) => r.title === '进行中')!.subtasks![1].doneAt);
   const home = personalTodosDataset.reviseUpdate!(raw.find((r) => r.title === '进行中')!, raw.find((r) => r.title === '进行中')!);
   expect((home as { subtasks: unknown[] }).subtasks).toHaveLength(2);
   // The same creation again (a retried flush) changes nothing.

@@ -24,7 +24,7 @@ export interface PersonalTodo {
   /** Ids in this device's task-tag catalog; an id missing from the catalog reads as untagged. */
   tagIds: string[];
   reminder: TodoReminder;
-  /** Ordered checklist steps; each has only a title and a done state. */
+  /** Ordered checklist steps: a title, a done state and, once checked, when (`doneAt`). */
   subtasks: TodoSubtask[];
   ownership: 'self';
   source: 'manual';
@@ -41,9 +41,10 @@ export interface PersonalTodoUpdate {
   reminder?: TodoReminder;
   /**
    * Replaces the whole checklist in this order, guarded by expectedRevision like every edit.
-   * Keep the ids of existing steps; a new step may omit its id and `done` (false).
+   * Keep the ids of existing steps; a new step may omit its id and `done` (false). `doneAt` is
+   * optional: a step already checked keeps its time and a newly checked one gets the time of the edit.
    */
-  subtasks?: Array<{ id?: string; title: string; done?: boolean }>;
+  subtasks?: Array<{ id?: string; title: string; done?: boolean; doneAt?: string }>;
   operation?: 'complete' | 'reopen' | 'delete' | 'later' | 'restore';
   until?: string;
 }
