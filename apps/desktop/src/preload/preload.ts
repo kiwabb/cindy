@@ -6181,6 +6181,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.invoke('local-db:sessions:ack-interrupted', id),
       // Stage 2 C2: fork 已迁到 electronAPI.maker.fork (走 maker:fork IPC)。
     },
+    /** Read-only learning goals from tutor teammates' projects on this computer. */
+    learning: {
+      snapshot: () => ipcRenderer.invoke('learning:snapshot'),
+      onChanged: (listener: () => void) => {
+        const wrapped = () => listener();
+        ipcRenderer.on('learning:changed', wrapped);
+        return () => ipcRenderer.removeListener('learning:changed', wrapped);
+      },
+    },
     personalTodos: {
       list: () => ipcRenderer.invoke('local-db:personal-todos:list'),
       update: (input: import('../shared/personalTodo').PersonalTodoUpdate) => ipcRenderer.invoke('local-db:personal-todos:update', input),
