@@ -9566,7 +9566,8 @@
         "unknown": "알 수 없는 탭",
         "ghostPanel": "플러그인 패널",
         "pluginView": "플러그인 보기",
-        "pluginTask": "플러그인 작업 페이지"
+        "pluginTask": "플러그인 작업 페이지",
+        "learningToday": "오늘"
       },
       "controls": {
         "showAria": "사이드바 표시",
@@ -10314,7 +10315,8 @@
         "plugins": "플러그인",
         "bots": "동료",
         "search": "검색",
-        "todos": "할 일"
+        "todos": "할 일",
+        "learning": "학습"
       },
       "todosCount_other": "진행 중인 할 일 {{count}}개"
     },
@@ -19892,7 +19894,8 @@
       "add": "추가",
       "cancel": "취소",
       "dismissRecognition": "“{{phrase}}” 인식 안 함"
-    }
+    },
+    "openLinked": "연결된 대화 열기"
   },
   "awayGuard": {
     "status": "Cindy가 작업 중입니다",
@@ -19973,5 +19976,97 @@
     "detail": "요청 기기: {{device}}\n목적: {{purpose}}\n\n활성화하면 같은 계정의 기기에서 작업 실행 및 파일 접근을 포함하여 이 컴퓨터를 제어할 수 있습니다. 설정에서 끌 때까지 유지됩니다.",
     "decline": "나중에",
     "enable": "원격 제어 활성화"
+  },
+  "learning": {
+    "title": "학습",
+    "today": "오늘",
+    "goals": "목표",
+    "archived": "보관됨",
+    "moduleNumber": "모듈 {{number}}",
+    "allCleared": "이 목표의 항목을 모두 통과했습니다",
+    "goStudy": "학습하러 가기",
+    "stepAt": "진행 단계 · {{step}}",
+    "step": {
+      "practice": "연습",
+      "explain": "설명"
+    },
+    "openQuestion": "답변을 기다리는 문제 1개",
+    "noOpenQuestion": "답변을 기다리는 문제가 없습니다",
+    "dueToday": "오늘 복습 {{count}}",
+    "nextReview": "다음 복습 {{date}}",
+    "plan": {
+      "title": "오늘 계획",
+      "recap": "돌아보기",
+      "explain": "설명",
+      "practice": "연습",
+      "wrap-up": "정리",
+      "segmentAria": "{{name}} {{count}}분",
+      "joiner": ", "
+    },
+    "minutes": "{{count}}분",
+    "goalQuote": "목표 원문: {{quote}}",
+    "outlineDraft": "개요 미확정",
+    "finalizeOutline": "확정하러 가기",
+    "masteredLabel": "익힘",
+    "masteredAria": "{{total}}개 중 {{count}}개 익힘",
+    "lastActivity": "최근 활동 {{when}}",
+    "todayAt": "오늘 {{time}}",
+    "outline": "개요",
+    "outlineSize": "모듈 {{modules}}개 · 항목 {{points}}개",
+    "aboutYou": "나에 대해",
+    "readOnly": "읽기 전용",
+    "profile": {
+      "priorKnowledge": "현재 기초",
+      "targetLevel": "목표 수준",
+      "timeBudget": "시간 계획",
+      "preferences": "선호"
+    },
+    "profileNote": "바뀐 점은 대화에서 {{name}}에게 알려 주세요",
+    "reviews": "복습",
+    "reviewedTimes_other": "{{count}}번 복습함",
+    "noReviews": "예정된 복습이 아직 없습니다",
+    "openConversation": "{{name}} 대화 열기",
+    "tutorFallback": "튜터",
+    "loadFailed": "학습 목표를 불러오지 못했습니다",
+    "empty": {
+      "title": "아직 학습 목표가 없습니다",
+      "body": "{{name}} 대화에서 배우고 싶은 것을 말하면 {{name}}이(가) 함께 개요를 정합니다.",
+      "action": "{{name}}와(과) 새 목표 만들기"
+    },
+    "pointState": {
+      "not-started": "시작 전",
+      "in-progress": "진행 중",
+      "mastered": "익힘",
+      "deferred": "보류",
+      "self-reported": "스스로 익혔다고 함"
+    },
+    "pointType": {
+      "memory": "암기",
+      "concept": "개념",
+      "procedure": "절차",
+      "design": "설계"
+    },
+    "checkLimit": {
+      "audio": "오디오 필요 · 아직 확인 불가",
+      "speech": "말하기 필요 · 아직 확인 불가"
+    },
+    "tab": {
+      "currentPoint": "현재 항목",
+      "waiting": "답변 대기",
+      "doneToday": "오늘 완료",
+      "answered": "답변",
+      "correct": "정답",
+      "continue": "계속 학습",
+      "explainFirst": "먼저 설명",
+      "anotherQuestion": "다른 문제",
+      "say": {
+        "continue": "계속 학습할게요",
+        "explainFirst": "먼저 설명해 주세요",
+        "anotherQuestion": "다른 문제로 바꿔 주세요"
+      },
+      "unbound": "이 대화에는 진행 중인 학습 목표가 연결되어 있지 않습니다",
+      "localOnly": "학습 목표는 이 컴퓨터의 대화에서만 표시됩니다",
+      "prefillFailed": "입력란을 잠시 사용할 수 없습니다. 잠시 후 다시 시도하세요"
+    }
   }
 }

@@ -9566,7 +9566,8 @@
         "unknown": "未知標籤頁",
         "ghostPanel": "插件面板",
         "pluginView": "插件視圖",
-        "pluginTask": "插件任務頁"
+        "pluginTask": "插件任務頁",
+        "learningToday": "今天"
       },
       "controls": {
         "showAria": "顯示側欄",
@@ -10314,7 +10315,8 @@
         "plugins": "插件",
         "bots": "夥伴",
         "search": "搜尋",
-        "todos": "待辦"
+        "todos": "待辦",
+        "learning": "學習"
       },
       "todosCount_other": "{{count}} 項進行中的待辦"
     },
@@ -19892,7 +19894,8 @@
       "add": "新增",
       "cancel": "取消",
       "dismissRecognition": "不辨識「{{phrase}}」"
-    }
+    },
+    "openLinked": "開啟關聯的對話"
   },
   "awayGuard": {
     "status": "Cindy 正在工作",
@@ -19973,5 +19976,97 @@
     "detail": "請求來自「{{device}}」\n用途：{{purpose}}\n\n開啟後，同帳號裝置可以遠端控制這台電腦，包括執行任務和存取檔案。此設定持續有效，可隨時在設定中關閉。",
     "decline": "暫不開啟",
     "enable": "開啟遠端控制"
+  },
+  "learning": {
+    "title": "學習",
+    "today": "今天",
+    "goals": "目標",
+    "archived": "已封存",
+    "moduleNumber": "模組 {{number}}",
+    "allCleared": "這個目標的知識點都已過關",
+    "goStudy": "去學習",
+    "stepAt": "進行到 · {{step}}",
+    "step": {
+      "practice": "練習",
+      "explain": "講解"
+    },
+    "openQuestion": "1 道題待回答",
+    "noOpenQuestion": "沒有待回答的題",
+    "dueToday": "今天到期複習 {{count}}",
+    "nextReview": "下次複習 {{date}}",
+    "plan": {
+      "title": "今日安排",
+      "recap": "回顧",
+      "explain": "講解",
+      "practice": "練習",
+      "wrap-up": "小結",
+      "segmentAria": "{{name}} {{count}} 分鐘",
+      "joiner": "，"
+    },
+    "minutes": "{{count}} 分鐘",
+    "goalQuote": "目標原話：{{quote}}",
+    "outlineDraft": "大綱未定稿",
+    "finalizeOutline": "去定稿",
+    "masteredLabel": "已掌握",
+    "masteredAria": "已掌握 {{count}} 個，共 {{total}} 個",
+    "lastActivity": "最近活動 {{when}}",
+    "todayAt": "今天 {{time}}",
+    "outline": "大綱",
+    "outlineSize": "{{modules}} 個模組 · {{points}} 個知識點",
+    "aboutYou": "關於你",
+    "readOnly": "唯讀",
+    "profile": {
+      "priorKnowledge": "現有基礎",
+      "targetLevel": "目標程度",
+      "timeBudget": "時間安排",
+      "preferences": "偏好"
+    },
+    "profileNote": "有變化請在對話裡告訴{{name}}",
+    "reviews": "複習",
+    "reviewedTimes_other": "已複習 {{count}} 次",
+    "noReviews": "還沒有排定的複習",
+    "openConversation": "開啟{{name}}對話",
+    "tutorFallback": "導師",
+    "loadFailed": "讀取學習目標失敗",
+    "empty": {
+      "title": "還沒有學習目標",
+      "body": "在{{name}}對話裡說出想學什麼，{{name}}會和你商定大綱。",
+      "action": "和{{name}}建立新目標"
+    },
+    "pointState": {
+      "not-started": "未開始",
+      "in-progress": "進行中",
+      "mastered": "已掌握",
+      "deferred": "已暫緩",
+      "self-reported": "自述掌握"
+    },
+    "pointType": {
+      "memory": "記憶",
+      "concept": "概念",
+      "procedure": "步驟",
+      "design": "設計"
+    },
+    "checkLimit": {
+      "audio": "需音訊 · 暫無法檢驗",
+      "speech": "需開口說 · 暫無法檢驗"
+    },
+    "tab": {
+      "currentPoint": "目前知識點",
+      "waiting": "待回答",
+      "doneToday": "今天已完成",
+      "answered": "作答",
+      "correct": "答對",
+      "continue": "繼續學習",
+      "explainFirst": "先講講",
+      "anotherQuestion": "換一道題",
+      "say": {
+        "continue": "繼續學習",
+        "explainFirst": "先講講",
+        "anotherQuestion": "換一道題"
+      },
+      "unbound": "這場對話沒有綁定進行中的學習目標",
+      "localOnly": "學習目標只在這台電腦上的對話裡顯示",
+      "prefillFailed": "輸入框暫時無法使用，請稍後再試"
+    }
   }
 }

@@ -9566,7 +9566,8 @@
         "unknown": "未明分頁",
         "ghostPanel": "法器面板",
         "pluginView": "法器視圖",
-        "pluginTask": "法器差事頁"
+        "pluginTask": "法器差事頁",
+        "learningToday": "今日"
       },
       "controls": {
         "showAria": "顯側欄",
@@ -10314,7 +10315,8 @@
         "plugins": "法器",
         "bots": "同僚",
         "search": "尋",
-        "todos": "待理"
+        "todos": "待理",
+        "learning": "學"
       },
       "todosCount_other": "待理方行者 {{count}}"
     },
@@ -19892,7 +19894,8 @@
       "add": "添",
       "cancel": "罷",
       "dismissRecognition": "不識「{{phrase}}」"
-    }
+    },
+    "openLinked": "啟所繫之對話"
   },
   "awayGuard": {
     "status": "Cindy 正勞作",
@@ -19973,5 +19976,97 @@
     "detail": "請求來自「{{device}}」\n所為：{{purpose}}\n\n啟用後，同帳號裝置可遠控此機，執行任務、存取檔案。此設長效，可隨時於設定中關閉。",
     "decline": "暫不開啟",
     "enable": "開啟遠端控制"
+  },
+  "learning": {
+    "title": "學",
+    "today": "今日",
+    "goals": "所志",
+    "archived": "已歸檔",
+    "moduleNumber": "第 {{number}} 篇",
+    "allCleared": "此志諸目皆已通過",
+    "goStudy": "往學",
+    "stepAt": "方至 · {{step}}",
+    "step": {
+      "practice": "習",
+      "explain": "講"
+    },
+    "openQuestion": "一題待答",
+    "noOpenQuestion": "無待答之題",
+    "dueToday": "今日當溫 {{count}}",
+    "nextReview": "下次溫習 {{date}}",
+    "plan": {
+      "title": "今日之課",
+      "recap": "溫故",
+      "explain": "講授",
+      "practice": "習之",
+      "wrap-up": "總結",
+      "segmentAria": "{{name}} {{count}} 分",
+      "joiner": "，"
+    },
+    "minutes": "{{count}} 分",
+    "goalQuote": "志之原話：{{quote}}",
+    "outlineDraft": "綱目未定",
+    "finalizeOutline": "往定之",
+    "masteredLabel": "已通",
+    "masteredAria": "已通 {{count}}，凡 {{total}}",
+    "lastActivity": "近動 {{when}}",
+    "todayAt": "今日 {{time}}",
+    "outline": "綱目",
+    "outlineSize": "{{modules}} 篇 · {{points}} 目",
+    "aboutYou": "關於汝",
+    "readOnly": "唯讀",
+    "profile": {
+      "priorKnowledge": "所學根柢",
+      "targetLevel": "所期之境",
+      "timeBudget": "時日之計",
+      "preferences": "所好"
+    },
+    "profileNote": "有變則於對話中告{{name}}",
+    "reviews": "溫習",
+    "reviewedTimes_other": "已溫 {{count}} 次",
+    "noReviews": "尚無溫習之期",
+    "openConversation": "啟{{name}}對話",
+    "tutorFallback": "導師",
+    "loadFailed": "讀所志失敗",
+    "empty": {
+      "title": "尚無所志",
+      "body": "於{{name}}對話中言所欲學，{{name}}當與汝共定綱目。",
+      "action": "與{{name}}立新志"
+    },
+    "pointState": {
+      "not-started": "未始",
+      "in-progress": "方學",
+      "mastered": "已通",
+      "deferred": "暫緩",
+      "self-reported": "自言已通"
+    },
+    "pointType": {
+      "memory": "記誦",
+      "concept": "概念",
+      "procedure": "步驟",
+      "design": "設計"
+    },
+    "checkLimit": {
+      "audio": "須聞音 · 暫不能驗",
+      "speech": "須開口 · 暫不能驗"
+    },
+    "tab": {
+      "currentPoint": "今所學",
+      "waiting": "待答",
+      "doneToday": "今日已畢",
+      "answered": "所答",
+      "correct": "答中",
+      "continue": "續學",
+      "explainFirst": "先講之",
+      "anotherQuestion": "易一題",
+      "say": {
+        "continue": "續學",
+        "explainFirst": "先講之",
+        "anotherQuestion": "易一題"
+      },
+      "unbound": "此對話未繫進行中之所志",
+      "localOnly": "所志唯於本機對話中見",
+      "prefillFailed": "輸入框暫不可用，稍後再試"
+    }
   }
 }

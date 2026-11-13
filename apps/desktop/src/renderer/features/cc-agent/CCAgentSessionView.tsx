@@ -263,6 +263,7 @@ import {
   type QueuedMessage,
 } from '@/lib/makerChatStore';
 import { openBackgroundTasksTab } from '@/features/right-sidebar/lib/openBackgroundTasksTab';
+import { LearningTodayTabAutoOpen } from '@/features/learning/learningTodayAutoOpen';
 import { openSubagentsTab } from '@/features/right-sidebar/lib/openSubagentsTab';
 import { BotAvatar } from '@/features/bots/BotAvatar';
 import { BotSessionContentHeaderRegistration } from '@/features/bots/BotSessionContentHeader';
@@ -5664,6 +5665,14 @@ function CCAgentSessionContent({
           initialCollapsed={shouldFirstFrameRevealOrcaWorkers ? false : undefined}
           writeInitialCollapsedRecord={shouldFirstFrameRevealOrcaWorkers}
           declare={setRightSidebarSessionId}
+        />
+      )}
+      {/* 导师对话的「今天」页签:本机对话绑定了进行中的学习目标时加上(不抢焦点)。 */}
+      {ownsRoute && !readOnly && sessionId && (
+        <LearningTodayTabAutoOpen
+          sessionId={sessionId}
+          remoteHostId={session?.remoteHostId ?? null}
+          deviceLinkDeviceId={rightSidebarDeviceLinkDeviceId}
         />
       )}
       {/* workdir 透 plugin ctx;remote session 一并携带 remoteHostId(文件浏览经

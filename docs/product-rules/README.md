@@ -12,6 +12,7 @@
 | --- | --- |
 | Agent 管理用户自己的资源、跨电脑工具与能力发现 | [Agent 与用户同权](agent-user-parity.md) |
 | 个人待办（fork）：桌面待办页、手机与 Agent 入口 | [个人待办](personal-todos.md) |
+| 学习页与导师对话的「今天」页签（fork）：只读导师的学习目标 | [学习页](learning-pages.md) |
 | 任务、对话、消息的用户称谓 | [命名](task-and-conversation-naming.md) |
 | 消息发送、来源标签与模型说明 | [消息来源](message-source.md) |
 | IM 上下文展示与完成未读 | [IM 消息呈现](im-message-presentation.md) |

@@ -143,4 +143,20 @@ describe('personal todo tools', () => {
       { id: 'b', subtasks: [], subtasksDone: 0, subtasksTotal: 0 },
     ]);
   });
+
+  // The tutor links its study todos to a conversation (2026-11-13, fork): the link reaches the host
+  // as given, null clears it, and a link with unknown fields never reaches the host.
+  it('forwards a conversation link or its removal and rejects one with unknown fields', async () => {
+    const callback = vi.fn<PersonalTodoCallbacks>(async () => ({ ok: true as const, todo: {} }));
+    const reg = new XdtHelperToolRegistry();
+    registerPersonalTodoTools(reg, callback);
+    const link = { sessionId: '79f2beb7-c1cc-4425-a77e-f4103d13f71c', deviceId: 'dev-1', botId: 'bot_tutor' };
+    expect(parse(await reg.call('update_personal_todo', { creationRequestId: 'study-1', title: '今日学习', link })).ok).toBe(true);
+    expect(callback).toHaveBeenLastCalledWith('update', { creationRequestId: 'study-1', title: '今日学习', link });
+    expect(parse(await reg.call('update_personal_todo', { id: 'a', expectedRevision: 1, link: null })).ok).toBe(true);
+    expect(callback).toHaveBeenLastCalledWith('update', { id: 'a', expectedRevision: 1, link: null });
+    callback.mockClear();
+    expect(parse(await reg.call('update_personal_todo', { id: 'a', link: { sessionId: 's', path: '/x' } })).ok).toBe(false);
+    expect(callback).not.toHaveBeenCalled();
+  });
 });

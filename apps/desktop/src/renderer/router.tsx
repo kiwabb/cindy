@@ -150,6 +150,11 @@ export const router = createHashRouter([
                         path: 'todos',
                         lazy: () => import('@/features/bots/TeammateTodosView').then(({ TeammateTodosView }) => ({ Component: TeammateTodosView })),
                       },
+                      // 学习页(导师伙伴的学习目标,只读);静态段同样排在 :botId 之前。
+                      {
+                        path: 'learning',
+                        lazy: () => import('@/features/learning/LearningView').then(({ LearningView }) => ({ Component: LearningView })),
+                      },
                       // 伙伴群聊是独立对象(不是某位伙伴的任务),静态段 'groups' 同样排在
                       // :botId 之前,/bots/groups/<id> 不会被当成一个叫 "groups" 的伙伴。
                       {

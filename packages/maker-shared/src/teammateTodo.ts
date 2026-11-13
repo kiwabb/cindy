@@ -42,6 +42,17 @@ export interface TodoSubtask {
   doneAt?: string;
 }
 export const TODO_MAX_SUBTASKS = 50;
+/**
+ * A conversation the todo leads to (e.g. today's study with a tutor teammate): the todo row opens
+ * that Session. Optional and additive: absent on every todo that never had one.
+ */
+export interface TodoLink {
+  sessionId: string;
+  /** The computer the conversation runs on, when it is not the computer holding the todo. */
+  deviceId?: string;
+  /** The teammate the conversation is with. */
+  botId?: string;
+}
 export interface TodoCompletion {
   summary: string;
   ref?: string;
@@ -82,6 +93,8 @@ export interface TeammateTodo {
   reminder?: TodoReminder;
   /** Ordered checklist; absent on stored items means none. */
   subtasks?: TodoSubtask[];
+  /** The conversation this todo opens; absent means none. */
+  link?: TodoLink;
 }
 export interface TodoPatch {
   id?: string;
@@ -108,6 +121,8 @@ export interface TodoPatch {
   reminder?: TodoReminder;
   /** Replaces the whole checklist (order included). */
   subtasks?: TodoSubtask[];
+  /** Sets the linked conversation; null removes it. */
+  link?: TodoLink | null;
 }
 export interface TodoState {
   version: 1;
@@ -177,6 +192,27 @@ export function normalizeTodoSubtasks(value: unknown): TodoSubtask[] {
       ...(done && isTodoTimestamp(doneAt) ? { doneAt } : {}),
     };
   });
+}
+const LINK_ID = /^[A-Za-z0-9_-]{1,128}$/;
+const DEVICE_ID = /^[A-Za-z0-9_.:-]{1,128}$/;
+/** A valid link with only its known fields, or null to clear; anything else is INVALID_INPUT. */
+export function normalizeTodoLink(value: unknown): TodoLink | null {
+  if (value === null) return null;
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    throw invalidInput('link must be an object with sessionId, or null');
+  const { sessionId, deviceId, botId, ...rest } = value as Record<string, unknown>;
+  if (Object.keys(rest).length) throw invalidInput('link accepts only sessionId, deviceId and botId');
+  if (typeof sessionId !== 'string' || !LINK_ID.test(sessionId))
+    throw invalidInput('link.sessionId must be 1-128 letters, digits, _ or -');
+  if (deviceId !== undefined && (typeof deviceId !== 'string' || !DEVICE_ID.test(deviceId)))
+    throw invalidInput('link.deviceId must be 1-128 letters, digits, _ . : or -');
+  if (botId !== undefined && (typeof botId !== 'string' || !LINK_ID.test(botId)))
+    throw invalidInput('link.botId must be 1-128 letters, digits, _ or -');
+  return {
+    sessionId,
+    ...(deviceId !== undefined ? { deviceId: deviceId as string } : {}),
+    ...(botId !== undefined ? { botId: botId as string } : {}),
+  };
 }
 /**
  * Settles each checked step's completion time in a whole-list replacement. A time the caller sent
@@ -605,6 +641,11 @@ export function applyTodoPatch(
     if (!validTodoReminder(patch.reminder))
       throw invalidInput(`reminder must be one of ${TODO_REMINDERS.join(', ')}`);
     t.reminder = patch.reminder;
+  }
+  if (patch.link !== undefined) {
+    const link = normalizeTodoLink(patch.link);
+    if (link) t.link = link;
+    else delete t.link;
   }
   if (patch.resolvedActionRequestId !== undefined) {
     if (!old?.action || old.action.requestId !== patch.resolvedActionRequestId)

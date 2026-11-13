@@ -1,6 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
-import { TodoError, type TeammateTodo, type TodoPatch } from '@cindy/maker-shared/teammate-todo';
+import {
+  normalizeTodoLink,
+  TodoError,
+  type TeammateTodo,
+  type TodoPatch,
+} from '@cindy/maker-shared/teammate-todo';
 import {
   PERSONAL_TODO_UPDATE_KEYS,
   projectPersonalTodo,
@@ -67,6 +72,7 @@ export function createPersonalTodoStore(file: string, assertCurrent = () => {}) 
         tagIds: input.tagIds,
         reminder: input.reminder,
         subtasks: withSubtaskIds(input.subtasks),
+        link: input.link,
         ...(input.deadline !== undefined ? { deadlineOverride: { value: input.deadline } } : {}),
         ...(!input.id ? { key, outcome: input.title } : {}),
         ...(input.operation === 'complete'
@@ -87,6 +93,7 @@ export function createPersonalTodoStore(file: string, assertCurrent = () => {}) 
         (existing.priority ?? 0) !== (input.priority ?? 0) ||
         !isDeepStrictEqual(existing.tagIds ?? [], input.tagIds ?? []) ||
         (existing.reminder ?? 'default') !== (input.reminder ?? 'default') ||
+        !isDeepStrictEqual(existing.link ?? null, normalizeTodoLink(input.link ?? null)) ||
         // Retried new steps get fresh ids, so compare what the owner typed.
         !isDeepStrictEqual(
           (existing.subtasks ?? []).map(({ title, done }) => ({ title, done })),

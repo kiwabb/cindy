@@ -9566,7 +9566,8 @@
         "unknown": "未知标签页",
         "ghostPanel": "插件面板",
         "pluginView": "插件视图",
-        "pluginTask": "插件任务页"
+        "pluginTask": "插件任务页",
+        "learningToday": "今天"
       },
       "controls": {
         "showAria": "显示侧栏",
@@ -10314,7 +10315,8 @@
         "plugins": "插件",
         "bots": "伙伴",
         "search": "搜索",
-        "todos": "待办"
+        "todos": "待办",
+        "learning": "学习"
       },
       "todosCount_other": "{{count}} 条进行中的待办"
     },
@@ -19892,7 +19894,8 @@
       "add": "添加",
       "cancel": "取消",
       "dismissRecognition": "不识别“{{phrase}}”"
-    }
+    },
+    "openLinked": "打开关联的对话"
   },
   "awayGuard": {
     "status": "Cindy 正在工作",
@@ -19973,5 +19976,97 @@
     "detail": "请求来自「{{device}}」\n用途：{{purpose}}\n\n开启后，同账号设备可以远程控制这台电脑，包括运行任务和访问文件。此设置持续有效，可随时在设置中关闭。",
     "decline": "暂不开启",
     "enable": "开启远程控制"
+  },
+  "learning": {
+    "title": "学习",
+    "today": "今天",
+    "goals": "目标",
+    "archived": "已归档",
+    "moduleNumber": "模块 {{number}}",
+    "allCleared": "这个目标的知识点都已过关",
+    "goStudy": "去学习",
+    "stepAt": "进行到 · {{step}}",
+    "step": {
+      "practice": "练习",
+      "explain": "讲解"
+    },
+    "openQuestion": "1 道题待回答",
+    "noOpenQuestion": "没有待回答的题",
+    "dueToday": "今天到期复习 {{count}}",
+    "nextReview": "下次复习 {{date}}",
+    "plan": {
+      "title": "今日安排",
+      "recap": "回顾",
+      "explain": "讲解",
+      "practice": "练习",
+      "wrap-up": "小结",
+      "segmentAria": "{{name}} {{count}} 分钟",
+      "joiner": "，"
+    },
+    "minutes": "{{count}} 分钟",
+    "goalQuote": "目标原话：{{quote}}",
+    "outlineDraft": "大纲未定稿",
+    "finalizeOutline": "去定稿",
+    "masteredLabel": "已掌握",
+    "masteredAria": "已掌握 {{count}} 个，共 {{total}} 个",
+    "lastActivity": "最近活动 {{when}}",
+    "todayAt": "今天 {{time}}",
+    "outline": "大纲",
+    "outlineSize": "{{modules}} 个模块 · {{points}} 个知识点",
+    "aboutYou": "关于你",
+    "readOnly": "只读",
+    "profile": {
+      "priorKnowledge": "现有基础",
+      "targetLevel": "目标水平",
+      "timeBudget": "时间安排",
+      "preferences": "偏好"
+    },
+    "profileNote": "有变化在对话里告诉{{name}}",
+    "reviews": "复习",
+    "reviewedTimes_other": "已复习 {{count}} 次",
+    "noReviews": "还没有排上的复习",
+    "openConversation": "打开{{name}}对话",
+    "tutorFallback": "导师",
+    "loadFailed": "读取学习目标失败",
+    "empty": {
+      "title": "还没有学习目标",
+      "body": "在{{name}}对话里说出想学什么，{{name}}会和你商定大纲。",
+      "action": "和{{name}}新建目标"
+    },
+    "pointState": {
+      "not-started": "未开始",
+      "in-progress": "进行中",
+      "mastered": "已掌握",
+      "deferred": "已暂缓",
+      "self-reported": "自述掌握"
+    },
+    "pointType": {
+      "memory": "记忆",
+      "concept": "概念",
+      "procedure": "步骤",
+      "design": "设计"
+    },
+    "checkLimit": {
+      "audio": "需音频 · 暂不能检验",
+      "speech": "需开口说 · 暂不能检验"
+    },
+    "tab": {
+      "currentPoint": "当前知识点",
+      "waiting": "待回答",
+      "doneToday": "今天已完成",
+      "answered": "作答",
+      "correct": "答对",
+      "continue": "继续学习",
+      "explainFirst": "先讲讲",
+      "anotherQuestion": "换一道题",
+      "say": {
+        "continue": "继续学习",
+        "explainFirst": "先讲讲",
+        "anotherQuestion": "换一道题"
+      },
+      "unbound": "这场对话没有绑定进行中的学习目标",
+      "localOnly": "学习目标只在这台电脑上的对话里显示",
+      "prefillFailed": "输入框暂时不可用，请稍后再试"
+    }
   }
 }

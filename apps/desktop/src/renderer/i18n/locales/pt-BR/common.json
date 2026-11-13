@@ -9682,7 +9682,8 @@
         "unknown": "Aba desconhecida",
         "ghostPanel": "Painel do plugin",
         "pluginView": "Visualização do plugin",
-        "pluginTask": "Página de tarefa do plugin"
+        "pluginTask": "Página de tarefa do plugin",
+        "learningToday": "Hoje"
       },
       "controls": {
         "showAria": "Mostrar barra lateral",
@@ -10439,7 +10440,8 @@
         "plugins": "Plugins",
         "bots": "Colegas",
         "search": "Pesquisar",
-        "todos": "Pendências"
+        "todos": "Pendências",
+        "learning": "Aprendizado"
       },
       "todosCount_one": "{{count}} pendência aberta",
       "todosCount_other": "{{count}} pendências abertas",
@@ -20153,7 +20155,8 @@
       "add": "Adicionar",
       "cancel": "Cancelar",
       "dismissRecognition": "Não reconhecer “{{phrase}}”"
-    }
+    },
+    "openLinked": "Abrir conversa vinculada"
   },
   "awayGuard": {
     "status": "O Cindy está trabalhando",
@@ -20234,5 +20237,99 @@
     "detail": "Solicitação de {{device}}\nFinalidade: {{purpose}}\n\nOs dispositivos da sua conta poderão controlar este computador, executar tarefas e acessar arquivos. A opção permanece ativa até você desativá-la nas configurações.",
     "decline": "Agora não",
     "enable": "Ativar controle remoto"
+  },
+  "learning": {
+    "title": "Aprendizado",
+    "today": "Hoje",
+    "goals": "Metas",
+    "archived": "Arquivadas",
+    "moduleNumber": "Módulo {{number}}",
+    "allCleared": "Todos os pontos desta meta foram concluídos",
+    "goStudy": "Estudar",
+    "stepAt": "Etapa · {{step}}",
+    "step": {
+      "practice": "prática",
+      "explain": "explicação"
+    },
+    "openQuestion": "1 pergunta para responder",
+    "noOpenQuestion": "Nenhuma pergunta para responder",
+    "dueToday": "Revisões de hoje: {{count}}",
+    "nextReview": "Próxima revisão {{date}}",
+    "plan": {
+      "title": "Plano de hoje",
+      "recap": "Revisão",
+      "explain": "Explicação",
+      "practice": "Prática",
+      "wrap-up": "Fechamento",
+      "segmentAria": "{{name}} {{count}} min",
+      "joiner": ", "
+    },
+    "minutes": "{{count}} min",
+    "goalQuote": "Nas suas palavras: {{quote}}",
+    "outlineDraft": "Roteiro ainda não combinado",
+    "finalizeOutline": "Combinar roteiro",
+    "masteredLabel": "Dominados",
+    "masteredAria": "{{count}} de {{total}} dominados",
+    "lastActivity": "Última atividade {{when}}",
+    "todayAt": "hoje {{time}}",
+    "outline": "Roteiro",
+    "outlineSize": "{{modules}} módulos · {{points}} pontos",
+    "aboutYou": "Sobre você",
+    "readOnly": "Somente leitura",
+    "profile": {
+      "priorKnowledge": "Ponto de partida",
+      "targetLevel": "Nível desejado",
+      "timeBudget": "Tempo",
+      "preferences": "Preferências"
+    },
+    "profileNote": "Se algo mudar, conte para {{name}} na conversa",
+    "reviews": "Revisões",
+    "reviewedTimes_one": "Revisado uma vez",
+    "reviewedTimes_other": "Revisado {{count}} vezes",
+    "noReviews": "Nenhuma revisão agendada ainda",
+    "openConversation": "Abrir conversa com {{name}}",
+    "tutorFallback": "Tutor",
+    "loadFailed": "Não foi possível ler as metas de aprendizado",
+    "empty": {
+      "title": "Ainda não há metas de aprendizado",
+      "body": "Conte para {{name}} na conversa o que você quer aprender, e vocês combinam o roteiro juntos.",
+      "action": "Criar uma meta com {{name}}"
+    },
+    "pointState": {
+      "not-started": "Não iniciado",
+      "in-progress": "Em andamento",
+      "mastered": "Dominado",
+      "deferred": "Adiado",
+      "self-reported": "Declarado por você"
+    },
+    "pointType": {
+      "memory": "Memória",
+      "concept": "Conceito",
+      "procedure": "Procedimento",
+      "design": "Design"
+    },
+    "checkLimit": {
+      "audio": "Precisa de áudio · ainda não dá para verificar",
+      "speech": "Precisa falar · ainda não dá para verificar"
+    },
+    "reviewedTimes_many": "Revisado {{count}} vezes",
+    "tab": {
+      "currentPoint": "Ponto atual",
+      "waiting": "Aguardando sua resposta",
+      "doneToday": "Feito hoje",
+      "answered": "Respondidas",
+      "correct": "Corretas",
+      "continue": "Continuar",
+      "explainFirst": "Explicar antes",
+      "anotherQuestion": "Outra pergunta",
+      "say": {
+        "continue": "Vamos continuar",
+        "explainFirst": "Explique primeiro",
+        "anotherQuestion": "Me dê outra pergunta"
+      },
+      "unbound": "Esta conversa não está vinculada a uma meta de aprendizado ativa",
+      "localOnly": "As metas de aprendizado só aparecem em conversas deste computador",
+      "prefillFailed": "A caixa de mensagem não está disponível agora. Tente de novo em instantes"
+    }
   }
 }

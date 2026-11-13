@@ -545,15 +545,16 @@ export function catalogSurfaces() {
     {
       id: 'desktop.bots',
       platform: 'desktop',
-      title: '伙伴（列表 / 个人待办 / 对话 / 设置 / 历史 / 伙伴私聊 / 群聊）',
+      title: '伙伴（列表 / 个人待办 / 学习 / 对话 / 设置 / 历史 / 伙伴私聊 / 群聊）',
       productionEntry:
-        'hash `/bots`、`/bots/list`、`/bots/:botId`、`/bots/roster`、`/bots/todos`（个人待办）及伙伴当前/历史任务、伙伴私聊、伙伴群聊路由（BotsFeatureLayout）',
+        'hash `/bots`、`/bots/list`、`/bots/:botId`、`/bots/roster`、`/bots/todos`（个人待办）、`/bots/learning`（学习）及伙伴当前/历史任务、伙伴私聊、伙伴群聊路由（BotsFeatureLayout）',
       reachableComponents: [
         'BotsHomeView',
         'BotsListView',
         'BotMarketDialog',
         'BotRosterView',
         'TeammateTodosView',
+        'LearningView',
         'BotSessionView',
         'RemoteBotSessionView',
         'BotHistorySessionView',
@@ -567,7 +568,10 @@ export function catalogSurfaces() {
         'BotLifecycleSettings',
         'BotCollaborationCard',
       ],
-      styleRoots: ['apps/desktop/src/renderer/features/bots'],
+      styleRoots: [
+        'apps/desktop/src/renderer/features/bots',
+        'apps/desktop/src/renderer/features/learning',
+      ],
       // 伙伴任务复用简化后的主聊天视图与消息组件；本 surface 只补它自己的覆盖层。
       extraStyleRoots: ['desktop.chat.session'],
       routerPaths: [
@@ -580,6 +584,7 @@ export function catalogSurfaces() {
         '/bots/:botId/session/:sessionId',
         '/bots/roster',
         '/bots/todos',
+        '/bots/learning',
         '/bots/groups/:groupId',
         '/bots/remote/:deviceId/:botId',
         '/bots/remote/:deviceId/:botId/history/:sessionId',
@@ -595,6 +600,7 @@ export function catalogSurfaces() {
         '/bots/:botId/session/:sessionId': 'BotSessionView',
         '/bots/roster': 'BotRosterView',
         '/bots/todos': 'TeammateTodosView',
+        '/bots/learning': 'LearningView',
         '/bots/groups/:groupId': 'BotGroupChatView',
         '/bots/remote/:deviceId/:botId': 'RemoteBotSessionView',
         '/bots/remote/:deviceId/:botId/history/:sessionId': 'BotHistorySessionView',

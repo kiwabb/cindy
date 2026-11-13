@@ -78,10 +78,11 @@ export function useActiveMainView() {
         location.pathname === '/cc-agent/scheduled' ||
         location.pathname.startsWith('/cc-agent/scheduled/');
       if (!isAutomations) {
-        // 创建伙伴与待办汇总都不是某位伙伴的对话，回到伙伴时不落在这两页。
+        // 创建伙伴、待办汇总与学习页都不是某位伙伴的对话，回到伙伴时不落在这几页。
         const notBotChat =
           location.pathname === '/bots/roster' || location.pathname === '/bots/roster/' ||
-          location.pathname === '/bots/todos' || location.pathname === '/bots/todos/';
+          location.pathname === '/bots/todos' || location.pathname === '/bots/todos/' ||
+          location.pathname === '/bots/learning' || location.pathname === '/bots/learning/';
         history.current.paths[matchedKey] = notBotChat
           ? '/bots'
           : location.pathname + location.search + location.hash;

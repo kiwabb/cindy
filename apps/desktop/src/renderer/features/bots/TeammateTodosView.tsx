@@ -160,6 +160,7 @@ function TodoBoard() {
       : t('personalTodos.all');
   };
 
+  const anyLinked = sections.some((section) => section.items.some((todo) => todo.link));
   const list: ReactNode = sections.length
     ? sections.map((section) => (
         <Section key={section.id} label={sectionLabel(section)} count={section.items.length}>
@@ -176,6 +177,7 @@ function TodoBoard() {
               }
               selected={editor?.id === todo.id}
               now={now}
+              reserveLinkSlot={anyLinked}
               // Opening the row that is already open closes it again.
               onOpen={(next) =>
                 next.id.startsWith(CONFLICT_DRAFT_PREFIX)

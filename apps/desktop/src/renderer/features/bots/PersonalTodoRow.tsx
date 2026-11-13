@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { Check, ChevronRight, ListChecks, Plus, TriangleAlert } from 'lucide-react';
+import { Check, ChevronRight, ListChecks, MessageSquareShare, Plus, TriangleAlert } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { TaskTag } from '@cindy/maker-shared';
 
 import { Button } from '@/components/ui/button';
 import { Tip } from '@/components/ui/tooltip';
+import { useSessionLinkTarget } from '@/components/chat/SessionLinkChip';
+import { buildSessionDeepLink } from '@/lib/deepLink';
 import { cn } from '@/lib/utils';
 import type { PersonalTodo, PersonalTodoUpdate } from '../../../shared/personalTodo';
 import { TODO_MAX_SUBTASKS } from '@cindy/maker-shared/teammate-todo';
@@ -28,6 +30,27 @@ function shortDate(value: string, locale: string): string {
     : new Intl.DateTimeFormat(locale, { month: 'numeric', day: 'numeric' }).format(date);
 }
 
+/** The trailing button of a todo linked to a conversation: opens that conversation. */
+function OpenLinkedConversation({ link, title }: { link: NonNullable<PersonalTodo['link']>; title: string }) {
+  const { t } = useTranslation();
+  // Same path as a session link in chat: a deviceId naming this computer opens it here, another
+  // computer's id opens that computer's task (the todo may be read on any synced computer).
+  const { openTarget } = useSessionLinkTarget(buildSessionDeepLink(link.sessionId, { deviceId: link.deviceId }));
+  const label = t('personalTodos.openLinked');
+  return (
+    <Tip text={label}>
+      <button
+        type="button"
+        aria-label={`${label}: ${title}`}
+        onClick={() => void openTarget(false)}
+        className="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-[var(--text-secondary)] outline-none transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
+      >
+        <MessageSquareShare size={14} aria-hidden />
+      </button>
+    </Tip>
+  );
+}
+
 /**
  * One personal todo. The checkbox and the body are sibling buttons (no nested interactive
  * controls); the tag and the due text inside the body are plain text.
@@ -43,6 +66,7 @@ export function PersonalTodoRow({
   onUpdate,
   onSteps,
   conflict,
+  reserveLinkSlot,
 }: {
   todo: PersonalTodo;
   view: TodoBoardView;
@@ -58,6 +82,8 @@ export function PersonalTodoRow({
   onSteps: (input: PersonalTodoUpdate) => Promise<void>;
   /** Multi-computer sync: an edit made here that the main computer refused, with the owner's choices. */
   conflict?: { busy: boolean; onResolve: (choice: 'mine' | 'theirs') => void };
+  /** Another row in the list opens a conversation: keep the trailing column aligned. */
+  reserveLinkSlot?: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const [busy, setBusy] = useState(false);
@@ -256,6 +282,11 @@ export function PersonalTodoRow({
             </span>
           ) : null}
         </button>
+        {todo.link ? (
+          <OpenLinkedConversation link={todo.link} title={todo.title} />
+        ) : reserveLinkSlot ? (
+          <span aria-hidden className="size-6 shrink-0" />
+        ) : null}
       </div>
       {expanded ? (
         <div className="flex flex-col pb-2 pl-16 pr-2.5">

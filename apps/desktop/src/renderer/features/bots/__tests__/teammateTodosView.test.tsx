@@ -25,6 +25,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { todoLocalDate, validateTodoDeadline } from '@cindy/maker-shared/teammate-todo';
 import { TASK_TAG_COLORS, type TaskTag } from '@cindy/maker-shared';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import type { PersonalTodo } from '../../../../shared/personalTodo';
 
 const h = vi.hoisted(() => ({ generation: 1 }));
@@ -36,7 +37,14 @@ vi.mock('react-i18next', () => ({
     i18n: { language: 'en' },
   }),
 }));
-vi.mock('@/contexts/AuthContext', () => ({ useOptionalDataOwnerGeneration: () => h.generation }));
+vi.mock('@/contexts/AuthContext', () => ({
+  useOptionalDataOwnerGeneration: () => h.generation,
+  useOptionalAuthDeviceId: () => 'this-computer',
+}));
+vi.mock('@/lib/orcaSessionIdentity', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  resolveSessionRoute: async (sessionId: string) => `/bots/bot_tutor/session/${sessionId}`,
+}));
 // Menus and popovers render their content inline so the choices can be exercised without pointer
 // plumbing; the real components keep their own tests.
 vi.mock('@/components/ui/dropdown-menu', async () => {
@@ -864,5 +872,30 @@ describe('personal todo steps', () => {
     expect(row.getAllByText(/^\d{1,2}:\d{2}\s?[AP]M$/)).toHaveLength(1);
     const lines = row.getAllByRole('listitem');
     expect(lines.map((line) => line.querySelector('[title]') !== null)).toEqual([true, false, false, true]);
+  });
+
+  // A todo the tutor linked to a conversation (2026-11-13, fork) opens it from the row's end; rows
+  // without a link get no button.
+  it('opens the linked conversation from a linked row only', async () => {
+    vi.mocked(api().list).mockResolvedValue([
+      // The todo names this computer (as a synced todo read here would): it opens locally.
+      mine('Study', { link: { sessionId: 'session-en', deviceId: 'this-computer', botId: 'bot_tutor' } }),
+      mine('Plain'),
+    ]);
+    function Where() {
+      return <span data-testid="where">{useLocation().pathname}</span>;
+    }
+    render(
+      <MemoryRouter initialEntries={['/bots/todos']}>
+        <Routes>
+          <Route path="/bots/todos" element={<TeammateTodosView />} />
+          <Route path="*" element={<Where />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    const open = await screen.findByRole('button', { name: 'personalTodos.openLinked: Study' });
+    expect(screen.queryByRole('button', { name: 'personalTodos.openLinked: Plain' })).toBeNull();
+    fireEvent.click(open);
+    await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/bots/bot_tutor/session/session-en'));
   });
 });

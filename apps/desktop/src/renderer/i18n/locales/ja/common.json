@@ -9566,7 +9566,8 @@
         "unknown": "不明なタブ",
         "ghostPanel": "プラグインパネル",
         "pluginView": "プラグインビュー",
-        "pluginTask": "プラグインのタスクページ"
+        "pluginTask": "プラグインのタスクページ",
+        "learningToday": "今日"
       },
       "controls": {
         "showAria": "サイドバーを表示",
@@ -10314,7 +10315,8 @@
         "plugins": "プラグイン",
         "bots": "仲間",
         "search": "検索",
-        "todos": "Todo"
+        "todos": "Todo",
+        "learning": "学習"
       },
       "todosCount_other": "進行中の Todo {{count}} 件"
     },
@@ -19892,7 +19894,8 @@
       "add": "追加",
       "cancel": "キャンセル",
       "dismissRecognition": "「{{phrase}}」を認識しない"
-    }
+    },
+    "openLinked": "関連付けた会話を開く"
   },
   "awayGuard": {
     "status": "Cindy が作業中です",
@@ -19973,5 +19976,97 @@
     "detail": "要求元：{{device}}\n目的：{{purpose}}\n\n有効にすると、同じアカウントのデバイスからタスクの実行やファイルへのアクセスなど、このコンピューターを操作できます。設定で無効にするまで有効です。",
     "decline": "今はしない",
     "enable": "リモート操作を有効にする"
+  },
+  "learning": {
+    "title": "学習",
+    "today": "今日",
+    "goals": "目標",
+    "archived": "アーカイブ済み",
+    "moduleNumber": "モジュール {{number}}",
+    "allCleared": "この目標の項目はすべてクリアしました",
+    "goStudy": "学習する",
+    "stepAt": "進行中 · {{step}}",
+    "step": {
+      "practice": "練習",
+      "explain": "説明"
+    },
+    "openQuestion": "回答待ちの問題が 1 問",
+    "noOpenQuestion": "回答待ちの問題はありません",
+    "dueToday": "今日が期限の復習 {{count}}",
+    "nextReview": "次の復習 {{date}}",
+    "plan": {
+      "title": "今日の予定",
+      "recap": "振り返り",
+      "explain": "説明",
+      "practice": "練習",
+      "wrap-up": "まとめ",
+      "segmentAria": "{{name}} {{count}} 分",
+      "joiner": "、"
+    },
+    "minutes": "{{count}} 分",
+    "goalQuote": "目標の原文：{{quote}}",
+    "outlineDraft": "アウトライン未確定",
+    "finalizeOutline": "確定しに行く",
+    "masteredLabel": "習得済み",
+    "masteredAria": "習得済み {{count}} 件／全 {{total}} 件",
+    "lastActivity": "最近の活動 {{when}}",
+    "todayAt": "今日 {{time}}",
+    "outline": "アウトライン",
+    "outlineSize": "{{modules}} モジュール · {{points}} 項目",
+    "aboutYou": "あなたについて",
+    "readOnly": "読み取り専用",
+    "profile": {
+      "priorKnowledge": "今の基礎",
+      "targetLevel": "目標レベル",
+      "timeBudget": "時間の目安",
+      "preferences": "好み"
+    },
+    "profileNote": "変更があれば会話で{{name}}に伝えてください",
+    "reviews": "復習",
+    "reviewedTimes_other": "復習済み {{count}} 回",
+    "noReviews": "予定された復習はまだありません",
+    "openConversation": "{{name}}との会話を開く",
+    "tutorFallback": "チューター",
+    "loadFailed": "学習目標を読み込めませんでした",
+    "empty": {
+      "title": "学習目標はまだありません",
+      "body": "{{name}}との会話で学びたいことを伝えると、{{name}}がアウトラインを一緒に決めます。",
+      "action": "{{name}}と新しい目標を作る"
+    },
+    "pointState": {
+      "not-started": "未着手",
+      "in-progress": "進行中",
+      "mastered": "習得済み",
+      "deferred": "保留中",
+      "self-reported": "自己申告で習得"
+    },
+    "pointType": {
+      "memory": "記憶",
+      "concept": "概念",
+      "procedure": "手順",
+      "design": "設計"
+    },
+    "checkLimit": {
+      "audio": "音声が必要 · まだ確認できません",
+      "speech": "発話が必要 · まだ確認できません"
+    },
+    "tab": {
+      "currentPoint": "現在の項目",
+      "waiting": "回答待ち",
+      "doneToday": "今日の完了",
+      "answered": "回答",
+      "correct": "正解",
+      "continue": "学習を続ける",
+      "explainFirst": "先に説明して",
+      "anotherQuestion": "別の問題にする",
+      "say": {
+        "continue": "学習を続けて",
+        "explainFirst": "先に説明して",
+        "anotherQuestion": "別の問題にして"
+      },
+      "unbound": "この会話には進行中の学習目標が結び付いていません",
+      "localOnly": "学習目標はこのコンピューター上の会話でのみ表示されます",
+      "prefillFailed": "入力欄を一時的に使えません。しばらくしてからもう一度お試しください"
+    }
   }
 }

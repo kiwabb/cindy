@@ -23,6 +23,7 @@ export interface PersonalTodoWire {
   tagIds?: string[];
   reminder?: string;
   subtasks?: Array<{ id: string; title: string; done: boolean; doneAt?: string }>;
+  link?: { sessionId: string; deviceId?: string; botId?: string };
   [key: string]: unknown;
 }
 
@@ -84,7 +85,7 @@ export function registerPersonalTodoTools(
     name: 'list_personal_todos',
     category: 'todos',
     description:
-      '列出用户本人的个人待办(仅本机、当前登录账号)。返回 id、revision、标题、备注、期限、状态、稍后到期时间、priority(0 无、1 低、2 中、3 高)、tagIds 与解析后的 tags(id/name/color)、reminder、subtasks(子任务清单 [{id,title,done,doneAt}],按顺序;doneAt=该步勾选的时间,未勾选或早于记录时间就已勾选的步骤没有)与 subtasksDone/subtasksTotal(完成进度);顶层 tags 是可用的任务标签目录(与 list_task_tags 同一批 id),给待办打标签时从这里取 id;开了多台电脑同步时,顶层 sync 给出本机角色、主力电脑是否在线与待同步条数,副本上的 tags 是主力电脑的目录。修改前用它取最新 revision。view:open=未完成且未稍后、later=稍后中、done=已完成、all=全部;默认未完成含稍后。priority=只列优先级不低于该级别的待办;tagId=只列带该标签的待办。',
+      '列出用户本人的个人待办(仅本机、当前登录账号)。返回 id、revision、标题、备注、期限、状态、稍后到期时间、priority(0 无、1 低、2 中、3 高)、tagIds 与解析后的 tags(id/name/color)、reminder、subtasks(子任务清单 [{id,title,done,doneAt}],按顺序;doneAt=该步勾选的时间,未勾选或早于记录时间就已勾选的步骤没有)与 subtasksDone/subtasksTotal(完成进度)、link(关联的对话 {sessionId, deviceId?, botId?},没有关联就没有这个字段);顶层 tags 是可用的任务标签目录(与 list_task_tags 同一批 id),给待办打标签时从这里取 id;开了多台电脑同步时,顶层 sync 给出本机角色、主力电脑是否在线与待同步条数,副本上的 tags 是主力电脑的目录。修改前用它取最新 revision。view:open=未完成且未稍后、later=稍后中、done=已完成、all=全部;默认未完成含稍后。priority=只列优先级不低于该级别的待办;tagId=只列带该标签的待办。',
     inputShape: {
       view: z.enum(['open', 'later', 'done', 'all']).optional(),
       priority: z.number().int().min(0).max(3).optional(),
@@ -130,7 +131,7 @@ export function registerPersonalTodoTools(
     name: 'update_personal_todo',
     category: 'todos',
     description:
-      '新建或修改用户本人的个人待办(仅本机、当前登录账号)。新建:不传 id,传 title 和 creationRequestId(1-80 位字母数字、_ 或 -);重试同一次新建必须复用同一个 creationRequestId 才不会重复,内容改了就换新 id。修改:传 id 与最近一次 list_personal_todos 的 expectedRevision,可改 title、notes、deadline(null 清除)、priority(0 无、1 低、2 中、3 高)、tagIds(标签 id 数组,整体替换,最多 16 个,[] 清空;id 取自 list_personal_todos 的 tags,通常只设一个)、subtasks(子任务清单,整体替换,最多 50 步:数组元素 {id?, title, done?};要勾选、改名、删除或调整顺序,先取最近一次 list_personal_todos 的 subtasks,改好后连同 expectedRevision 整个清单一起发送;已有步骤保留原 id,新步骤不带 id;勾选时间由系统记录(已勾的保留原时间,新勾的记为本次修改时间),不必传;[] 清空)、reminder(期限提醒:default=到期时刻,仅日期期限为当天 09:00;off=不提醒;before-15m/before-1h/before-1d=提前 15 分钟/1 小时/1 天),或用 operation 完成(complete)、重开(reopen)、稍后(later,需 until=未来的 ISO 时间)、恢复稍后(restore)、删除(delete)。冲突时先重新列出再基于最新内容重试。多台电脑同步中,在副本电脑上修改会先记在本机并返回 sync:synced(主力电脑已接收)或 sync:pending(待主力电脑接收,不是失败)。',
+      '新建或修改用户本人的个人待办(仅本机、当前登录账号)。新建:不传 id,传 title 和 creationRequestId(1-80 位字母数字、_ 或 -);重试同一次新建必须复用同一个 creationRequestId 才不会重复,内容改了就换新 id。修改:传 id 与最近一次 list_personal_todos 的 expectedRevision,可改 title、notes、deadline(null 清除)、priority(0 无、1 低、2 中、3 高)、tagIds(标签 id 数组,整体替换,最多 16 个,[] 清空;id 取自 list_personal_todos 的 tags,通常只设一个)、subtasks(子任务清单,整体替换,最多 50 步:数组元素 {id?, title, done?};要勾选、改名、删除或调整顺序,先取最近一次 list_personal_todos 的 subtasks,改好后连同 expectedRevision 整个清单一起发送;已有步骤保留原 id,新步骤不带 id;勾选时间由系统记录(已勾的保留原时间,新勾的记为本次修改时间),不必传;[] 清空)、reminder(期限提醒:default=到期时刻,仅日期期限为当天 09:00;off=不提醒;before-15m/before-1h/before-1d=提前 15 分钟/1 小时/1 天)、link(关联一场对话:{sessionId, deviceId?, botId?},用户点待办行尾的按钮就打开这场对话;sessionId=任务 id,deviceId=对话不在这台电脑上时它所在电脑的 id,botId=伙伴 id;null 取消关联;只在要设置或修改时传),或用 operation 完成(complete)、重开(reopen)、稍后(later,需 until=未来的 ISO 时间)、恢复稍后(restore)、删除(delete)。冲突时先重新列出再基于最新内容重试。多台电脑同步中,在副本电脑上修改会先记在本机并返回 sync:synced(主力电脑已接收)或 sync:pending(待主力电脑接收,不是失败)。',
     inputShape: {
       id: z.string().max(128).optional(),
       creationRequestId: z.string().regex(/^[A-Za-z0-9_-]{1,80}$/).optional(),
@@ -144,6 +145,15 @@ export function registerPersonalTodoTools(
       subtasks: z
         .array(z.object({ id: z.string().max(128).optional(), title: z.string().min(1).max(300), done: z.boolean().optional() }))
         .max(50)
+        .optional(),
+      link: z
+        .object({
+          sessionId: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),
+          deviceId: z.string().regex(/^[A-Za-z0-9_.:-]{1,128}$/).optional(),
+          botId: z.string().regex(/^[A-Za-z0-9_-]{1,128}$/).optional(),
+        })
+        .strict()
+        .nullable()
         .optional(),
       operation: z.enum(['complete', 'reopen', 'delete', 'later', 'restore']).optional(),
       until: z.string().max(80).optional(),

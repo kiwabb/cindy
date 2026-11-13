@@ -9609,7 +9609,8 @@
         "unknown": "Unknown tab",
         "ghostPanel": "Plugin panel",
         "pluginView": "Plugin view",
-        "pluginTask": "Plugin task page"
+        "pluginTask": "Plugin task page",
+        "learningToday": "Today"
       },
       "controls": {
         "showAria": "Show sidebar",
@@ -10357,7 +10358,8 @@
         "plugins": "Plugins",
         "bots": "Teammates",
         "search": "Search",
-        "todos": "Todos"
+        "todos": "Todos",
+        "learning": "Learning"
       },
       "todosCount_one": "{{count}} open todo",
       "todosCount_other": "{{count}} open todos"
@@ -19965,7 +19967,8 @@
       "add": "Add",
       "cancel": "Cancel",
       "dismissRecognition": "Don’t recognize “{{phrase}}”"
-    }
+    },
+    "openLinked": "Open linked conversation"
   },
   "awayGuard": {
     "status": "Cindy is working",
@@ -20046,5 +20049,98 @@
     "detail": "Request from {{device}}\nPurpose: {{purpose}}\n\nEnabling this setting lets devices on your account control this computer, including running tasks and accessing files. It stays enabled until you turn it off in Settings.",
     "decline": "Not now",
     "enable": "Enable remote control"
+  },
+  "learning": {
+    "title": "Learning",
+    "today": "Today",
+    "goals": "Goals",
+    "archived": "Archived",
+    "moduleNumber": "Module {{number}}",
+    "allCleared": "Every point of this goal is cleared",
+    "goStudy": "Study now",
+    "stepAt": "At · {{step}}",
+    "step": {
+      "practice": "practice",
+      "explain": "explanation"
+    },
+    "openQuestion": "1 question to answer",
+    "noOpenQuestion": "No question to answer",
+    "dueToday": "Reviews due today: {{count}}",
+    "nextReview": "Next review {{date}}",
+    "plan": {
+      "title": "Today’s plan",
+      "recap": "Recap",
+      "explain": "Explain",
+      "practice": "Practice",
+      "wrap-up": "Wrap-up",
+      "segmentAria": "{{name}} {{count}} min",
+      "joiner": ", "
+    },
+    "minutes": "{{count}} min",
+    "goalQuote": "In your words: {{quote}}",
+    "outlineDraft": "Outline not agreed yet",
+    "finalizeOutline": "Agree outline",
+    "masteredLabel": "Mastered",
+    "masteredAria": "{{count}} of {{total}} mastered",
+    "lastActivity": "Last activity {{when}}",
+    "todayAt": "today {{time}}",
+    "outline": "Outline",
+    "outlineSize": "{{modules}} modules · {{points}} points",
+    "aboutYou": "About you",
+    "readOnly": "Read-only",
+    "profile": {
+      "priorKnowledge": "Starting point",
+      "targetLevel": "Target level",
+      "timeBudget": "Time",
+      "preferences": "Preferences"
+    },
+    "profileNote": "Tell {{name}} in the conversation if anything changes",
+    "reviews": "Reviews",
+    "reviewedTimes_one": "Reviewed once",
+    "reviewedTimes_other": "Reviewed {{count}} times",
+    "noReviews": "No reviews scheduled yet",
+    "openConversation": "Open {{name}} conversation",
+    "tutorFallback": "Tutor",
+    "loadFailed": "Couldn’t read learning goals",
+    "empty": {
+      "title": "No learning goals yet",
+      "body": "Tell {{name}} what you want to learn in the conversation, and you’ll agree on an outline together.",
+      "action": "Start a goal with {{name}}"
+    },
+    "pointState": {
+      "not-started": "Not started",
+      "in-progress": "In progress",
+      "mastered": "Mastered",
+      "deferred": "Deferred",
+      "self-reported": "Self-reported"
+    },
+    "pointType": {
+      "memory": "Memory",
+      "concept": "Concept",
+      "procedure": "Procedure",
+      "design": "Design"
+    },
+    "checkLimit": {
+      "audio": "Needs audio · can’t check yet",
+      "speech": "Needs speaking · can’t check yet"
+    },
+    "tab": {
+      "currentPoint": "Current point",
+      "waiting": "Waiting for your answer",
+      "doneToday": "Done today",
+      "answered": "Answered",
+      "correct": "Correct",
+      "continue": "Continue",
+      "explainFirst": "Explain first",
+      "anotherQuestion": "Another question",
+      "say": {
+        "continue": "Let’s continue",
+        "explainFirst": "Explain it first",
+        "anotherQuestion": "Give me another question"
+      },
+      "unbound": "This conversation isn’t linked to a learning goal in progress",
+      "localOnly": "Learning goals show only in conversations on this computer",
+      "prefillFailed": "The message box isn’t available right now. Try again in a moment"
+    }
   }
 }
