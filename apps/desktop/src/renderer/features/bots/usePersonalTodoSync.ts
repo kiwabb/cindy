@@ -32,6 +32,7 @@ export function conflictDraftTodo(conflict: PersonalTodoSyncConflict): PersonalT
     tagIds: draft.tagIds ?? [],
     reminder: draft.reminder ?? 'default',
     subtasks: (draft.subtasks ?? []).map((step, index) => ({ id: step.id ?? `draft-${index}`, title: step.title, done: step.done ?? false })),
+    ...(draft.link ? { link: draft.link } : {}),
     ownership: 'self',
     source: 'manual',
   };

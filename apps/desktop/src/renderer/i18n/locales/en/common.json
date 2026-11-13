@@ -19967,7 +19967,8 @@
       "add": "Add",
       "cancel": "Cancel",
       "dismissRecognition": "Don’t recognize “{{phrase}}”"
-    }
+    },
+    "openLinked": "Open linked conversation"
   },
   "awayGuard": {
     "status": "Cindy is working",

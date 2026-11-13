@@ -20155,7 +20155,8 @@
       "add": "Añadir",
       "cancel": "Cancelar",
       "dismissRecognition": "No reconocer «{{phrase}}»"
-    }
+    },
+    "openLinked": "Abrir la conversación vinculada"
   },
   "awayGuard": {
     "status": "Cindy está trabajando",

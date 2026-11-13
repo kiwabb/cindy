@@ -19894,7 +19894,8 @@
       "add": "追加",
       "cancel": "キャンセル",
       "dismissRecognition": "「{{phrase}}」を認識しない"
-    }
+    },
+    "openLinked": "関連付けた会話を開く"
   },
   "awayGuard": {
     "status": "Cindy が作業中です",

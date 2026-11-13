@@ -1,6 +1,7 @@
 import type {
   TeammateTodo,
   TodoDeadline,
+  TodoLink,
   TodoPriority,
   TodoReminder,
   TodoSubtask,
@@ -26,6 +27,8 @@ export interface PersonalTodo {
   reminder: TodoReminder;
   /** Ordered checklist steps: a title, a done state and, once checked, when (`doneAt`). */
   subtasks: TodoSubtask[];
+  /** The conversation this todo opens (e.g. a tutor's study conversation); absent means none. */
+  link?: TodoLink;
   ownership: 'self';
   source: 'manual';
 }
@@ -45,6 +48,8 @@ export interface PersonalTodoUpdate {
    * optional: a step already checked keeps its time and a newly checked one gets the time of the edit.
    */
   subtasks?: Array<{ id?: string; title: string; done?: boolean; doneAt?: string }>;
+  /** Links the todo to a conversation; null removes the link. Send it only to change it. */
+  link?: TodoLink | null;
   operation?: 'complete' | 'reopen' | 'delete' | 'later' | 'restore';
   until?: string;
 }
@@ -59,6 +64,7 @@ export const PERSONAL_TODO_UPDATE_KEYS = [
   'tagIds',
   'reminder',
   'subtasks',
+  'link',
   'operation',
   'until',
 ] as const satisfies ReadonlyArray<keyof PersonalTodoUpdate>;
@@ -79,6 +85,7 @@ export function projectPersonalTodo(todo: TeammateTodo): PersonalTodo {
     tagIds: todo.tagIds ?? [],
     reminder: todo.reminder ?? 'default',
     subtasks: todo.subtasks ?? [],
+    ...(todo.link ? { link: todo.link } : {}),
     ownership: 'self',
     source: 'manual',
   };

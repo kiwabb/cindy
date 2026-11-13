@@ -19894,7 +19894,8 @@
       "add": "添",
       "cancel": "罷",
       "dismissRecognition": "不識「{{phrase}}」"
-    }
+    },
+    "openLinked": "啟所繫之對話"
   },
   "awayGuard": {
     "status": "Cindy 正勞作",

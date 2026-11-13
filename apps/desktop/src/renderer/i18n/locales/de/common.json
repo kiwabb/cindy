@@ -19967,7 +19967,8 @@
       "add": "Hinzufügen",
       "cancel": "Abbrechen",
       "dismissRecognition": "„{{phrase}}“ nicht erkennen"
-    }
+    },
+    "openLinked": "Verknüpftes Gespräch öffnen"
   },
   "awayGuard": {
     "status": "Cindy arbeitet",

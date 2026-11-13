@@ -130,6 +130,8 @@ export const personalTodosDataset: SharedDatasetDefinition<StoredTodo, TaskTag[]
       ...(item.tagIds?.length ? { tagIds: item.tagIds } : {}),
       ...(item.reminder && item.reminder !== 'default' ? { reminder: item.reminder } : {}),
       ...(item.subtasks?.length ? { subtasks: stepsOf(item) } : {}),
+      // Only when set: a main computer from before links refuses the unknown field.
+      ...(item.link ? { link: item.link } : {}),
       ...(item.status === 'done' ? { [CARRY_DONE]: true } : {}),
       ...(item.status === 'open' && item.decision?.kind === 'later' && item.decision.until
         ? { [CARRY_LATER]: item.decision.until }
@@ -148,6 +150,10 @@ export const personalTodosDataset: SharedDatasetDefinition<StoredTodo, TaskTag[]
       tagIds: local.tagIds ?? [],
       reminder: local.reminder ?? 'default',
       subtasks: stepsOf(local),
+      // Only when it differs, so a main computer from before links still takes the rest.
+      ...(JSON.stringify(local.link ?? null) !== JSON.stringify(remote.link ?? null)
+        ? { link: local.link ?? null }
+        : {}),
       ...revisionOperation(local, remote),
     };
   },

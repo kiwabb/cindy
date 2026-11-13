@@ -19894,7 +19894,8 @@
       "add": "添加",
       "cancel": "取消",
       "dismissRecognition": "不识别“{{phrase}}”"
-    }
+    },
+    "openLinked": "打开关联的对话"
   },
   "awayGuard": {
     "status": "Cindy 正在工作",

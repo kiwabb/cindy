@@ -435,6 +435,26 @@ describe('personal todo account store', () => {
     expect(kept.subtasks[0]).not.toHaveProperty('doneAt');
     expect(kept.subtasks[2].doneAt).toBe('2020-01-03T20:00:00.000Z');
   });
+  // Contract for the linked conversation (2026-11-13, fork): optional and additive. Edits that do
+  // not name it keep it, null removes it, malformed links write nothing, and unlinked todos read
+  // exactly as before (no link key at all).
+  it('keeps a linked conversation across other edits, clears it with null and rejects malformed links', async () => {
+    const { file } = await fixture();
+    const store = createPersonalTodoStore(file);
+    const link = { sessionId: '79f2beb7-c1cc-4425-a77e-f4103d13f71c', botId: 'bot_tutor' };
+    const created = await store.update({ creationRequestId: 'study-2026-11-13', title: '英语 · 今日学习', link });
+    expect(created.link).toEqual(link);
+    const renamed = await store.update({ id: created.id, expectedRevision: created.revision, title: '英语 · 今日学习 20 分钟' });
+    expect(renamed.link).toEqual(link);
+    // The same creation retried with another link is an edited draft, not a duplicate.
+    await expect(store.update({ creationRequestId: 'study-2026-11-13', title: '英语 · 今日学习', link: { sessionId: 'other' } })).rejects.toMatchObject({ code: 'CONFLICT' });
+    for (const bad of [{ sessionId: '../x' }, { sessionId: 's', extra: 1 }, { deviceId: 'd' }, 'session'])
+      await expect(store.update({ id: renamed.id, expectedRevision: renamed.revision, link: bad as never })).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+    const cleared = await store.update({ id: renamed.id, expectedRevision: renamed.revision, link: null });
+    expect(cleared).not.toHaveProperty('link');
+    const plain = await store.update({ creationRequestId: 'no-link', title: 'Plain' });
+    expect(plain).not.toHaveProperty('link');
+  });
 });
 
 // Unit: a real atomic store commit followed by a lost transport receipt must be replay-safe.

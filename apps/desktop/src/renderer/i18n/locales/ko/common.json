@@ -19894,7 +19894,8 @@
       "add": "추가",
       "cancel": "취소",
       "dismissRecognition": "“{{phrase}}” 인식 안 함"
-    }
+    },
+    "openLinked": "연결된 대화 열기"
   },
   "awayGuard": {
     "status": "Cindy가 작업 중입니다",
