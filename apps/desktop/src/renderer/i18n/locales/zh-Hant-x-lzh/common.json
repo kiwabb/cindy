@@ -9566,7 +9566,8 @@
         "unknown": "未明分頁",
         "ghostPanel": "法器面板",
         "pluginView": "法器視圖",
-        "pluginTask": "法器差事頁"
+        "pluginTask": "法器差事頁",
+        "learningToday": "今日"
       },
       "controls": {
         "showAria": "顯側欄",
@@ -20047,6 +20048,24 @@
     "checkLimit": {
       "audio": "須聞音 · 暫不能驗",
       "speech": "須開口 · 暫不能驗"
+    },
+    "tab": {
+      "currentPoint": "今所學",
+      "waiting": "待答",
+      "doneToday": "今日已畢",
+      "answered": "所答",
+      "correct": "答中",
+      "continue": "續學",
+      "explainFirst": "先講之",
+      "anotherQuestion": "易一題",
+      "say": {
+        "continue": "續學",
+        "explainFirst": "先講之",
+        "anotherQuestion": "易一題"
+      },
+      "unbound": "此對話未繫進行中之所志",
+      "localOnly": "所志唯於本機對話中見",
+      "prefillFailed": "輸入框暫不可用，稍後再試"
     }
   }
 }

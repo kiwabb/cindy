@@ -9682,7 +9682,8 @@
         "unknown": "Onglet inconnu",
         "ghostPanel": "Panneau de plugin",
         "pluginView": "Vue de plugin",
-        "pluginTask": "Tâche de plugin"
+        "pluginTask": "Tâche de plugin",
+        "learningToday": "Aujourd’hui"
       },
       "controls": {
         "showAria": "Afficher la barre latérale",
@@ -20310,6 +20311,24 @@
       "audio": "Audio requis · vérification impossible pour l’instant",
       "speech": "Expression orale requise · vérification impossible pour l’instant"
     },
-    "reviewedTimes_many": "Révisé {{count}} fois"
+    "reviewedTimes_many": "Révisé {{count}} fois",
+    "tab": {
+      "currentPoint": "Point en cours",
+      "waiting": "En attente de réponse",
+      "doneToday": "Fait aujourd’hui",
+      "answered": "Réponses",
+      "correct": "Correctes",
+      "continue": "Continuer",
+      "explainFirst": "Expliquer d’abord",
+      "anotherQuestion": "Autre question",
+      "say": {
+        "continue": "Continuons",
+        "explainFirst": "Explique-le d’abord",
+        "anotherQuestion": "Donne-moi une autre question"
+      },
+      "unbound": "Cette conversation n’est liée à aucun objectif d’apprentissage actif",
+      "localOnly": "Les objectifs d’apprentissage ne s’affichent que dans les conversations de cet ordinateur",
+      "prefillFailed": "La zone de message n’est pas disponible pour le moment. Réessayez dans un instant"
+    }
   }
 }

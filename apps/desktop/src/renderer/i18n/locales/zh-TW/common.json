@@ -9566,7 +9566,8 @@
         "unknown": "未知標籤頁",
         "ghostPanel": "插件面板",
         "pluginView": "插件視圖",
-        "pluginTask": "插件任務頁"
+        "pluginTask": "插件任務頁",
+        "learningToday": "今天"
       },
       "controls": {
         "showAria": "顯示側欄",
@@ -20047,6 +20048,24 @@
     "checkLimit": {
       "audio": "需音訊 · 暫無法檢驗",
       "speech": "需開口說 · 暫無法檢驗"
+    },
+    "tab": {
+      "currentPoint": "目前知識點",
+      "waiting": "待回答",
+      "doneToday": "今天已完成",
+      "answered": "作答",
+      "correct": "答對",
+      "continue": "繼續學習",
+      "explainFirst": "先講講",
+      "anotherQuestion": "換一道題",
+      "say": {
+        "continue": "繼續學習",
+        "explainFirst": "先講講",
+        "anotherQuestion": "換一道題"
+      },
+      "unbound": "這場對話沒有綁定進行中的學習目標",
+      "localOnly": "學習目標只在這台電腦上的對話裡顯示",
+      "prefillFailed": "輸入框暫時無法使用，請稍後再試"
     }
   }
 }

@@ -9682,7 +9682,8 @@
         "unknown": "Separador desconhecido",
         "ghostPanel": "Painel do plugin",
         "pluginView": "Vista do plugin",
-        "pluginTask": "Página de tarefa do plugin"
+        "pluginTask": "Página de tarefa do plugin",
+        "learningToday": "Hoje"
       },
       "controls": {
         "showAria": "Mostrar barra lateral",
@@ -20310,6 +20311,24 @@
       "audio": "Precisa de áudio · ainda não é possível verificar",
       "speech": "Precisa de falar · ainda não é possível verificar"
     },
-    "reviewedTimes_many": "Revisto {{count}} vezes"
+    "reviewedTimes_many": "Revisto {{count}} vezes",
+    "tab": {
+      "currentPoint": "Ponto atual",
+      "waiting": "À espera da sua resposta",
+      "doneToday": "Feito hoje",
+      "answered": "Respondidas",
+      "correct": "Corretas",
+      "continue": "Continuar",
+      "explainFirst": "Explicar primeiro",
+      "anotherQuestion": "Outra pergunta",
+      "say": {
+        "continue": "Vamos continuar",
+        "explainFirst": "Explique primeiro",
+        "anotherQuestion": "Dê-me outra pergunta"
+      },
+      "unbound": "Esta conversa não está associada a um objetivo de aprendizagem ativo",
+      "localOnly": "Os objetivos de aprendizagem só aparecem em conversas deste computador",
+      "prefillFailed": "A caixa de mensagem não está disponível agora. Tente novamente daqui a pouco"
+    }
   }
 }

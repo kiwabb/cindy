@@ -9566,7 +9566,8 @@
         "unknown": "未知标签页",
         "ghostPanel": "插件面板",
         "pluginView": "插件视图",
-        "pluginTask": "插件任务页"
+        "pluginTask": "插件任务页",
+        "learningToday": "今天"
       },
       "controls": {
         "showAria": "显示侧栏",
@@ -20047,6 +20048,24 @@
     "checkLimit": {
       "audio": "需音频 · 暂不能检验",
       "speech": "需开口说 · 暂不能检验"
+    },
+    "tab": {
+      "currentPoint": "当前知识点",
+      "waiting": "待回答",
+      "doneToday": "今天已完成",
+      "answered": "作答",
+      "correct": "答对",
+      "continue": "继续学习",
+      "explainFirst": "先讲讲",
+      "anotherQuestion": "换一道题",
+      "say": {
+        "continue": "继续学习",
+        "explainFirst": "先讲讲",
+        "anotherQuestion": "换一道题"
+      },
+      "unbound": "这场对话没有绑定进行中的学习目标",
+      "localOnly": "学习目标只在这台电脑上的对话里显示",
+      "prefillFailed": "输入框暂时不可用，请稍后再试"
     }
   }
 }

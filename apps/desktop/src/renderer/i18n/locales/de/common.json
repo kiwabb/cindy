@@ -9609,7 +9609,8 @@
         "unknown": "Unbekannter Tab",
         "ghostPanel": "Plugin-Panel",
         "pluginView": "Plugin-Ansicht",
-        "pluginTask": "Plugin-Aufgabenseite"
+        "pluginTask": "Plugin-Aufgabenseite",
+        "learningToday": "Heute"
       },
       "controls": {
         "showAria": "Seitenleiste anzeigen",
@@ -20121,6 +20122,24 @@
     "checkLimit": {
       "audio": "Braucht Audio · noch nicht prüfbar",
       "speech": "Braucht Sprechen · noch nicht prüfbar"
+    },
+    "tab": {
+      "currentPoint": "Aktueller Punkt",
+      "waiting": "Wartet auf Antwort",
+      "doneToday": "Heute erledigt",
+      "answered": "Beantwortet",
+      "correct": "Richtig",
+      "continue": "Weiterlernen",
+      "explainFirst": "Erst erklären",
+      "anotherQuestion": "Andere Frage",
+      "say": {
+        "continue": "Lass uns weitermachen",
+        "explainFirst": "Erklär es mir zuerst",
+        "anotherQuestion": "Gib mir eine andere Frage"
+      },
+      "unbound": "Dieses Gespräch ist mit keinem aktiven Lernziel verknüpft",
+      "localOnly": "Lernziele erscheinen nur in Gesprächen auf diesem Computer",
+      "prefillFailed": "Das Eingabefeld ist gerade nicht verfügbar. Versuch es gleich noch einmal"
     }
   }
 }

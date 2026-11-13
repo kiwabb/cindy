@@ -9682,7 +9682,8 @@
         "unknown": "Aba desconhecida",
         "ghostPanel": "Painel do plugin",
         "pluginView": "Visualização do plugin",
-        "pluginTask": "Página de tarefa do plugin"
+        "pluginTask": "Página de tarefa do plugin",
+        "learningToday": "Hoje"
       },
       "controls": {
         "showAria": "Mostrar barra lateral",
@@ -20310,6 +20311,24 @@
       "audio": "Precisa de áudio · ainda não dá para verificar",
       "speech": "Precisa falar · ainda não dá para verificar"
     },
-    "reviewedTimes_many": "Revisado {{count}} vezes"
+    "reviewedTimes_many": "Revisado {{count}} vezes",
+    "tab": {
+      "currentPoint": "Ponto atual",
+      "waiting": "Aguardando sua resposta",
+      "doneToday": "Feito hoje",
+      "answered": "Respondidas",
+      "correct": "Corretas",
+      "continue": "Continuar",
+      "explainFirst": "Explicar antes",
+      "anotherQuestion": "Outra pergunta",
+      "say": {
+        "continue": "Vamos continuar",
+        "explainFirst": "Explique primeiro",
+        "anotherQuestion": "Me dê outra pergunta"
+      },
+      "unbound": "Esta conversa não está vinculada a uma meta de aprendizado ativa",
+      "localOnly": "As metas de aprendizado só aparecem em conversas deste computador",
+      "prefillFailed": "A caixa de mensagem não está disponível agora. Tente de novo em instantes"
+    }
   }
 }

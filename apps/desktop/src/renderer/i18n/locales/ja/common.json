@@ -9566,7 +9566,8 @@
         "unknown": "不明なタブ",
         "ghostPanel": "プラグインパネル",
         "pluginView": "プラグインビュー",
-        "pluginTask": "プラグインのタスクページ"
+        "pluginTask": "プラグインのタスクページ",
+        "learningToday": "今日"
       },
       "controls": {
         "showAria": "サイドバーを表示",
@@ -20047,6 +20048,24 @@
     "checkLimit": {
       "audio": "音声が必要 · まだ確認できません",
       "speech": "発話が必要 · まだ確認できません"
+    },
+    "tab": {
+      "currentPoint": "現在の項目",
+      "waiting": "回答待ち",
+      "doneToday": "今日の完了",
+      "answered": "回答",
+      "correct": "正解",
+      "continue": "学習を続ける",
+      "explainFirst": "先に説明して",
+      "anotherQuestion": "別の問題にする",
+      "say": {
+        "continue": "学習を続けて",
+        "explainFirst": "先に説明して",
+        "anotherQuestion": "別の問題にして"
+      },
+      "unbound": "この会話には進行中の学習目標が結び付いていません",
+      "localOnly": "学習目標はこのコンピューター上の会話でのみ表示されます",
+      "prefillFailed": "入力欄を一時的に使えません。しばらくしてからもう一度お試しください"
     }
   }
 }

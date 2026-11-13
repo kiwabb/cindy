@@ -9682,7 +9682,8 @@
         "unknown": "Pestaña desconocida",
         "ghostPanel": "Panel del complemento",
         "pluginView": "Vista del complemento",
-        "pluginTask": "Página de tarea del complemento"
+        "pluginTask": "Página de tarea del complemento",
+        "learningToday": "Hoy"
       },
       "controls": {
         "showAria": "Mostrar barra lateral",
@@ -20310,6 +20311,24 @@
       "audio": "Requiere audio · aún no se puede comprobar",
       "speech": "Requiere hablar · aún no se puede comprobar"
     },
-    "reviewedTimes_many": "Repasado {{count}} veces"
+    "reviewedTimes_many": "Repasado {{count}} veces",
+    "tab": {
+      "currentPoint": "Punto actual",
+      "waiting": "Esperando tu respuesta",
+      "doneToday": "Hecho hoy",
+      "answered": "Respondidas",
+      "correct": "Correctas",
+      "continue": "Seguir",
+      "explainFirst": "Explícalo antes",
+      "anotherQuestion": "Otra pregunta",
+      "say": {
+        "continue": "Sigamos",
+        "explainFirst": "Explícamelo primero",
+        "anotherQuestion": "Dame otra pregunta"
+      },
+      "unbound": "Esta conversación no está vinculada a un objetivo de aprendizaje activo",
+      "localOnly": "Los objetivos de aprendizaje solo se muestran en conversaciones de este ordenador",
+      "prefillFailed": "El cuadro de mensaje no está disponible ahora. Inténtalo de nuevo en un momento"
+    }
   }
 }

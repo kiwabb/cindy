@@ -9609,7 +9609,8 @@
         "unknown": "Unknown tab",
         "ghostPanel": "Plugin panel",
         "pluginView": "Plugin view",
-        "pluginTask": "Plugin task page"
+        "pluginTask": "Plugin task page",
+        "learningToday": "Today"
       },
       "controls": {
         "showAria": "Show sidebar",
@@ -20121,6 +20122,24 @@
     "checkLimit": {
       "audio": "Needs audio · can’t check yet",
       "speech": "Needs speaking · can’t check yet"
+    },
+    "tab": {
+      "currentPoint": "Current point",
+      "waiting": "Waiting for your answer",
+      "doneToday": "Done today",
+      "answered": "Answered",
+      "correct": "Correct",
+      "continue": "Continue",
+      "explainFirst": "Explain first",
+      "anotherQuestion": "Another question",
+      "say": {
+        "continue": "Let’s continue",
+        "explainFirst": "Explain it first",
+        "anotherQuestion": "Give me another question"
+      },
+      "unbound": "This conversation isn’t linked to a learning goal in progress",
+      "localOnly": "Learning goals show only in conversations on this computer",
+      "prefillFailed": "The message box isn’t available right now. Try again in a moment"
     }
   }
 }
