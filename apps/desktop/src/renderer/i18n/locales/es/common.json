@@ -10439,7 +10439,8 @@
         "plugins": "Complementos",
         "bots": "Compañeros",
         "search": "Buscar",
-        "todos": "Pendientes"
+        "todos": "Pendientes",
+        "learning": "Aprendizaje"
       },
       "todosCount_one": "{{count}} pendiente abierto",
       "todosCount_other": "{{count}} pendientes abiertos",
@@ -20234,5 +20235,81 @@
     "detail": "Solicitud de {{device}}\nMotivo: {{purpose}}\n\nLos dispositivos de tu cuenta podrán controlar este ordenador, ejecutar tareas y acceder a archivos. Seguirá activado hasta que lo desactives en Ajustes.",
     "decline": "Ahora no",
     "enable": "Activar control remoto"
+  },
+  "learning": {
+    "title": "Aprendizaje",
+    "today": "Hoy",
+    "goals": "Objetivos",
+    "archived": "Archivados",
+    "moduleNumber": "Módulo {{number}}",
+    "allCleared": "Todos los puntos de este objetivo están superados",
+    "goStudy": "Estudiar",
+    "stepAt": "Vas por · {{step}}",
+    "step": {
+      "practice": "práctica",
+      "explain": "explicación"
+    },
+    "openQuestion": "1 pregunta por responder",
+    "noOpenQuestion": "No hay preguntas por responder",
+    "dueToday": "Repasos para hoy: {{count}}",
+    "nextReview": "Próximo repaso {{date}}",
+    "plan": {
+      "title": "Plan de hoy",
+      "recap": "Repaso",
+      "explain": "Explicación",
+      "practice": "Práctica",
+      "wrap-up": "Cierre",
+      "segmentAria": "{{name}} {{count}} min",
+      "joiner": ", "
+    },
+    "minutes": "{{count}} min",
+    "goalQuote": "En tus palabras: {{quote}}",
+    "outlineDraft": "Esquema sin acordar",
+    "finalizeOutline": "Acordar esquema",
+    "masteredLabel": "Dominados",
+    "masteredAria": "{{count}} de {{total}} dominados",
+    "lastActivity": "Última actividad {{when}}",
+    "todayAt": "hoy {{time}}",
+    "outline": "Esquema",
+    "outlineSize": "{{modules}} módulos · {{points}} puntos",
+    "aboutYou": "Sobre ti",
+    "readOnly": "Solo lectura",
+    "profile": {
+      "priorKnowledge": "Punto de partida",
+      "targetLevel": "Nivel objetivo",
+      "timeBudget": "Tiempo",
+      "preferences": "Preferencias"
+    },
+    "profileNote": "Si algo cambia, díselo a {{name}} en la conversación",
+    "reviews": "Repasos",
+    "reviewedTimes_one": "Repasado una vez",
+    "reviewedTimes_other": "Repasado {{count}} veces",
+    "noReviews": "Aún no hay repasos programados",
+    "openConversation": "Abrir la conversación con {{name}}",
+    "tutorFallback": "Tutor",
+    "loadFailed": "No se pudieron leer los objetivos de aprendizaje",
+    "empty": {
+      "title": "Aún no hay objetivos de aprendizaje",
+      "body": "Cuéntale a {{name}} en la conversación qué quieres aprender y acordaréis el esquema juntos.",
+      "action": "Crear un objetivo con {{name}}"
+    },
+    "pointState": {
+      "not-started": "Sin empezar",
+      "in-progress": "En curso",
+      "mastered": "Dominado",
+      "deferred": "Aplazado",
+      "self-reported": "Declarado por ti"
+    },
+    "pointType": {
+      "memory": "Memoria",
+      "concept": "Concepto",
+      "procedure": "Procedimiento",
+      "design": "Diseño"
+    },
+    "checkLimit": {
+      "audio": "Requiere audio · aún no se puede comprobar",
+      "speech": "Requiere hablar · aún no se puede comprobar"
+    },
+    "reviewedTimes_many": "Repasado {{count}} veces"
   }
 }

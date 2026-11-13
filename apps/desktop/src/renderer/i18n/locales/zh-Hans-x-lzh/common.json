@@ -10314,7 +10314,8 @@
         "plugins": "法器",
         "bots": "同僚",
         "search": "寻",
-        "todos": "待理"
+        "todos": "待理",
+        "learning": "学"
       },
       "todosCount_other": "待理方行者 {{count}}"
     },
@@ -19973,5 +19974,79 @@
     "detail": "请求来自「{{device}}」\n所为：{{purpose}}\n\n启用后，同账号设备可远控此机，执行任务、访问文件。此设长效，可随时于设置中关闭。",
     "decline": "暂不开启",
     "enable": "开启远程控制"
+  },
+  "learning": {
+    "title": "学",
+    "today": "今日",
+    "goals": "所志",
+    "archived": "已归档",
+    "moduleNumber": "第 {{number}} 篇",
+    "allCleared": "此志诸目皆已通过",
+    "goStudy": "往学",
+    "stepAt": "方至 · {{step}}",
+    "step": {
+      "practice": "习",
+      "explain": "讲"
+    },
+    "openQuestion": "一题待答",
+    "noOpenQuestion": "无待答之题",
+    "dueToday": "今日当温 {{count}}",
+    "nextReview": "下次温习 {{date}}",
+    "plan": {
+      "title": "今日之课",
+      "recap": "温故",
+      "explain": "讲授",
+      "practice": "习之",
+      "wrap-up": "总结",
+      "segmentAria": "{{name}} {{count}} 分",
+      "joiner": "，"
+    },
+    "minutes": "{{count}} 分",
+    "goalQuote": "志之原话：{{quote}}",
+    "outlineDraft": "纲目未定",
+    "finalizeOutline": "往定之",
+    "masteredLabel": "已通",
+    "masteredAria": "已通 {{count}}，凡 {{total}}",
+    "lastActivity": "近动 {{when}}",
+    "todayAt": "今日 {{time}}",
+    "outline": "纲目",
+    "outlineSize": "{{modules}} 篇 · {{points}} 目",
+    "aboutYou": "关于汝",
+    "readOnly": "只读",
+    "profile": {
+      "priorKnowledge": "所学根柢",
+      "targetLevel": "所期之境",
+      "timeBudget": "时日之计",
+      "preferences": "所好"
+    },
+    "profileNote": "有变则于对话中告{{name}}",
+    "reviews": "温习",
+    "reviewedTimes_other": "已温 {{count}} 次",
+    "noReviews": "尚无温习之期",
+    "openConversation": "启{{name}}对话",
+    "tutorFallback": "导师",
+    "loadFailed": "读所志失败",
+    "empty": {
+      "title": "尚无所志",
+      "body": "于{{name}}对话中言所欲学，{{name}}当与汝共定纲目。",
+      "action": "与{{name}}立新志"
+    },
+    "pointState": {
+      "not-started": "未始",
+      "in-progress": "方学",
+      "mastered": "已通",
+      "deferred": "暂缓",
+      "self-reported": "自言已通"
+    },
+    "pointType": {
+      "memory": "记诵",
+      "concept": "概念",
+      "procedure": "步骤",
+      "design": "设计"
+    },
+    "checkLimit": {
+      "audio": "须闻音 · 暂不能验",
+      "speech": "须开口 · 暂不能验"
+    }
   }
 }

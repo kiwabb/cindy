@@ -10439,7 +10439,8 @@
         "plugins": "Plugins",
         "bots": "Colegas",
         "search": "Pesquisar",
-        "todos": "Afazeres"
+        "todos": "Afazeres",
+        "learning": "Aprendizagem"
       },
       "todosCount_one": "{{count}} afazer em aberto",
       "todosCount_other": "{{count}} afazeres em aberto",
@@ -20234,5 +20235,81 @@
     "detail": "Pedido de {{device}}\nFinalidade: {{purpose}}\n\nOs dispositivos da sua conta poderão controlar este computador, executar tarefas e aceder a ficheiros. A opção mantém-se ativa até a desativar nas definições.",
     "decline": "Agora não",
     "enable": "Ativar controlo remoto"
+  },
+  "learning": {
+    "title": "Aprendizagem",
+    "today": "Hoje",
+    "goals": "Objetivos",
+    "archived": "Arquivados",
+    "moduleNumber": "Módulo {{number}}",
+    "allCleared": "Todos os pontos deste objetivo estão concluídos",
+    "goStudy": "Estudar",
+    "stepAt": "Etapa · {{step}}",
+    "step": {
+      "practice": "prática",
+      "explain": "explicação"
+    },
+    "openQuestion": "1 pergunta por responder",
+    "noOpenQuestion": "Nenhuma pergunta por responder",
+    "dueToday": "Revisões de hoje: {{count}}",
+    "nextReview": "Próxima revisão {{date}}",
+    "plan": {
+      "title": "Plano de hoje",
+      "recap": "Revisão",
+      "explain": "Explicação",
+      "practice": "Prática",
+      "wrap-up": "Conclusão",
+      "segmentAria": "{{name}} {{count}} min",
+      "joiner": ", "
+    },
+    "minutes": "{{count}} min",
+    "goalQuote": "Nas suas palavras: {{quote}}",
+    "outlineDraft": "Plano ainda não acordado",
+    "finalizeOutline": "Acordar plano",
+    "masteredLabel": "Dominados",
+    "masteredAria": "{{count}} de {{total}} dominados",
+    "lastActivity": "Última atividade {{when}}",
+    "todayAt": "hoje {{time}}",
+    "outline": "Plano",
+    "outlineSize": "{{modules}} módulos · {{points}} pontos",
+    "aboutYou": "Sobre si",
+    "readOnly": "Só de leitura",
+    "profile": {
+      "priorKnowledge": "Ponto de partida",
+      "targetLevel": "Nível pretendido",
+      "timeBudget": "Tempo",
+      "preferences": "Preferências"
+    },
+    "profileNote": "Se algo mudar, diga a {{name}} na conversa",
+    "reviews": "Revisões",
+    "reviewedTimes_one": "Revisto uma vez",
+    "reviewedTimes_other": "Revisto {{count}} vezes",
+    "noReviews": "Ainda não há revisões agendadas",
+    "openConversation": "Abrir conversa com {{name}}",
+    "tutorFallback": "Tutor",
+    "loadFailed": "Não foi possível ler os objetivos de aprendizagem",
+    "empty": {
+      "title": "Ainda não há objetivos de aprendizagem",
+      "body": "Diga a {{name}} na conversa o que quer aprender e acordem o plano em conjunto.",
+      "action": "Criar um objetivo com {{name}}"
+    },
+    "pointState": {
+      "not-started": "Não iniciado",
+      "in-progress": "Em curso",
+      "mastered": "Dominado",
+      "deferred": "Adiado",
+      "self-reported": "Declarado por si"
+    },
+    "pointType": {
+      "memory": "Memória",
+      "concept": "Conceito",
+      "procedure": "Procedimento",
+      "design": "Design"
+    },
+    "checkLimit": {
+      "audio": "Precisa de áudio · ainda não é possível verificar",
+      "speech": "Precisa de falar · ainda não é possível verificar"
+    },
+    "reviewedTimes_many": "Revisto {{count}} vezes"
   }
 }

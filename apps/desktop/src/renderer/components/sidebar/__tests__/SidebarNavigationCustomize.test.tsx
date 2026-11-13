@@ -70,8 +70,8 @@ vi.mock('react-i18next', () => ({
 }));
 
 const defaults = () => ({
-  order: ['automations', 'todos', 'plugins', 'search'] as const,
-  visible: ['automations', 'todos', 'plugins', 'search'] as const,
+  order: ['automations', 'todos', 'learning', 'plugins', 'search'] as const,
+  visible: ['automations', 'todos', 'learning', 'plugins', 'search'] as const,
 });
 
 beforeEach(() => {
@@ -100,11 +100,12 @@ describe('sidebar navigation customization', () => {
     render(<SidebarNavigationCustomize onDone={() => {}} />);
     // Rows drag from anywhere except the checkbox, which stays a plain toggle.
     expect(sortableMock.props?.filter).toBe("[role='checkbox']");
-    act(() => sortableMock.props!.onReorder(['plugins', 'search', 'todos', 'automations']));
+    act(() => sortableMock.props!.onReorder(['plugins', 'search', 'todos', 'learning', 'automations']));
     expect(order()).toEqual([
       'sidebar.navigation.items.plugins',
       'sidebar.navigation.items.search',
       'sidebar.navigation.items.todos',
+      'sidebar.navigation.items.learning',
       'sidebar.navigation.items.automations',
     ]);
     fireEvent.click(screen.getByRole('button', { name: 'sidebar.navigation.customize.done' }));
@@ -112,10 +113,11 @@ describe('sidebar navigation customization', () => {
       'plugins',
       'search',
       'todos',
+      'learning',
       'automations',
     ]);
     expect(JSON.parse(localStorage.getItem(PREFS_KEY)!)).toEqual({
-      order: ['plugins', 'search', 'todos', 'automations'],
+      order: ['plugins', 'search', 'todos', 'learning', 'automations'],
     });
   });
 
@@ -124,6 +126,7 @@ describe('sidebar navigation customization', () => {
     const grip = screen.getByRole('button', {
       name: 'sidebar.navigation.customize.reorder: sidebar.navigation.items.plugins',
     });
+    fireEvent.keyDown(grip, { key: 'ArrowUp' });
     fireEvent.keyDown(grip, { key: 'ArrowUp' });
     fireEvent.keyDown(grip, { key: 'ArrowUp' });
     fireEvent.click(screen.getByRole('checkbox', { name: 'sidebar.navigation.items.search' }));
@@ -136,7 +139,7 @@ describe('sidebar navigation customization', () => {
     expect(order()[0]).toBe('sidebar.navigation.items.plugins');
     fireEvent.click(screen.getByRole('button', { name: 'sidebar.navigation.customize.done' }));
     expect(getSidebarNavigationPrefs(OWNER)).toEqual({
-      order: ['plugins', 'automations', 'todos', 'search'],
+      order: ['plugins', 'automations', 'todos', 'learning', 'search'],
       visible: ['plugins'],
       appsAtTop: [],
     });
@@ -179,8 +182,8 @@ describe('sidebar navigation customization', () => {
     );
     act(() => window.dispatchEvent(new StorageEvent('storage', { key: PREFS_KEY })));
     expect(getSidebarNavigationPrefs(OWNER)).toEqual({
-      order: ['plugins', 'automations', 'todos', 'search'],
-      visible: ['automations', 'todos', 'search'],
+      order: ['plugins', 'automations', 'todos', 'learning', 'search'],
+      visible: ['automations', 'todos', 'learning', 'search'],
       appsAtTop: [],
     });
     render(<SidebarNavigationCustomize onDone={() => {}} />);
@@ -199,7 +202,7 @@ describe('sidebar navigation customization', () => {
     fireEvent.click(screen.getByRole('button', { name: 'sidebar.navigation.customize.done' }));
     expect(getSidebarNavigationPrefs(OWNER)).toEqual({
       order: [...defaults().order],
-      visible: ['automations', 'todos', 'plugins'],
+      visible: ['automations', 'todos', 'learning', 'plugins'],
       appsAtTop: [],
     });
   });
@@ -207,14 +210,15 @@ describe('sidebar navigation customization', () => {
     mainViewsMock.routeCapable = [SITES];
     mainViewsMock.sidebarVisible = [SITES];
     setSidebarNavigationPrefs(OWNER, {
-      order: ['automations', 'todos', 'plugins', 'search'],
-      visible: ['automations', 'todos', 'plugins', 'search'],
+      order: [...defaults().order],
+      visible: [...defaults().visible],
       appsAtTop: ['app:xd-sites'],
     });
     render(<SidebarNavigationCustomize onDone={() => {}} />);
     expect(order()).toEqual([
       'sidebar.navigation.items.automations',
       'sidebar.navigation.items.todos',
+      'sidebar.navigation.items.learning',
       'sidebar.navigation.items.plugins',
       'sidebar.navigation.items.search',
       '站点',
@@ -234,6 +238,7 @@ describe('sidebar navigation customization', () => {
     expect(getSidebarNavigationPrefs(OWNER).order).toEqual([
       'automations',
       'todos',
+      'learning',
       'plugins',
       'app:xd-sites',
       'search',
@@ -304,8 +309,8 @@ describe('sidebar navigation customization', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'sidebar.navigation.customize.done' }));
     expect(getSidebarNavigationPrefs(OWNER)).toEqual({
-      order: ['automations', 'todos', 'plugins', 'search'],
-      visible: ['automations', 'todos', 'plugins', 'search'],
+      order: [...defaults().order],
+      visible: [...defaults().visible],
       appsAtTop: [],
     });
     // No overrides remain, so later product defaults keep applying.
@@ -374,17 +379,18 @@ describe('sidebar navigation customization', () => {
   it('keeps a switched-off plugin at its place when other entries are reordered', () => {
     mainViewsMock.routeCapable = [SITES];
     setSidebarNavigationPrefs(OWNER, {
-      order: ['automations', 'todos', 'app:xd-sites', 'plugins', 'search'],
-      visible: ['automations', 'todos', 'plugins', 'search'],
+      order: ['automations', 'todos', 'learning', 'app:xd-sites', 'plugins', 'search'],
+      visible: [...defaults().visible],
     });
     render(<SidebarNavigationCustomize onDone={() => {}} />);
     expect(order()).not.toContain('站点');
-    act(() => sortableMock.props!.onReorder(['plugins', 'automations', 'todos', 'search']));
+    act(() => sortableMock.props!.onReorder(['plugins', 'automations', 'todos', 'learning', 'search']));
     fireEvent.click(screen.getByRole('button', { name: 'sidebar.navigation.customize.done' }));
     expect(getSidebarNavigationPrefs(OWNER).order).toEqual([
       'plugins',
       'automations',
       'todos',
+      'learning',
       'app:xd-sites',
       'search',
     ]);
@@ -394,21 +400,15 @@ describe('sidebar navigation customization', () => {
     mainViewsMock.routeCapable = [SITES];
     mainViewsMock.sidebarVisible = [SITES];
     setSidebarNavigationPrefs(OWNER, {
-      order: ['app:xd-sites', 'automations', 'todos', 'plugins', 'search'],
-      visible: ['automations', 'todos', 'plugins', 'search'],
+      order: ['app:xd-sites', ...defaults().order],
+      visible: [...defaults().visible],
     });
     const view = render(<SidebarNavigationCustomize onDone={() => {}} />);
     mainViewsMock.sidebarVisible = [];
     view.rerender(<SidebarNavigationCustomize onDone={() => {}} />);
     fireEvent.click(screen.getByRole('checkbox', { name: 'sidebar.navigation.items.search' }));
     fireEvent.click(screen.getByRole('button', { name: 'sidebar.navigation.customize.done' }));
-    expect(getSidebarNavigationPrefs(OWNER).order).toEqual([
-      'app:xd-sites',
-      'automations',
-      'todos',
-      'plugins',
-      'search',
-    ]);
+    expect(getSidebarNavigationPrefs(OWNER).order).toEqual(['app:xd-sites', ...defaults().order]);
   });
 
   it('keeps a reorder made after choosing reset', () => {
@@ -418,12 +418,13 @@ describe('sidebar navigation customization', () => {
     });
     render(<SidebarNavigationCustomize onDone={() => {}} />);
     fireEvent.click(screen.getByRole('button', { name: 'sidebar.navigation.customize.reset' }));
-    act(() => sortableMock.props!.onReorder(['plugins', 'automations', 'todos', 'search']));
+    act(() => sortableMock.props!.onReorder(['plugins', 'automations', 'todos', 'learning', 'search']));
     fireEvent.click(screen.getByRole('button', { name: 'sidebar.navigation.customize.done' }));
     expect(getSidebarNavigationPrefs(OWNER).order).toEqual([
       'plugins',
       'automations',
       'todos',
+      'learning',
       'search',
     ]);
   });

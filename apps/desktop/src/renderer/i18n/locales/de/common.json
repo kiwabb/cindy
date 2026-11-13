@@ -10357,7 +10357,8 @@
         "plugins": "Plugins",
         "bots": "Teammitglieder",
         "search": "Suchen",
-        "todos": "To-dos"
+        "todos": "To-dos",
+        "learning": "Lernen"
       },
       "todosCount_one": "{{count}} offenes To-do",
       "todosCount_other": "{{count}} offene To-dos"
@@ -20046,5 +20047,80 @@
     "detail": "Anfrage von {{device}}\nZweck: {{purpose}}\n\nGeräte Ihres Kontos können diesen Computer steuern, Aufgaben ausführen und auf Dateien zugreifen. Die Einstellung bleibt aktiv, bis Sie sie in den Einstellungen deaktivieren.",
     "decline": "Jetzt nicht",
     "enable": "Fernsteuerung aktivieren"
+  },
+  "learning": {
+    "title": "Lernen",
+    "today": "Heute",
+    "goals": "Ziele",
+    "archived": "Archiviert",
+    "moduleNumber": "Modul {{number}}",
+    "allCleared": "Alle Punkte dieses Ziels sind geschafft",
+    "goStudy": "Jetzt lernen",
+    "stepAt": "Stand · {{step}}",
+    "step": {
+      "practice": "Übung",
+      "explain": "Erklärung"
+    },
+    "openQuestion": "1 Frage offen",
+    "noOpenQuestion": "Keine offene Frage",
+    "dueToday": "Heute fällige Wiederholungen: {{count}}",
+    "nextReview": "Nächste Wiederholung {{date}}",
+    "plan": {
+      "title": "Heutiger Plan",
+      "recap": "Rückblick",
+      "explain": "Erklären",
+      "practice": "Üben",
+      "wrap-up": "Abschluss",
+      "segmentAria": "{{name}} {{count}} Min.",
+      "joiner": ", "
+    },
+    "minutes": "{{count}} Min.",
+    "goalQuote": "In deinen Worten: {{quote}}",
+    "outlineDraft": "Gliederung noch nicht vereinbart",
+    "finalizeOutline": "Gliederung festlegen",
+    "masteredLabel": "Beherrscht",
+    "masteredAria": "{{count}} von {{total}} beherrscht",
+    "lastActivity": "Zuletzt aktiv {{when}}",
+    "todayAt": "heute {{time}}",
+    "outline": "Gliederung",
+    "outlineSize": "{{modules}} Module · {{points}} Punkte",
+    "aboutYou": "Über dich",
+    "readOnly": "Schreibgeschützt",
+    "profile": {
+      "priorKnowledge": "Vorkenntnisse",
+      "targetLevel": "Zielniveau",
+      "timeBudget": "Zeit",
+      "preferences": "Vorlieben"
+    },
+    "profileNote": "Sag {{name}} im Gespräch, wenn sich etwas ändert",
+    "reviews": "Wiederholungen",
+    "reviewedTimes_one": "Einmal wiederholt",
+    "reviewedTimes_other": "{{count}}-mal wiederholt",
+    "noReviews": "Noch keine Wiederholungen geplant",
+    "openConversation": "Gespräch mit {{name}} öffnen",
+    "tutorFallback": "Tutor",
+    "loadFailed": "Lernziele konnten nicht gelesen werden",
+    "empty": {
+      "title": "Noch keine Lernziele",
+      "body": "Sag {{name}} im Gespräch, was du lernen möchtest; ihr legt die Gliederung gemeinsam fest.",
+      "action": "Ziel mit {{name}} anlegen"
+    },
+    "pointState": {
+      "not-started": "Nicht begonnen",
+      "in-progress": "In Arbeit",
+      "mastered": "Beherrscht",
+      "deferred": "Zurückgestellt",
+      "self-reported": "Selbst angegeben"
+    },
+    "pointType": {
+      "memory": "Merken",
+      "concept": "Konzept",
+      "procedure": "Ablauf",
+      "design": "Gestaltung"
+    },
+    "checkLimit": {
+      "audio": "Braucht Audio · noch nicht prüfbar",
+      "speech": "Braucht Sprechen · noch nicht prüfbar"
+    }
   }
 }

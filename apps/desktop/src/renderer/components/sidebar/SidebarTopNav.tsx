@@ -132,6 +132,7 @@ function useSidebarNavigationActions(
   const hasGhostUnread = useAnyGhostUnread() || hasRetirementUnread;
   const reviewUnread = usePluginReviewUpdates().updates.filter(item => item.unread);
   const onTodosMatch = useMatch('/bots/todos');
+  const onLearningMatch = useMatch('/bots/learning');
   const todoCount = useTodoBoardOpenCount();
   return {
     automations: {
@@ -148,6 +149,13 @@ function useSidebarNavigationActions(
       active: Boolean(onTodosMatch),
       showDot: false,
       count: { value: todoCount, label: t('sidebar.navigation.todosCount', { count: todoCount }) },
+    },
+    learning: {
+      label: t('sidebar.navigation.items.learning'),
+      icon: SIDEBAR_NAVIGATION_ITEM_ICONS.learning,
+      onSelect: () => navigate('/bots/learning'),
+      active: Boolean(onLearningMatch),
+      showDot: false,
     },
     plugins: {
       label: t('sidebar.tabs.plugins'),

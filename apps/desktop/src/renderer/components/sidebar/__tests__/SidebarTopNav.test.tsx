@@ -83,8 +83,8 @@ beforeEach(() => {
   localStorage.removeItem('sidebar-navigation:apps:v1');
   navigationTesting.resetArrivals();
   setSidebarNavigationPrefs(OWNER, {
-    order: ['automations', 'todos', 'plugins', 'search'],
-    visible: ['automations', 'todos', 'plugins', 'search'],
+    order: ['automations', 'todos', 'learning', 'plugins', 'search'],
+    visible: ['automations', 'todos', 'learning', 'plugins', 'search'],
   });
 });
 
@@ -433,6 +433,14 @@ describe('Sidebar navigation rows and More', () => {
     expect(screen.getByRole('button', { name: 'sidebar.navigation.items.todos' }).hasAttribute('aria-current')).toBe(false);
   });
 
+  // 学习页（2026-11-13）同样不是某位伙伴的对话：入口打开 /bots/learning 并高亮。
+  it('opens the learning page from its own entry', () => {
+    render(<Harness initialPath="/cc-agent" />);
+    fireEvent.click(screen.getByRole('button', { name: 'sidebar.navigation.items.learning' }));
+    expect(screen.getByTestId('location').textContent).toBe('/bots/learning');
+    expect(screen.getByRole('button', { name: 'sidebar.navigation.items.learning' }).getAttribute('aria-current')).toBe('page');
+  });
+
   it('keeps the previous task when visiting automations before plugins', () => {
     const sessionPath = '/cc-agent/session-1?remoteHostId=host-1#message-2';
     render(<Harness initialPath={sessionPath} />);
@@ -769,7 +777,7 @@ describe('Plugins joining the sidebar', () => {
       .toBe('false');
     fireEvent.click(screen.getByRole('button', { name: 'sidebar.navigation.customize.done' }));
     expect(getSidebarNavigationPrefs('owner-2').visible).toEqual(['automations']);
-    expect(getSidebarNavigationPrefs(OWNER).visible).toEqual(['automations', 'todos', 'plugins', 'search']);
+    expect(getSidebarNavigationPrefs(OWNER).visible).toEqual(['automations', 'todos', 'learning', 'plugins', 'search']);
   });
 });
 
