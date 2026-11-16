@@ -20329,7 +20329,11 @@
       },
       "unbound": "Esta conversa não está associada a um objetivo de aprendizagem ativo",
       "localOnly": "Os objetivos de aprendizagem só aparecem em conversas deste computador",
-      "prefillFailed": "A caixa de mensagem não está disponível agora. Tente novamente daqui a pouco"
+      "passed": "Concluídos",
+      "passedNames": "Concluídos: {{names}}",
+      "nameJoiner": ", ",
+      "sendFailed": "A mensagem não foi enviada. Tente novamente daqui a pouco",
+      "sendUnavailable": "Não é possível enviar mensagens nesta conversa agora"
     }
   }
 }

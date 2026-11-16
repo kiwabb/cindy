@@ -6,7 +6,8 @@
  *   的五种状态；掌握判定沿用导师状态脚本的口径（procedure 0.9、学习者自述单列）。
  * - 现有覆盖缺口：新模块，无相邻覆盖。
  * - 最小失败输入：progress.json 被写成半截 JSON；开着的题带 expected_answer；已归档目标仍在
- *   sessions.json 里。
+ *   sessions.json 里；mastered_at 里有今天过关的、今天记了时间但只是自述掌握的、记了时间却未掌握的知识点
+ *   （2026-11-16「今天已完成」的过关行，简报 §五）。
  * - tier：unit（mkdtemp 临时目录、进程内调用）。
  * - 实测耗时：本机单独运行 2.4 s（vitest Duration，用例 39 ms）。
  */
@@ -74,6 +75,11 @@ const progress = {
     expected_answer: 'SECRET-ANSWER',
     explanation: 'SECRET-EXPLANATION',
   },
+  mastered_at: {
+    k0: sec(new Date(2026, 10, 13, 9)),
+    k2: sec(new Date(2026, 10, 13, 11)),
+    k1: sec(new Date(2026, 10, 12, 9)),
+  },
   updated_at: sec(new Date(2026, 10, 13, 10)),
 };
 
@@ -132,7 +138,8 @@ describe('learning goals reader', () => {
     expect(goal.current).toEqual({ moduleId: 'm0', pointId: 'k1' });
     expect(goal.step).toBe('practice');
     expect(goal.outlineAgreed).toBe(false);
-    expect(goal.today).toEqual({ attempts: 2, correct: 1 });
+    // Only a point still assessed as mastered whose recorded pass is today counts as passed today.
+    expect(goal.today).toEqual({ attempts: 2, correct: 1, passed: [{ pointId: 'k0', pointName: 'k0 名称' }] });
     // Only cleared points have reviews; the open question carries no answer.
     expect(goal.reviews.map((r) => [r.pointId, r.pointName, r.reviewCount])).toEqual([['k0', 'k0 名称', 3]]);
     expect(goal.dailyPlan).toBeNull();

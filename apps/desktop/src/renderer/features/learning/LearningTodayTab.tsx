@@ -1,14 +1,15 @@
 /**
  * 对话右侧的「今天」页签：只在绑定了进行中学习目标的导师对话里出现（按 Session id 绑定），
- * 显示当前知识点、开着的题（只有题面）、今天的作答、折叠大纲，以及三句快捷话。快捷话只写进
- * 这场对话的输入框，由用户按发送；页签本身不发消息、不改目标。
+ * 显示当前知识点、开着的题（只有题面）、今天过关与作答、折叠大纲，以及三句快捷话。快捷话由用户
+ * 点按后以用户本人的消息经这场对话自己的发送路径发出（与消息区的开场选项同一路径：对话正在回复
+ * 时进入排队，不动输入框里的草稿，也不带上待回复的引用）；页签不改目标。
  */
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { BookOpenText, CircleCheck, MessageCircleQuestion, Play, RefreshCw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
-import { insertPromptIntoComposer } from '@/lib/composerActionsBus';
+import { useRegisteredSessionQuickSend } from '@/components/chat/SessionQuickSendContext';
 import type { TabKindBodyProps } from '@/features/right-sidebar/types';
 import type { LearningGoal } from '../../../shared/learning';
 import { MiniOutline, pointStateLabel } from './learningVisuals';
@@ -37,13 +38,29 @@ function Section({ label, value, children }: { label: string; value?: string; ch
 
 function TodayBody({ goal, sessionId }: { goal: LearningGoal; sessionId: string }) {
   const { t } = useTranslation();
-  const [prefillFailed, setPrefillFailed] = useState(false);
+  const quickSend = useRegisteredSessionQuickSend(sessionId);
+  const sendingRef = useRef(false);
+  const [sending, setSending] = useState(false);
+  const [sendFailed, setSendFailed] = useState(false);
   const moduleIndex = goal.modules.findIndex((module) => module.id === goal.current?.moduleId);
   const module = goal.modules[moduleIndex];
   const point = module?.points.find((candidate) => candidate.id === goal.current?.pointId);
-  const say = (key: 'continue' | 'explainFirst' | 'anotherQuestion') => {
-    setPrefillFailed(!insertPromptIntoComposer({ targetSessionId: sessionId, text: t(`learning.tab.say.${key}`) }));
+  const say = async (key: 'continue' | 'explainFirst' | 'anotherQuestion') => {
+    if (!quickSend || sendingRef.current) return;
+    sendingRef.current = true;
+    setSending(true);
+    try {
+      // literalText: a phrase is never read as a command; independent: a pending reply quote stays for the user.
+      setSendFailed(!(await quickSend.send(t(`learning.tab.say.${key}`), { literalText: true, independent: true })));
+    } catch {
+      setSendFailed(true);
+    } finally {
+      sendingRef.current = false;
+      setSending(false);
+    }
   };
+  const actionsDisabled = !quickSend || sending;
+  const passed = goal.today.passed;
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-1">
@@ -75,27 +92,57 @@ function TodayBody({ goal, sessionId }: { goal: LearningGoal; sessionId: string 
           )}
         </Section>
         <Section label={t('learning.tab.doneToday')}>
+          {passed ? (
+            <p className="flex items-start gap-2 py-0.5 text-13 leading-5">
+              <CircleCheck size={14} aria-hidden className="mt-[3px] shrink-0 text-[var(--text-primary)]" />
+              <span className="min-w-0">
+                {passed.length
+                  ? t('learning.tab.passedNames', {
+                      names: passed.map((point) => point.pointName).join(t('learning.tab.nameJoiner')),
+                    })
+                  : t('learning.tab.passed')}
+              </span>
+              <span className="ml-auto shrink-0 tabular-nums text-[var(--text-secondary)]">{passed.length}</span>
+            </p>
+          ) : null}
           <p className="flex items-start gap-2 py-0.5 text-13 leading-5">
             <MessageCircleQuestion size={14} aria-hidden className="mt-[3px] shrink-0 text-[var(--text-primary)]" />
             <span className="min-w-0">{t('learning.tab.answered')}</span>
             <span className="ml-auto shrink-0 tabular-nums text-[var(--text-secondary)]">{goal.today.attempts}</span>
           </p>
-          <p className="flex items-start gap-2 py-0.5 text-13 leading-5">
-            <CircleCheck size={14} aria-hidden className="mt-[3px] shrink-0 text-[var(--text-primary)]" />
-            <span className="min-w-0">{t('learning.tab.correct')}</span>
-            <span className="ml-auto shrink-0 tabular-nums text-[var(--text-secondary)]">{goal.today.correct}</span>
-          </p>
+          {passed ? null : (
+            // Until the tutor records pass times, correct answers stand in for passes.
+            <p className="flex items-start gap-2 py-0.5 text-13 leading-5">
+              <CircleCheck size={14} aria-hidden className="mt-[3px] shrink-0 text-[var(--text-primary)]" />
+              <span className="min-w-0">{t('learning.tab.correct')}</span>
+              <span className="ml-auto shrink-0 tabular-nums text-[var(--text-secondary)]">{goal.today.correct}</span>
+            </p>
+          )}
         </Section>
         <Section label={t('learning.outline')} value={`${goal.masteredCount} / ${goal.totalCount}`}>
           <MiniOutline goal={goal} />
         </Section>
       </div>
       <div className="flex shrink-0 flex-wrap gap-2 border-t border-[var(--border-default)] px-4 py-3">
-        <Button size="sm" compact variant="primary" onClick={() => say('continue')}>
+        <Button
+          size="sm"
+          compact
+          variant="primary"
+          disabled={actionsDisabled}
+          title={quickSend ? undefined : t('learning.tab.sendUnavailable')}
+          onClick={() => void say('continue')}
+        >
           <Play size={13} aria-hidden />
           {t('learning.tab.continue')}
         </Button>
-        <Button size="sm" compact variant="secondary" onClick={() => say('explainFirst')}>
+        <Button
+          size="sm"
+          compact
+          variant="secondary"
+          disabled={actionsDisabled}
+          title={quickSend ? undefined : t('learning.tab.sendUnavailable')}
+          onClick={() => void say('explainFirst')}
+        >
           <BookOpenText size={13} aria-hidden />
           {t('learning.tab.explainFirst')}
         </Button>
@@ -103,16 +150,18 @@ function TodayBody({ goal, sessionId }: { goal: LearningGoal; sessionId: string 
           size="sm"
           compact
           variant="secondary"
-          disabled={!goal.openQuestion}
-          title={goal.openQuestion ? undefined : t('learning.noOpenQuestion')}
-          onClick={() => say('anotherQuestion')}
+          disabled={actionsDisabled || !goal.openQuestion}
+          title={
+            !goal.openQuestion ? t('learning.noOpenQuestion') : quickSend ? undefined : t('learning.tab.sendUnavailable')
+          }
+          onClick={() => void say('anotherQuestion')}
         >
           <RefreshCw size={13} aria-hidden />
           {t('learning.tab.anotherQuestion')}
         </Button>
-        {prefillFailed ? (
+        {sendFailed ? (
           <p role="status" className="w-full text-12 leading-4 text-[var(--text-secondary)]">
-            {t('learning.tab.prefillFailed')}
+            {t('learning.tab.sendFailed')}
           </p>
         ) : null}
       </div>

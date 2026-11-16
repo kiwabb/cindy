@@ -11,6 +11,7 @@ import type {
   LearningGoal,
   LearningModule,
   LearningOpenQuestion,
+  LearningPassedPoint,
   LearningPlanSegmentKind,
   LearningPoint,
   LearningPointType,
@@ -218,6 +219,19 @@ export function projectLearningGoal(files: LearningGoalFiles, now = new Date()):
     attempts += 1;
     if (attempt.is_correct === true) correct += 1;
   }
+  // Pass times exist only once the tutor records them (`mastered_at`: point id -> seconds). A point
+  // counts when its recorded pass falls today and it is still assessed as mastered (not a learner's
+  // own claim); nothing is inferred from answers or review times.
+  const masteredAt = progress.mastered_at;
+  const passed: LearningPassedPoint[] | null =
+    masteredAt && typeof masteredAt === 'object' && !Array.isArray(masteredAt)
+      ? points.flatMap(({ point }) => {
+          const at = ms((masteredAt as Json)[point.id]);
+          return point.state === 'mastered' && at !== null && at >= start && at < end
+            ? [{ pointId: point.id, pointName: shortPointName(point.name) }]
+            : [];
+        })
+      : null;
 
   const profile = obj(progress.learner_profile);
   const activity = [ms(progress.updated_at), ms(meta.updated_at)].filter(
@@ -245,7 +259,7 @@ export function projectLearningGoal(files: LearningGoalFiles, now = new Date()):
     reviews,
     dailyPlan: dailyPlan(progress),
     lastActivityAt: activity.length ? Math.max(...activity) : null,
-    today: { attempts, correct },
+    today: { attempts, correct, passed },
     sessionIds: files.sessionIds,
   };
 }

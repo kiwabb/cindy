@@ -20329,7 +20329,11 @@
       },
       "unbound": "Esta conversa não está vinculada a uma meta de aprendizado ativa",
       "localOnly": "As metas de aprendizado só aparecem em conversas deste computador",
-      "prefillFailed": "A caixa de mensagem não está disponível agora. Tente de novo em instantes"
+      "passed": "Concluídos",
+      "passedNames": "Concluídos: {{names}}",
+      "nameJoiner": ", ",
+      "sendFailed": "A mensagem não foi enviada. Tente de novo em instantes",
+      "sendUnavailable": "Não é possível enviar mensagens nesta conversa agora"
     }
   }
 }

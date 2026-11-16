@@ -20140,7 +20140,11 @@
       },
       "unbound": "This conversation isn’t linked to a learning goal in progress",
       "localOnly": "Learning goals show only in conversations on this computer",
-      "prefillFailed": "The message box isn’t available right now. Try again in a moment"
+      "passed": "Passed",
+      "passedNames": "Passed: {{names}}",
+      "nameJoiner": ", ",
+      "sendFailed": "The message wasn’t sent. Try again in a moment",
+      "sendUnavailable": "This conversation can’t send messages right now"
     }
   }
 }

@@ -20066,7 +20066,11 @@
       },
       "unbound": "這場對話沒有綁定進行中的學習目標",
       "localOnly": "學習目標只在這台電腦上的對話裡顯示",
-      "prefillFailed": "輸入框暫時無法使用，請稍後再試"
+      "passed": "過關",
+      "passedNames": "過關：{{names}}",
+      "nameJoiner": "、",
+      "sendFailed": "沒有送出，請稍後再試",
+      "sendUnavailable": "這場對話現在無法傳送"
     }
   }
 }

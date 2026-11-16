@@ -20329,7 +20329,11 @@
       },
       "unbound": "Cette conversation n’est liée à aucun objectif d’apprentissage actif",
       "localOnly": "Les objectifs d’apprentissage ne s’affichent que dans les conversations de cet ordinateur",
-      "prefillFailed": "La zone de message n’est pas disponible pour le moment. Réessayez dans un instant"
+      "passed": "Validés",
+      "passedNames": "Validés : {{names}}",
+      "nameJoiner": ", ",
+      "sendFailed": "Le message n’a pas été envoyé. Réessayez dans un instant",
+      "sendUnavailable": "Impossible d’envoyer des messages dans cette conversation pour le moment"
     }
   }
 }

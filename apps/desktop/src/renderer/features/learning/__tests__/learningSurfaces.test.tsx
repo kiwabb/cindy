@@ -3,10 +3,13 @@
  * 测试价值
  * - 生产入口与可观察结果：学习页 LearningView（/bots/learning）与导师对话右侧「今天」页签的正文
  *   LearningTodayTabBody。主人看到今天学什么、开着的题、大纲与已归档；点「去学习」进入绑定的对话；
- *   页签只在本机且绑定了进行中目标的对话里显示，快捷话只写进这场对话的输入框。
+ *   页签只在本机且绑定了进行中目标的对话里显示；快捷话点了就经这场对话自己的发送入口发出（不发给
+ *   别的对话，发送中不重复发，对话不能发送时置灰，没发出去时提示）；今天过关的知识点按导师记录列出。
  * - Bug／规则依据：设计简报 2026-11-12 §四/§五 与定稿原型（「换一道题」没有题时置灰；远程或归属未定的
  *   对话不显示；页面不出题作答、不发消息）。
  * - 现有覆盖缺口：主进程投影有 learningGoals.test.ts；界面如何按绑定、归属与题目状态呈现没有覆盖。
+ *   2026-11-16：快捷话由预填改为直接发送（简报 §五），补发送目标、并发与失败；发送入口内部的排队与
+ *   草稿处理沿用对话页 handleSend，本文件只验证页签交给它的文字与选项。
  * - 最小失败输入：一个进行中目标（有题开着）与一个已归档目标；同一会话分别以本机、远程、未绑定打开。
  * - tier：unit（jsdom，IPC 与路由解析用内存 fake）。
  * - 实测耗时：本机单独运行 6.2 s（vitest Duration，其中 jsdom 环境与全局 setup 约 4 s，收集 0.9 s，用例 0.4 s）。
@@ -18,7 +21,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setDataOwnerGeneration } from '@/contexts/dataOwnerGeneration';
 import type { LearningGoal, LearningSnapshot } from '../../../../shared/learning';
 
-const h = vi.hoisted(() => ({ insert: vi.fn(() => true) }));
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -32,8 +34,8 @@ vi.mock('@/features/bots/botStore', () => ({ useBotProfiles: () => [{ id: 'bot_t
 vi.mock('@/lib/orcaSessionIdentity', () => ({
   resolveSessionRoute: async (sessionId: string) => `/bots/bot_tutor/session/${sessionId}`,
 }));
-vi.mock('@/lib/composerActionsBus', () => ({ insertPromptIntoComposer: h.insert }));
 
+const { SessionQuickSendRegistration } = await import('@/components/chat/SessionQuickSendContext');
 const { LearningView } = await import('../LearningView');
 const { LearningTodayTabBody } = await import('../LearningTodayTab');
 
@@ -68,7 +70,7 @@ const goal = (patch: Partial<LearningGoal>): LearningGoal => ({
   reviews: [{ pointId: 'k0', pointName: '关键词块', dueAt: Date.now() + 5 * 86_400_000, reviewCount: 3 }],
   dailyPlan: null,
   lastActivityAt: Date.now(),
-  today: { attempts: 3, correct: 2 },
+  today: { attempts: 3, correct: 2, passed: null },
   sessionIds: ['session-en'],
   ...patch,
 });
@@ -92,7 +94,6 @@ const tabCtx = (sessionId: string, deviceLinkDeviceId: string | null | undefined
 
 beforeEach(() => {
   setDataOwnerGeneration('test-owner', 1);
-  h.insert.mockClear();
   snapshot = {
     goals: [goal({}), goal({ id: 'topic_old', name: '旧目标', status: 'archived', sessionIds: [] })],
     bindings: { 'session-en': { goalId: 'topic_en', botId: 'bot_tutor' } },
@@ -128,19 +129,43 @@ describe('Learning page', () => {
 });
 
 describe('Today tab', () => {
-  it('shows the bound goal here and only prefills this conversation', async () => {
-    render(<LearningTodayTabBody state={{}} ctx={tabCtx('session-en', null)} />);
+  it('shows the bound goal here and sends a phrase once through this conversation only', async () => {
+    let finish: (sent: boolean) => void = () => undefined;
+    const mine = { send: vi.fn(() => new Promise<boolean>((resolve) => (finish = resolve))) };
+    const other = { send: vi.fn(async () => true) };
+    render(
+      <>
+        <SessionQuickSendRegistration sessionId="session-en" sender={mine} />
+        <SessionQuickSendRegistration sessionId="session-other" sender={other} />
+        <LearningTodayTabBody state={{}} ctx={tabCtx('session-en', null)} />
+      </>,
+    );
     expect(await screen.findByText('The model does not use new data.')).toBeTruthy();
     expect(screen.getAllByText('拆句子')).toHaveLength(2); // current point and outline
-    fireEvent.click(screen.getByRole('button', { name: 'learning.tab.continue' }));
-    expect(h.insert).toHaveBeenCalledWith({ targetSessionId: 'session-en', text: 'learning.tab.say.continue' });
+    expect(screen.getByText('learning.tab.correct')).toBeTruthy(); // no pass times recorded yet
+    const continueButton = screen.getByRole('button', { name: 'learning.tab.continue' });
+    fireEvent.click(continueButton);
+    fireEvent.click(continueButton);
+    expect(mine.send).toHaveBeenCalledTimes(1);
+    expect(mine.send).toHaveBeenCalledWith('learning.tab.say.continue', { literalText: true, independent: true });
+    expect(other.send).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'learning.tab.explainFirst' }).hasAttribute('disabled')).toBe(true);
+    await act(async () => finish(false));
+    expect(screen.getByRole('status').textContent).toBe('learning.tab.sendFailed');
     expect(screen.getByRole('button', { name: 'learning.tab.anotherQuestion' }).hasAttribute('disabled')).toBe(false);
   });
 
-  it('disables another question without an open one, and shows nothing for remote or unbound conversations', async () => {
-    snapshot.goals[0] = goal({ openQuestion: null, step: 'explain' });
+  it('disables phrases when this conversation cannot send, lists today’s passes, and shows nothing for remote or unbound conversations', async () => {
+    snapshot.goals[0] = goal({
+      openQuestion: null,
+      step: 'explain',
+      today: { attempts: 3, correct: 2, passed: [{ pointId: 'k0', pointName: '关键词块' }] },
+    });
     const view = render(<LearningTodayTabBody state={{}} ctx={tabCtx('session-en', null)} />);
     expect((await screen.findByRole('button', { name: 'learning.tab.anotherQuestion' })).hasAttribute('disabled')).toBe(true);
+    expect(screen.getByRole('button', { name: 'learning.tab.continue' }).hasAttribute('disabled')).toBe(true);
+    expect(screen.getByText('learning.tab.passedNames:关键词块')).toBeTruthy();
+    expect(screen.queryByText('learning.tab.correct')).toBeNull();
     view.rerender(<LearningTodayTabBody state={{}} ctx={tabCtx('session-en', 'device-2')} />);
     expect(screen.getByText('learning.tab.localOnly')).toBeTruthy();
     view.rerender(<LearningTodayTabBody state={{}} ctx={tabCtx('session-en', undefined)} />);

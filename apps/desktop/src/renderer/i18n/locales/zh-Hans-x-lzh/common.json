@@ -20066,7 +20066,11 @@
       },
       "unbound": "此对话未系进行中之所志",
       "localOnly": "所志唯于本机对话中见",
-      "prefillFailed": "输入框暂不可用，稍后再试"
+      "passed": "过关",
+      "passedNames": "过关：{{names}}",
+      "nameJoiner": "、",
+      "sendFailed": "未能发出，稍后再试",
+      "sendUnavailable": "此对话今不可发"
     }
   }
 }
