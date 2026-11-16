@@ -19984,6 +19984,7 @@
     "archived": "已封存",
     "moduleNumber": "模組 {{number}}",
     "allCleared": "這個目標的知識點都已過關",
+    "noOutlineYet": "大綱還在和導師商量，定好後會顯示在這裡",
     "goStudy": "去學習",
     "stepAt": "進行到 · {{step}}",
     "step": {

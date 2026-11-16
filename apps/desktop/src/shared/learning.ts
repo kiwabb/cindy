@@ -36,6 +36,7 @@ export interface LearningReview {
   pointName: string;
   /** Epoch ms. */
   dueAt: number;
+  /** Days this point was reviewed in the tutor's review mode (local days of the reading computer). */
   reviewCount: number;
 }
 

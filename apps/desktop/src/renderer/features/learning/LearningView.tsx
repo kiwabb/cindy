@@ -194,7 +194,11 @@ function GoalCard({ goal, defaultOpen }: { goal: LearningGoal; defaultOpen: bool
               {t('learning.outlineSize', { modules: goal.modules.length, points: goal.totalCount })}
             </span>
           </h3>
-          <GoalOutline goal={goal} />
+          {goal.totalCount ? (
+            <GoalOutline goal={goal} />
+          ) : (
+            <p className="px-2 py-1 text-13 leading-5 text-[var(--text-secondary)]">{t('learning.noOutlineYet')}</p>
+          )}
           <div className="grid grid-cols-[repeat(auto-fit,minmax(16rem,1fr))] gap-x-8">
             <div>
               <h3 className="flex items-center gap-1.5 pb-1.5 pt-3.5 text-13 font-medium leading-5 text-[var(--text-secondary)]">

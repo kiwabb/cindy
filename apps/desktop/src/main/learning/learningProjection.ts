@@ -192,6 +192,20 @@ export function projectLearningGoal(files: LearningGoalFiles, now = new Date()):
       : null;
 
   const clearedIds = new Set(points.filter(({ point }) => cleared(point)).map(({ point }) => point.id));
+  // Real reviews only: the tutor marks evidence given in review mode on an already mastered point
+  // with `review_mode: true` (its v3); each local day with such evidence is one review. The queue's
+  // `review_count` also counts every answer given while learning, so it is not used.
+  const reviewDays = new Map<string, Set<string>>();
+  for (const raw of arr(progress.learning_evidence)) {
+    const evidence = obj(raw);
+    const at = ms(evidence.timestamp);
+    const pointId = str(evidence.knowledge_point_id, 256);
+    if (evidence.review_mode !== true || at === null || !pointId) continue;
+    const day = new Date(at);
+    const days = reviewDays.get(pointId) ?? new Set<string>();
+    days.add(`${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`);
+    reviewDays.set(pointId, days);
+  }
   const reviews: LearningReview[] = arr(progress.review_queue)
     .map(obj)
     .flatMap((task) => {
@@ -203,7 +217,7 @@ export function projectLearningGoal(files: LearningGoalFiles, now = new Date()):
           pointId,
           pointName: shortPointName(pointNames.get(pointId) ?? ''),
           dueAt,
-          reviewCount: Math.max(0, Math.floor(num(obj(task.state).review_count) ?? 0)),
+          reviewCount: reviewDays.get(pointId)?.size ?? 0,
         },
       ];
     })

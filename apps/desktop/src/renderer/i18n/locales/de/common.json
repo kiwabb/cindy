@@ -20057,6 +20057,7 @@
     "archived": "Archiviert",
     "moduleNumber": "Modul {{number}}",
     "allCleared": "Alle Punkte dieses Ziels sind geschafft",
+    "noOutlineYet": "Die Gliederung wird noch mit deinem Tutor erarbeitet. Sie erscheint hier, sobald sie steht",
     "goStudy": "Jetzt lernen",
     "stepAt": "Stand · {{step}}",
     "step": {

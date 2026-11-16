@@ -19984,6 +19984,7 @@
     "archived": "已归档",
     "moduleNumber": "第 {{number}} 篇",
     "allCleared": "此志诸目皆已通过",
+    "noOutlineYet": "纲目尚与师议，定后见于此",
     "goStudy": "往学",
     "stepAt": "方至 · {{step}}",
     "step": {

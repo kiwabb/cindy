@@ -20057,6 +20057,7 @@
     "archived": "Archived",
     "moduleNumber": "Module {{number}}",
     "allCleared": "Every point of this goal is cleared",
+    "noOutlineYet": "The outline is still being worked out with your tutor. It will show here once it’s ready",
     "goStudy": "Study now",
     "stepAt": "At · {{step}}",
     "step": {

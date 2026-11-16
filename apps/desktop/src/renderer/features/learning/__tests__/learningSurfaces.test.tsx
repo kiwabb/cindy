@@ -8,7 +8,8 @@
  * - Bug／规则依据：设计简报 2026-11-12 §四/§五 与定稿原型（「换一道题」没有题时置灰；远程或归属未定的
  *   对话不显示；页面不出题作答、不发消息）。
  * - 现有覆盖缺口：主进程投影有 learningGoals.test.ts；界面如何按绑定、归属与题目状态呈现没有覆盖。
- *   2026-11-16：快捷话由预填改为直接发送（简报 §五），补发送目标、并发与失败；发送入口内部的排队与
+ *   2026-11-16：快捷话由预填改为直接发送（简报 §五），补发送目标、并发与失败；还没有大纲的目标（导师
+ *   新建、0 个知识点）在页签里曾显示「知识点都已过关」，补这一种输入；发送入口内部的排队与
  *   草稿处理沿用对话页 handleSend，本文件只验证页签交给它的文字与选项。
  * - 最小失败输入：一个进行中目标（有题开着）与一个已归档目标；同一会话分别以本机、远程、未绑定打开。
  * - tier：unit（jsdom，IPC 与路由解析用内存 fake）。
@@ -161,6 +162,11 @@ describe('Today tab', () => {
       step: 'explain',
       today: { attempts: 3, correct: 2, passed: [{ pointId: 'k0', pointName: '关键词块' }] },
     });
+    // A goal whose outline is still being agreed (no points yet) must not read as "all passed".
+    snapshot.goals.push(
+      goal({ id: 'topic_plan', modules: [], masteredCount: 0, totalCount: 0, current: null, step: null, openQuestion: null }),
+    );
+    snapshot.bindings['session-plan'] = { goalId: 'topic_plan', botId: 'bot_tutor' };
     const view = render(<LearningTodayTabBody state={{}} ctx={tabCtx('session-en', null)} />);
     expect((await screen.findByRole('button', { name: 'learning.tab.anotherQuestion' })).hasAttribute('disabled')).toBe(true);
     expect(screen.getByRole('button', { name: 'learning.tab.continue' }).hasAttribute('disabled')).toBe(true);
@@ -172,5 +178,8 @@ describe('Today tab', () => {
     expect(screen.queryByText('拆句子')).toBeNull();
     await act(async () => view.rerender(<LearningTodayTabBody state={{}} ctx={tabCtx('session-other', null)} />));
     expect(screen.getByText('learning.tab.unbound')).toBeTruthy();
+    view.rerender(<LearningTodayTabBody state={{}} ctx={tabCtx('session-plan', null)} />);
+    expect(screen.getAllByText('learning.noOutlineYet')).toHaveLength(2); // current point and outline
+    expect(screen.queryByText('learning.allCleared')).toBeNull();
   });
 });

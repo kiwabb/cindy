@@ -70,7 +70,7 @@ function TodayBody({ goal, sessionId }: { goal: LearningGoal; sessionId: string 
               {t('learning.moduleNumber', { number: moduleIndex + 1 })} · {module.name}
             </p>
           ) : null}
-          <p className="text-13 leading-5 text-[var(--text-primary)]">{point?.name ?? t('learning.allCleared')}</p>
+          <p className="text-13 leading-5 text-[var(--text-primary)]">{point?.name ?? t(goal.totalCount ? 'learning.allCleared' : 'learning.noOutlineYet')}</p>
         </Section>
         <Section label={t('learning.tab.waiting')} value={goal.openQuestion ? '1' : '0'}>
           {goal.openQuestion ? (
@@ -120,7 +120,11 @@ function TodayBody({ goal, sessionId }: { goal: LearningGoal; sessionId: string 
           )}
         </Section>
         <Section label={t('learning.outline')} value={`${goal.masteredCount} / ${goal.totalCount}`}>
-          <MiniOutline goal={goal} />
+          {goal.totalCount ? (
+            <MiniOutline goal={goal} />
+          ) : (
+            <p className="text-13 leading-5 text-[var(--text-secondary)]">{t('learning.noOutlineYet')}</p>
+          )}
         </Section>
       </div>
       <div className="flex shrink-0 flex-wrap gap-2 border-t border-[var(--border-default)] px-4 py-3">

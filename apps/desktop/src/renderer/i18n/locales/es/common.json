@@ -20245,6 +20245,7 @@
     "archived": "Archivados",
     "moduleNumber": "Módulo {{number}}",
     "allCleared": "Todos los puntos de este objetivo están superados",
+    "noOutlineYet": "El esquema aún se está preparando con tu tutor. Aparecerá aquí cuando esté listo",
     "goStudy": "Estudiar",
     "stepAt": "Vas por · {{step}}",
     "step": {

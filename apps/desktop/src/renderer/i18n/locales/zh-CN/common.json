@@ -19984,6 +19984,7 @@
     "archived": "已归档",
     "moduleNumber": "模块 {{number}}",
     "allCleared": "这个目标的知识点都已过关",
+    "noOutlineYet": "大纲还在和导师商量，定好后会显示在这里",
     "goStudy": "去学习",
     "stepAt": "进行到 · {{step}}",
     "step": {

@@ -20245,6 +20245,7 @@
     "archived": "Archivés",
     "moduleNumber": "Module {{number}}",
     "allCleared": "Tous les points de cet objectif sont validés",
+    "noOutlineYet": "Le plan est encore en cours d’élaboration avec votre tuteur. Il s’affichera ici une fois prêt",
     "goStudy": "Étudier",
     "stepAt": "Étape · {{step}}",
     "step": {
