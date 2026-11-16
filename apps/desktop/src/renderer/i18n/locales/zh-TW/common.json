@@ -19984,6 +19984,7 @@
     "archived": "已封存",
     "moduleNumber": "模組 {{number}}",
     "allCleared": "這個目標的知識點都已過關",
+    "noOutlineYet": "大綱還在和導師商量，定好後會顯示在這裡",
     "goStudy": "去學習",
     "stepAt": "進行到 · {{step}}",
     "step": {
@@ -20066,7 +20067,11 @@
       },
       "unbound": "這場對話沒有綁定進行中的學習目標",
       "localOnly": "學習目標只在這台電腦上的對話裡顯示",
-      "prefillFailed": "輸入框暫時無法使用，請稍後再試"
+      "passed": "過關",
+      "passedNames": "過關：{{names}}",
+      "nameJoiner": "、",
+      "sendFailed": "沒有送出，請稍後再試",
+      "sendUnavailable": "這場對話現在無法傳送"
     }
   }
 }

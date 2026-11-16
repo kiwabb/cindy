@@ -19984,6 +19984,7 @@
     "archived": "アーカイブ済み",
     "moduleNumber": "モジュール {{number}}",
     "allCleared": "この目標の項目はすべてクリアしました",
+    "noOutlineYet": "アウトラインはまだ講師と相談中です。決まるとここに表示されます",
     "goStudy": "学習する",
     "stepAt": "進行中 · {{step}}",
     "step": {
@@ -20066,7 +20067,11 @@
       },
       "unbound": "この会話には進行中の学習目標が結び付いていません",
       "localOnly": "学習目標はこのコンピューター上の会話でのみ表示されます",
-      "prefillFailed": "入力欄を一時的に使えません。しばらくしてからもう一度お試しください"
+      "passed": "合格",
+      "passedNames": "合格：{{names}}",
+      "nameJoiner": "、",
+      "sendFailed": "送信できませんでした。しばらくしてからもう一度お試しください",
+      "sendUnavailable": "この会話では今メッセージを送信できません"
     }
   }
 }

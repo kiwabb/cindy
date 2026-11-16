@@ -20057,6 +20057,7 @@
     "archived": "Archiviert",
     "moduleNumber": "Modul {{number}}",
     "allCleared": "Alle Punkte dieses Ziels sind geschafft",
+    "noOutlineYet": "Die Gliederung wird noch mit deinem Tutor erarbeitet. Sie erscheint hier, sobald sie steht",
     "goStudy": "Jetzt lernen",
     "stepAt": "Stand · {{step}}",
     "step": {
@@ -20140,7 +20141,11 @@
       },
       "unbound": "Dieses Gespräch ist mit keinem aktiven Lernziel verknüpft",
       "localOnly": "Lernziele erscheinen nur in Gesprächen auf diesem Computer",
-      "prefillFailed": "Das Eingabefeld ist gerade nicht verfügbar. Versuch es gleich noch einmal"
+      "passed": "Bestanden",
+      "passedNames": "Bestanden: {{names}}",
+      "nameJoiner": ", ",
+      "sendFailed": "Die Nachricht wurde nicht gesendet. Versuch es gleich noch einmal",
+      "sendUnavailable": "In dieser Unterhaltung kannst du gerade keine Nachrichten senden"
     }
   }
 }

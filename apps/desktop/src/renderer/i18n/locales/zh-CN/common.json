@@ -19984,6 +19984,7 @@
     "archived": "已归档",
     "moduleNumber": "模块 {{number}}",
     "allCleared": "这个目标的知识点都已过关",
+    "noOutlineYet": "大纲还在和导师商量，定好后会显示在这里",
     "goStudy": "去学习",
     "stepAt": "进行到 · {{step}}",
     "step": {
@@ -20066,7 +20067,11 @@
       },
       "unbound": "这场对话没有绑定进行中的学习目标",
       "localOnly": "学习目标只在这台电脑上的对话里显示",
-      "prefillFailed": "输入框暂时不可用，请稍后再试"
+      "passed": "过关",
+      "passedNames": "过关：{{names}}",
+      "nameJoiner": "、",
+      "sendFailed": "没有发出去，请稍后再试",
+      "sendUnavailable": "这场对话现在不能发送"
     }
   }
 }

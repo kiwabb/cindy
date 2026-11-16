@@ -36,7 +36,14 @@ export interface LearningReview {
   pointName: string;
   /** Epoch ms. */
   dueAt: number;
+  /** Days this point was reviewed in the tutor's review mode (local days of the reading computer). */
   reviewCount: number;
+}
+
+/** A point passed today, named as the review schedule names it. */
+export interface LearningPassedPoint {
+  pointId: string;
+  pointName: string;
 }
 
 /** The question waiting for the learner's answer: the prompt and choices only, never the answer. */
@@ -86,8 +93,12 @@ export interface LearningGoal {
   dailyPlan: LearningDailyPlan | null;
   /** Epoch ms of the last recorded change. */
   lastActivityAt: number | null;
-  /** Answers recorded today (local day of the reading computer), and how many were right. */
-  today: { attempts: number; correct: number };
+  /**
+   * Answers recorded today (local day of the reading computer), and how many were right. `passed`
+   * lists points the tutor recorded as mastered today (`mastered_at`) and still mastered; null while
+   * the tutor records no pass times, so "none passed" and "not recorded" stay apart.
+   */
+  today: { attempts: number; correct: number; passed: LearningPassedPoint[] | null };
   /** Conversations (Session ids) bound to this goal, most recently bound first. */
   sessionIds: string[];
 }

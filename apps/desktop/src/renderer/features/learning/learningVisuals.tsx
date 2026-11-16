@@ -105,29 +105,30 @@ export function DailyPlanBar({ plan, now }: { plan: LearningDailyPlan; now: 'exp
         <span>{t('learning.plan.title')}</span>
         <span className="tabular-nums">{t('learning.minutes', { count: plan.minutes })}</span>
       </div>
-      <div role="img" aria-label={label} className="flex h-1.5 gap-[3px]">
+      {/* Each segment is one column (bar over its label), sized by minutes but never narrower than its
+          label, so a short segment widens a little instead of clipping its text at narrow widths. */}
+      <div role="img" aria-label={label} className="flex gap-[3px]">
         {plan.segments.map((segment, index) => (
           <span
             key={`${segment.kind}-${index}`}
-            className={cn(
-              'h-1.5 min-w-0 rounded-full',
-              segment.kind === now ? 'bg-[var(--quota-bar-fill)]' : 'bg-[var(--quota-bar-track)]',
-            )}
-            style={{ flex: `${segment.minutes} 1 0` }}
-          />
-        ))}
-      </div>
-      <div aria-hidden className="flex gap-[3px] text-12 leading-4 tabular-nums text-[var(--text-tertiary)]">
-        {plan.segments.map((segment, index) => (
-          <span
-            key={`${segment.kind}-${index}`}
-            className={cn(
-              'min-w-0 overflow-hidden whitespace-nowrap',
-              segment.kind === now && 'font-medium text-[var(--text-primary)]',
-            )}
+            className="flex min-w-max flex-col gap-1.5"
             style={{ flex: `${segment.minutes} 1 0` }}
           >
-            {t(`learning.plan.${segment.kind}`)} {segment.minutes}
+            <span
+              className={cn(
+                'h-1.5 rounded-full',
+                segment.kind === now ? 'bg-[var(--quota-bar-fill)]' : 'bg-[var(--quota-bar-track)]',
+              )}
+            />
+            <span
+              aria-hidden
+              className={cn(
+                'whitespace-nowrap text-12 leading-4 tabular-nums text-[var(--text-tertiary)]',
+                segment.kind === now && 'font-medium text-[var(--text-primary)]',
+              )}
+            >
+              {t(`learning.plan.${segment.kind}`)} {segment.minutes}
+            </span>
           </span>
         ))}
       </div>

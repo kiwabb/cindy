@@ -6,7 +6,9 @@
  *   的五种状态；掌握判定沿用导师状态脚本的口径（procedure 0.9、学习者自述单列）。
  * - 现有覆盖缺口：新模块，无相邻覆盖。
  * - 最小失败输入：progress.json 被写成半截 JSON；开着的题带 expected_answer；已归档目标仍在
- *   sessions.json 里。
+ *   sessions.json 里；mastered_at 里有今天过关的、今天记了时间但只是自述掌握的、记了时间却未掌握的知识点
+ *   （2026-11-16「今天已完成」的过关行，简报 §五）；复习队列的 review_count 是 3，但真正在复习模式下的
+ *   证据只有两天（同一天两条只算一次，学习时的作答不算）——学习页曾把学习时的作答算成「已复习 3 次」。
  * - tier：unit（mkdtemp 临时目录、进程内调用）。
  * - 实测耗时：本机单独运行 2.4 s（vitest Duration，用例 39 ms）。
  */
@@ -63,6 +65,12 @@ const progress = {
     { knowledge_point_id: 'k1', is_correct: false, timestamp: sec(new Date(2026, 10, 13, 10)) },
     { knowledge_point_id: 'k1', is_correct: true, timestamp: sec(new Date(2026, 10, 12, 10)) },
   ],
+  learning_evidence: [
+    { knowledge_point_id: 'k0', timestamp: sec(new Date(2026, 10, 9, 9)), result: 'correct' },
+    { knowledge_point_id: 'k0', timestamp: sec(new Date(2026, 10, 10, 9)), review_mode: true },
+    { knowledge_point_id: 'k0', timestamp: sec(new Date(2026, 10, 10, 21)), review_mode: true },
+    { knowledge_point_id: 'k0', timestamp: sec(new Date(2026, 10, 11, 9)), review_mode: true },
+  ],
   review_queue: [
     { knowledge_point_id: 'k0', due_at: sec(new Date(2026, 10, 18)), state: { review_count: 3 } },
     { knowledge_point_id: 'k1', due_at: sec(new Date(2026, 10, 14)), state: { review_count: 1 } },
@@ -73,6 +81,11 @@ const progress = {
     options: [],
     expected_answer: 'SECRET-ANSWER',
     explanation: 'SECRET-EXPLANATION',
+  },
+  mastered_at: {
+    k0: sec(new Date(2026, 10, 13, 9)),
+    k2: sec(new Date(2026, 10, 13, 11)),
+    k1: sec(new Date(2026, 10, 12, 9)),
   },
   updated_at: sec(new Date(2026, 10, 13, 10)),
 };
@@ -132,9 +145,11 @@ describe('learning goals reader', () => {
     expect(goal.current).toEqual({ moduleId: 'm0', pointId: 'k1' });
     expect(goal.step).toBe('practice');
     expect(goal.outlineAgreed).toBe(false);
-    expect(goal.today).toEqual({ attempts: 2, correct: 1 });
+    // Only a point still assessed as mastered whose recorded pass is today counts as passed today.
+    expect(goal.today).toEqual({ attempts: 2, correct: 1, passed: [{ pointId: 'k0', pointName: 'k0 名称' }] });
     // Only cleared points have reviews; the open question carries no answer.
-    expect(goal.reviews.map((r) => [r.pointId, r.pointName, r.reviewCount])).toEqual([['k0', 'k0 名称', 3]]);
+    // Reviews are counted in review-mode days, not the queue's review_count (which includes learning answers).
+    expect(goal.reviews.map((r) => [r.pointId, r.pointName, r.reviewCount])).toEqual([['k0', 'k0 名称', 2]]);
     expect(goal.dailyPlan).toBeNull();
     expect(JSON.stringify(snapshot)).not.toMatch(/SECRET|emoji/);
   });

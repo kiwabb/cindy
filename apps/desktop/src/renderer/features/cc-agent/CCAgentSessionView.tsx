@@ -297,7 +297,7 @@ import {
   resolveSessionRoute,
 } from '@/lib/orcaSessionIdentity';
 import type { Effort, PermissionMode } from '@/lib/userPreferences.types';
-import { SessionQuickSendProvider, type SessionQuickSend } from '@/components/chat/SessionQuickSendContext';
+import { SessionQuickSendProvider, SessionQuickSendRegistration, type SessionQuickSend } from '@/components/chat/SessionQuickSendContext';
 import type { AttachedFile, ComposerBotMention, MentionedResource } from '@/lib/fileTypes';
 import { serializeAttachedFiles } from '@/lib/messageAttachmentPayload';
 import { startReviewOnDevice } from '@/lib/startReviewOnDevice';
@@ -5669,11 +5669,15 @@ function CCAgentSessionContent({
       )}
       {/* 导师对话的「今天」页签:本机对话绑定了进行中的学习目标时加上(不抢焦点)。 */}
       {ownsRoute && !readOnly && sessionId && (
-        <LearningTodayTabAutoOpen
-          sessionId={sessionId}
-          remoteHostId={session?.remoteHostId ?? null}
-          deviceLinkDeviceId={rightSidebarDeviceLinkDeviceId}
-        />
+        <>
+          <LearningTodayTabAutoOpen
+            sessionId={sessionId}
+            remoteHostId={session?.remoteHostId ?? null}
+            deviceLinkDeviceId={rightSidebarDeviceLinkDeviceId}
+          />
+          {/* 「今天」页签的快捷话经这场对话自己的发送路径发出,门槛与消息区的 quickSend 相同。 */}
+          <SessionQuickSendRegistration sessionId={sessionId} sender={cindyMakeInputLocked ? null : quickSend} />
+        </>
       )}
       {/* workdir 透 plugin ctx;remote session 一并携带 remoteHostId(文件浏览经
           main 路由到远端 file-service,不再推空串禁用)。session 还没解析时

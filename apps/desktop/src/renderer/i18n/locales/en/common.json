@@ -20057,6 +20057,7 @@
     "archived": "Archived",
     "moduleNumber": "Module {{number}}",
     "allCleared": "Every point of this goal is cleared",
+    "noOutlineYet": "The outline is still being worked out with your tutor. It will show here once it’s ready",
     "goStudy": "Study now",
     "stepAt": "At · {{step}}",
     "step": {
@@ -20140,7 +20141,11 @@
       },
       "unbound": "This conversation isn’t linked to a learning goal in progress",
       "localOnly": "Learning goals show only in conversations on this computer",
-      "prefillFailed": "The message box isn’t available right now. Try again in a moment"
+      "passed": "Passed",
+      "passedNames": "Passed: {{names}}",
+      "nameJoiner": ", ",
+      "sendFailed": "The message wasn’t sent. Try again in a moment",
+      "sendUnavailable": "This conversation can’t send messages right now"
     }
   }
 }

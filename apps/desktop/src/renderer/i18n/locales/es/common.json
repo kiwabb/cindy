@@ -20245,6 +20245,7 @@
     "archived": "Archivados",
     "moduleNumber": "Módulo {{number}}",
     "allCleared": "Todos los puntos de este objetivo están superados",
+    "noOutlineYet": "El esquema aún se está preparando con tu tutor. Aparecerá aquí cuando esté listo",
     "goStudy": "Estudiar",
     "stepAt": "Vas por · {{step}}",
     "step": {
@@ -20329,7 +20330,11 @@
       },
       "unbound": "Esta conversación no está vinculada a un objetivo de aprendizaje activo",
       "localOnly": "Los objetivos de aprendizaje solo se muestran en conversaciones de este ordenador",
-      "prefillFailed": "El cuadro de mensaje no está disponible ahora. Inténtalo de nuevo en un momento"
+      "passed": "Superados",
+      "passedNames": "Superados: {{names}}",
+      "nameJoiner": ", ",
+      "sendFailed": "No se envió el mensaje. Inténtalo de nuevo en un momento",
+      "sendUnavailable": "Ahora no se pueden enviar mensajes en esta conversación"
     }
   }
 }
