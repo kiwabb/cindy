@@ -642,3 +642,17 @@ it.each([false,true])('companion subscription uses the authorized run and reject
   if(!revoke)expect(rows.find(row=>row.t==='result').value).toEqual({providerId:'openai',model:'fixture-model',text:'[]'});
  }finally{ended.resolve();await host.dispose();}
 });
+
+it.each([{args:['fixture input', {providerId:'other',model:'other'}]}, {args:[{prompt:'fixture',providerId:'other',model:'other'}]}])('rejects companion route parameters rather than ignoring them ($args)', async ({args}) => {
+ const ready=whenStarted(),ended=whenStarted();
+ const companionText=vi.fn(async()=>({providerId:'openai',model:'fixture-model',text:'[]'}));
+ const host=createRemoteAgentHost({isAgentAvailable:()=>true,startHosted:async input=>{const handle={...idleHandle(input),close:async()=>ended.resolve(),events:()=>({async *[Symbol.asyncIterator](){await ended.promise;}})};ready.resolve();return handle;},isControllerAuthorized:()=>true,captureOwner:()=> 'owner',isOwnerCurrent:()=>true,runsRoot,providerAccess:{resolve:async()=> 'openai',isAllowed:()=>true},companionText});
+ try {
+  await host.handle('controller',{op:'open',runId:RUN_1,agentKind:'codex',payload:{json:{...openPayload('companion-invalid-fixture'),options:{model:'fixture-model',providerId:'openai'}}}});await ready.promise;await settle();
+  await host.handle('controller',{op:'call',runId:RUN_1,callId:UPLOAD_1,method:'requestCompanionText',payload:{json:args}});await settle();
+  const result=await host.handle('controller',{op:'poll',runs:[{runId:RUN_1,cursor:0}],waitMs:0}) as {runs:Array<{data?:string}>};
+  const rows=Buffer.from(result.runs[0].data!,'base64').toString().trim().split('\n').map(line=>JSON.parse(line));
+  expect(rows.find(row=>row.t==='result'&&row.callId===UPLOAD_1)).toMatchObject({ok:false,error:{code:'REMOTE_AGENT_INVALID'}});
+  expect(companionText).not.toHaveBeenCalled();
+ }finally{ended.resolve();await host.dispose();}
+});

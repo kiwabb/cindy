@@ -2689,6 +2689,8 @@ export function createRemoteAgentHost(deps: RemoteAgentHostDeps) {
       if (!handle) fail('REMOTE_AGENT_UNAVAILABLE', 'agent has not started');
       const raw = await resolvePayload(run.controller, payload);
       const args = takeGroupNewRound(run, callId, method, Array.isArray(raw) ? raw : []);
+      if (method === 'requestCompanionText' && (!Array.isArray(raw) || args.length !== 1 || typeof args[0] !== 'string' || args[0].length > 131072))
+        fail('REMOTE_AGENT_INVALID', 'companion analysis accepts only bounded prompt text; route is owned by the run');
       const target = (handle as unknown as Record<string, unknown>)[method];
       if (typeof target !== 'function') fail('REMOTE_AGENT_UNSUPPORTED', `${method} is not supported by this agent`);
       let callArgs: unknown[] = args;
