@@ -69,7 +69,7 @@ export function finishNativeFactMemoryTurn(session: NativeFactSession, generatio
 /** Accept only the host's verified desktop context (direct send or trusted queue receipt).
  * Never derive user facts from the final wire prompt, assistant text or channel metadata. */
 export function readNativeFactUserSource(
-  context: { origin: { kind: string }; rawChannelText: string } | undefined,
+  context: { origin: { kind: string }; rawChannelText?: string } | undefined,
   persisted: { clientId: string; autoResume?: boolean; sourcePlugin?: unknown; botTaskCoordination?: unknown; sharedTaskAuthor?: unknown } | null | undefined,
   retryUserClientId: string | undefined,
   queue?: { ordinary: boolean; authoredText: unknown; remote: boolean },
