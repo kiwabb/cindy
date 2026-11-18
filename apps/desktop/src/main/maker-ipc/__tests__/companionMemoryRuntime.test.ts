@@ -15,7 +15,7 @@ function fixture(projectMode = false, workDir = '/fixture-not-used/bots/bot-fixt
   const store = vi.fn(async () => ({ createFactMemory, getStorageIdentity: () => ({}) })); const refresh = vi.fn(async () => {});
   const runtime = new CompanionMemoryRuntime({ owner: () => owner, session: () => session, readBot: async () => ({ canonicalSessionId, deleting: false, projectMode }), store: store as any, state, provider: () => provider, analysis: () => ({} as any), refresh, reportFailure: vi.fn() });
   const selection = { ownerId: owner.id, botId: 'bot-fixture', sessionId: session.id, route: { providerId: 'provider-fixture', model: session.model, protocol: 'openai-responses' as const, baseUrl: 'http://127.0.0.1:1/v1' } };
-  return { runtime, selection, store, createFactMemory, queues, statuses, refresh, changeProvider: () => { provider = 'foreign-provider'; }, changeOwner: () => { owner = { ...owner, epoch: 'epoch2' }; }, replace: () => { session = { ...session, instanceId: 'instance2' }; } };
+  return { runtime, selection, store, createFactMemory, queues, statuses, refresh, capability: (value:boolean) => { session.supportsHostTurnContext=value; }, changeProvider: () => { provider = 'foreign-provider'; }, changeOwner: () => { owner = { ...owner, epoch: 'epoch2' }; }, replace: () => { session = { ...session, instanceId: 'instance2' }; } };
 }
 it('disabled sends do no IO; close disposes and explicit selection rebinds a new Session', async () => {
   const f = fixture(); await f.runtime.ensure(f.selection.sessionId); expect(f.store).not.toHaveBeenCalled();
@@ -78,4 +78,14 @@ it('shares the selected provider guard with state assembly and hidden contributi
  let guard!:()=>void;const state=vi.fn(async(input:any)=>{guard=input.assertCurrent;return {dispose:vi.fn(),contribute:vi.fn()};});
  const f=fixture(false,undefined,undefined,state);await f.runtime.activate({...f.selection,companionState:true});
  guard();f.changeProvider();expect(()=>guard()).toThrow('STALE');f.runtime.dispose();
+});
+
+it('old peer keeps ordinary chat possible without opening or binding private memory', async () => {
+  const f=fixture(); f.capability(false);
+  await expect(f.runtime.activate(f.selection)).resolves.toBeUndefined();
+  expect(f.store).not.toHaveBeenCalled(); expect(f.queues).toHaveLength(0);
+  f.capability(true); await f.runtime.ensure(f.selection.sessionId);
+  expect(f.store).toHaveBeenCalledOnce(); expect(f.queues).toHaveLength(1);
+  f.capability(false); await f.runtime.ensure(f.selection.sessionId);
+  expect(f.queues[0].dispose).toHaveBeenCalledOnce();
 });

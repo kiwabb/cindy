@@ -61,6 +61,12 @@ export class CompanionMemoryRuntime {
       if (boundStore) assertPrivateCompanionStore(owner!.root, selection.botId, boundStore.getStorageIdentity());
     };
     current();
+    // Older peers can still serve ordinary chat. Do not attach unsupported recall
+    // or extraction, and retry capability negotiation on a later real send.
+    if (session!.supportsHostTurnContext === false) {
+      this.bindings.get(sessionId)?.dispose();
+      return;
+    }
     if (this.bindings.get(sessionId)?.instanceId === session!.instanceId) return;
     this.bindings.get(sessionId)?.dispose();
     const bot = await this.deps.readBot(selection.botId); current();
