@@ -347,7 +347,7 @@ describe('personal todo composer', () => {
   // A: delayed first snapshot is a unit fixture; writes must overlay it, not cancel completeness.
   it('merges a successful creation into the delayed first full snapshot without losing existing items or count', async () => {
     const existing = mine('existing-unit', { title: 'Existing unit item', createdAt: '2026-01-01T00:00:00Z' });
-    const created = mine('created-unit', { title: 'New unit item', createdAt: '2026-11-06T00:00:00Z' });
+    const created = mine('created-unit', { title: 'New unit item', createdAt: '2026-11-06T00:00:00Z', rank: -1 });
     let release!: (items: PersonalTodo[]) => void;
     vi.mocked(api().list).mockImplementationOnce(() => new Promise((resolve) => { release = resolve; }));
     update().mockResolvedValueOnce(created);
@@ -357,7 +357,7 @@ describe('personal todo composer', () => {
     submitComposer();
     await screen.findByRole('button', { name: created.title });
     await act(async () => { release([existing]); });
-    // Same priority and no deadline: the newer item reads first.
+    // Manual order by default: the composer placed the new item first.
     await waitFor(() => expect(rowTitles()).toEqual([created.title, existing.title]));
     expect(screen.getByTestId('personal-count').textContent).toBe('2');
     expect(api().list).toHaveBeenCalledTimes(1);
@@ -372,7 +372,10 @@ describe('personal todo composer', () => {
     vi.mocked(api().list).mockImplementation(() => store.list());
     update().mockImplementation(async (input) => {
       try {
-        const saved = await store.update(input);
+        // The IPC layer turns a place into a rank before the store; this transport skips that layer.
+        const stored = { ...input };
+        delete stored.place;
+        const saved = await store.update(stored);
         if (dropReply) { dropReply = false; throw new Error('Unit IPC reply lost after atomic commit'); }
         return saved;
       } catch (error) {
@@ -406,7 +409,9 @@ describe('personal todo composer', () => {
 
 describe('personal todo list', () => {
 
-  it('groups by deadline by default, remembers the chosen grouping per account, and shows the tag only when it adds something', async () => {
+  it('keeps deadline groups for an account that picked an order before, remembers the grouping per account, and shows the tag only when it adds something', async () => {
+    // Picked before manual order existed: the grouping it never picked stays at the earlier default.
+    localStorage.setItem('personal-todo-order:test-owner', 'priority');
     vi.mocked(api().list).mockResolvedValue([
       mine('Overdue', { priority: 3, deadline: { kind: 'date', date: '2026-11-04', timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone }, tagIds: ['t-work'] }),
       mine('Plain', { priority: 1 }),
@@ -438,12 +443,20 @@ describe('personal todo list', () => {
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'personalTodos.order.due' }));
     expect(localStorage.getItem('personal-todo-order:test-owner')).toBe('due');
 
-    // Another account keeps its own choice.
+    // Another account keeps its own choice; one that never picked starts in manual order without groups.
     cleanup();
     setDataOwnerGeneration('other-owner', 2);
     h.generation = 2;
     render(<TeammateTodosView />);
-    expect(screen.getByRole('menuitemradio', { name: 'personalTodos.group.due' }).getAttribute('aria-checked')).toBe('true');
+    const checked = (name: string) => screen.getByRole('menuitemradio', { name }).getAttribute('aria-checked');
+    expect(checked('personalTodos.group.none')).toBe('true');
+    expect(checked('personalTodos.order.manual')).toBe('true');
+    // Picking only a grouping keeps manual order the next time the list opens.
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'personalTodos.group.priority' }));
+    cleanup();
+    render(<TeammateTodosView />);
+    expect(checked('personalTodos.group.priority')).toBe('true');
+    expect(checked('personalTodos.order.manual')).toBe('true');
   });
 
   it('filters by tag chips and counts only open items per tag', async () => {

@@ -21,7 +21,7 @@ export default {
     'sync-conflict-row': { about: 'A refused edit marks its row with the two choices' },
     'sync-conflict-draft': { about: 'A refused creation shows as a marked draft row' },
     empty: { about: 'No todos: one sentence and the composer' },
-    'manual-order': { about: 'Manual order chosen from the menu, ungrouped; the last row is dragged to the top with the mouse (the drop is answered in memory, fixture data only)' },
+    'manual-order': { about: 'Manual order without groups (the default for an account that never picked); the last row is dragged to the top with the mouse (the drop is answered in memory, fixture data only)' },
   },
   async ready(page) {
     await page.getByTestId('todo-board').waitFor();
@@ -72,8 +72,9 @@ export default {
       await page.keyboard.press('Escape');
       assert.equal(await page.getByRole('textbox', { name: await ui.t('taskTags.name'), exact: true }).count(), 0);
 
-      // Grouping and order menu.
-      await page.getByRole('button', { name: await ui.t('personalTodos.group.due') }).click();
+      // Grouping and order menu: a fresh account starts in manual order without groups.
+      await page.getByRole('button', { name: await ui.t('personalTodos.group.none') }).click();
+      assert.equal(await page.getByRole('menuitemradio', { name: await ui.t('personalTodos.order.manual') }).getAttribute('aria-checked'), 'true');
       await page.getByRole('menuitemradio', { name: await ui.t('personalTodos.order.created') }).waitFor();
       await ui.capture('grouping-menu');
       await page.keyboard.press('Escape');
@@ -110,12 +111,13 @@ export default {
     if (ui.case === 'manual-order') {
       const titles = () => page.getByTestId('todo-board-row').evaluateAll((rows) => rows.map((row) => row.textContent ?? ''));
       await page.getByTestId('todo-board-row').first().waitFor();
-      await page.getByRole('button', { name: await ui.t('personalTodos.group.due') }).click();
-      await page.getByRole('menuitemradio', { name: await ui.t('personalTodos.group.none') }).click();
+      // The default for an account that never picked: manual order, no groups.
       await page.getByRole('button', { name: await ui.t('personalTodos.group.none') }).click();
-      await page.getByRole('menuitemradio', { name: await ui.t('personalTodos.order.manual') }).waitFor();
+      const manual = page.getByRole('menuitemradio', { name: await ui.t('personalTodos.order.manual') });
+      assert.equal(await manual.getAttribute('aria-checked'), 'true', 'manual order is the default');
       await ui.capture('order-menu-manual');
-      await page.getByRole('menuitemradio', { name: await ui.t('personalTodos.order.manual') }).click();
+      await page.keyboard.press('Escape');
+      await manual.waitFor({ state: 'detached' });
       // Creation order, oldest first: the fixture dates p9 on the 1st, then p1 … p8.
       const before = await titles();
       assert.ok(before[0].includes('整理桌面文件') && before.at(-1).includes('买咖啡豆'), 'manual order starts as creation order');

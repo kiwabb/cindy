@@ -33,6 +33,8 @@ import { StepAdder, StepList } from './PersonalTodoSteps';
 import {
   DEFAULT_PERSONAL_GROUPING,
   DEFAULT_PERSONAL_ORDER,
+  EARLIER_PERSONAL_GROUPING,
+  EARLIER_PERSONAL_ORDER,
   PERSONAL_GROUPINGS,
   PERSONAL_ORDERS,
   PERSONAL_PRIORITIES,
@@ -53,21 +55,28 @@ import {
 } from './personalTodoVisuals';
 import { quickDate } from './todoDates';
 
+const storedKey = (name: string, dataOwnerId: string | null | undefined) =>
+  `${name}:${dataOwnerId ?? 'local'}`;
+
+function storedValue(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
 /** A per-account preference kept in localStorage; storage that cannot be read or written only costs the memory. */
 function useStoredChoice<T extends string>(
   name: string,
   dataOwnerId: string | null | undefined,
   allowed: readonly T[],
-  fallback: T,
+  fallback: () => T,
 ) {
-  const key = `${name}:${dataOwnerId ?? 'local'}`;
+  const key = storedKey(name, dataOwnerId);
   const load = (): T => {
-    try {
-      const saved = localStorage.getItem(key);
-      return allowed.find((value) => value === saved) ?? fallback;
-    } catch {
-      return fallback;
-    }
+    const saved = storedValue(key);
+    return allowed.find((value) => value === saved) ?? fallback();
   };
   const [value, setValue] = useState<T>(load);
   useEffect(() => setValue(load()), [key]);
@@ -91,27 +100,41 @@ export function usePersonalTodos() {
     getPersonalTodoSnapshot,
   );
   useEffect(ensurePersonalTodos, [dataOwnerId, ownerGeneration]);
+  // Manual order without grouping is the default only for an account that never picked either;
+  // one that picked one of them keeps the other at its earlier default.
+  const pickedBefore = () =>
+    storedValue(storedKey('personal-todo-grouping', dataOwnerId)) !== null ||
+    storedValue(storedKey('personal-todo-order', dataOwnerId)) !== null;
   const [grouping, selectGrouping] = useStoredChoice<PersonalGrouping>(
     'personal-todo-grouping',
     dataOwnerId,
     PERSONAL_GROUPINGS,
-    DEFAULT_PERSONAL_GROUPING,
+    () => (pickedBefore() ? EARLIER_PERSONAL_GROUPING : DEFAULT_PERSONAL_GROUPING),
   );
   const [order, selectOrder] = useStoredChoice<PersonalOrder>(
     'personal-todo-order',
     dataOwnerId,
     PERSONAL_ORDERS,
-    DEFAULT_PERSONAL_ORDER,
+    () => (pickedBefore() ? EARLIER_PERSONAL_ORDER : DEFAULT_PERSONAL_ORDER),
   );
+  // Picking one keeps the other as it is now, so the next load does not fall back to the earlier default.
+  const chooseGrouping = (next: PersonalGrouping) => {
+    selectGrouping(next);
+    selectOrder(order);
+  };
+  const chooseOrder = (next: PersonalOrder) => {
+    selectOrder(next);
+    selectGrouping(grouping);
+  };
   return {
     ...snapshot,
     refresh: refreshPersonalTodos,
     update: updatePersonalTodo,
     reorder: reorderPersonalTodos,
     grouping,
-    selectGrouping,
+    selectGrouping: chooseGrouping,
     order,
-    selectOrder,
+    selectOrder: chooseOrder,
     dataOwnerId,
   };
 }
