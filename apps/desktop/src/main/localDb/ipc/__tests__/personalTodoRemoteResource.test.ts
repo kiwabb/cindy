@@ -372,6 +372,13 @@ describe('manual order', () => {
     expect(phone).not.toHaveProperty('rank');
     await update({ id: phone.id, expectedRevision: phone.revision, title: 'A2' });
     expect(await order()).toEqual(['C', 'E', 'A2', 'D', 'B']);
+    await expect(update({ id: phone.id, rank: 1 })).rejects.toMatchObject({ code: 'INVALID_PARAMS' });
+    await expect(update({ id: phone.id, place: { to: 'top' } })).rejects.toMatchObject({ code: 'INVALID_PARAMS' });
+
+    // Moved to the bottom right after being written, a todo still sits above one created a moment later.
+    await reorderPersonalTodos([(await todo('C')).id], { to: 'bottom' });
+    await writePersonalTodo({ creationRequestId: 'order-G', title: 'G' });
+    expect(await order()).toEqual(['E', 'A2', 'D', 'B', 'C', 'G']);
 
     await expect(writePersonalTodo({ id: current.id, place: { after: 'nope' } })).rejects.toMatchObject({ code: 'NOT_FOUND' });
     await expect(writePersonalTodo({ id: current.id, rank: 1, place: { to: 'top' } })).rejects.toMatchObject({ code: 'INVALID_INPUT' });
@@ -396,10 +403,15 @@ describe('manual order', () => {
   it('on a replica queues plain rank edits and carries the rank only when there is one', async () => {
     await createFour();
     env.role = 'replica';
-    env.enqueue.mockImplementation(async (_dataset: string, queued: Record<string, unknown>) => personalTodosDataset.applySubmit(queued));
+    // The last edit's flush answers for the batch: synced once the main computer took it.
+    env.enqueue.mockImplementation(async (_dataset: string, queued: Record<string, unknown>, options: { waitMs?: number }) => {
+      const applied = await personalTodosDataset.applySubmit(queued);
+      return options.waitMs ? { ...applied, synced: { id: applied.id, revision: applied.revision } } : applied;
+    });
     const result = await reorderPersonalTodos([(await todo('D')).id, (await todo('C')).id], { to: 'top' });
     expect(await order()).toEqual(['D', 'C', 'A', 'B']);
-    expect(result.sync).toBe('pending');
+    expect(result.sync).toBe('synced');
+    env.enqueue.mockImplementation(async (_dataset: string, queued: Record<string, unknown>) => personalTodosDataset.applySubmit(queued));
     const calls = env.enqueue.mock.calls as Array<[string, Record<string, unknown>, { waitMs?: number }]>;
     expect(calls.map(([, queued]) => Object.keys(queued).sort())).toEqual([
       ['expectedRevision', 'id', 'rank'],

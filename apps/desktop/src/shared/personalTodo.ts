@@ -148,6 +148,11 @@ export function normalizePersonalTodoPlace(value: unknown): PersonalTodoPlace {
 
 /** Spacing between neighbouring ranks the planner hands out: one second on the creation scale. */
 const RANK_STEP = 1000;
+/**
+ * Spacing at the bottom of the list: one millisecond, so a todo moved to the end right after it was
+ * created does not get a rank ahead of the clock and end up below todos created a moment later.
+ */
+const BOTTOM_STEP = 1;
 
 type Ranked = Pick<PersonalTodo, 'id' | 'rank' | 'createdAt'>;
 
@@ -191,11 +196,11 @@ export function planPersonalTodoOrder(
   const k = moving.length;
   const ranks = moving.map((item, i) =>
     low === undefined && high === undefined
-      ? moving[0].rank + i * RANK_STEP
+      ? Math.min(...moving.map((todo) => todo.rank)) + i * BOTTOM_STEP
       : low === undefined
         ? high! - (k - i) * RANK_STEP
         : high === undefined
-          ? low + (i + 1) * RANK_STEP
+          ? low + (i + 1) * BOTTOM_STEP
           : low + ((high - low) * (i + 1)) / (k + 1),
   );
   const fits = ranks.every(

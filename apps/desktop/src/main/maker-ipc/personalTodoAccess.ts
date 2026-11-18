@@ -206,8 +206,8 @@ async function writeRanks(
   scope: DataOwnerBroadcastScope,
 ): Promise<PersonalTodoReorderResult> {
   const todos: PersonalTodo[] = [];
-  let pending = false;
-  let queued = false;
+  // Replica: the last edit's answer, the only one that waited (the earlier ones go out in its flush).
+  let sync: PersonalTodoWriteResult['sync'];
   let local = false;
   try {
     for (const [index, change] of plan.entries()) {
@@ -220,14 +220,13 @@ async function writeRanks(
         { waitMs: index === plan.length - 1 ? REPLICA_WRITE_WAIT_MS : 0, notify: false },
       );
       todos.push(result.todo);
-      if (result.sync) queued = true;
+      if (result.sync) sync = result.sync;
       else local = true;
-      if (result.sync === 'pending') pending = true;
     }
   } finally {
     if (local) notifyPersonalTodosChanged(scope);
   }
-  return { todos, ...(queued ? { sync: pending ? 'pending' : 'synced' } : {}) };
+  return { todos, ...(sync ? { sync } : {}) };
 }
 
 async function writeOne(
