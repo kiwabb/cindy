@@ -2679,11 +2679,14 @@ export function createRemoteAgentHost(deps: RemoteAgentHostDeps) {
   }
 
   async function callOnHandle(run: Run, callId: string, method: RemoteAgentMethod, payload: RemoteAgentPayload): Promise<void> {
-    if (run.relay?.started) return relayCall(run, run.relay, callId, method, payload);
+    // Companion extraction is a direct same-account feature, never a provider-group relay method.
+    if (run.relay?.started && method !== 'requestCompanionText') return relayCall(run, run.relay, callId, method, payload);
     const handle = run.handle;
     let rollbackProvider: (() => void) | undefined;
     let standbyTurn: Run['standbyTurn'];
     try {
+      if (method === 'requestCompanionText' && (run.relay || run.trust === 'guest'))
+        fail('REMOTE_AGENT_UNSUPPORTED', 'companion analysis requires a direct same-account run');
       if (run.closing) fail('REMOTE_AGENT_EXPIRED', 'task has ended');
       if (!delegatedRunAllowed(run)) fail('REMOTE_AGENT_UNAVAILABLE', 'this shared task is no longer authorized');
       if (!handle) fail('REMOTE_AGENT_UNAVAILABLE', 'agent has not started');

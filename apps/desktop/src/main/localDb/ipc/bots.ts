@@ -193,7 +193,7 @@ export function getBotMemoryAccess(): ReturnType<typeof createBotMemoryAccess> {
   });
   return botMemoryAccess;
 }
-export function invalidateBotMemoryAccess() { botMemoryAccess?.invalidate(); }
+export function invalidateBotMemoryAccess(botId?: string) { botMemoryAccess?.invalidate(botId); }
 export function getBotMemoryService() { return getBotMemoryAccess().service; }
 
 /**

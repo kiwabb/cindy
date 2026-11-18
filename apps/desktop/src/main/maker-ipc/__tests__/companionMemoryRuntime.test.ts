@@ -1,13 +1,15 @@
 /** Lifecycle unit fixtures: bindings and queue are mocked, never starts Electron or a model. */
 import { it, expect, vi } from 'vitest';
+import path from 'node:path';
+const fixtureRoot = path.resolve('/fixture-not-used');
 const bindings = vi.hoisted(() => ({ hidden: vi.fn(() => vi.fn()), facts: vi.fn(() => vi.fn()) }));
 vi.mock('../nativeMemoryTurn.js', () => ({ bindNativeMemoryTurn: bindings.hidden }));
 vi.mock('../nativeFactMemory.js', () => ({ bindNativeFactMemory: bindings.facts }));
 vi.mock('../privateCompanionStore.js', () => ({ assertPrivateCompanionStore: vi.fn() }));
 import { CompanionMemoryRuntime } from '../companionMemoryRuntime.js';
-function fixture(projectMode = false, workDir = '/fixture-not-used/bots/bot-fixture/workspace', canonicalSessionId = 'session-fixture', state?: any) {
+function fixture(projectMode = false, workDir = path.join(fixtureRoot, 'bots', 'bot-fixture', 'workspace'), canonicalSessionId = 'session-fixture', state?: any) {
   let provider = 'provider-fixture';
-  let owner = { id: 'owner-fixture', epoch: 'epoch1', root: '/fixture-not-used' };
+  let owner = { id: 'owner-fixture', epoch: 'epoch1', root: fixtureRoot };
   const statuses = new Set<(status: string) => void>();
   let session: any = { id: 'session-fixture', instanceId: 'instance1', workDir, agentKind: 'codex', model: 'fixture-model', getStatus: () => 'active', onStatusChange: (cb: any) => { statuses.add(cb); return () => statuses.delete(cb); } };
   const queues: any[] = [];

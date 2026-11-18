@@ -10577,7 +10577,7 @@
       "previewUnavailable": "須明確選擇本機或同帳號另一台電腦的 OpenAI 訂閱及 Codex 模型。來源無法使用時暫停整理，不會改用公司或備援模型；選擇變更後請關閉再開啟。",
       "previewError": "設定未能儲存或已變更，請重新開啟記憶頁。",
       "privateHint": "這份記憶只屬於目前夥伴，專案內其他任務不使用它。查看或編輯不會啟用自動整理。",
-      "privateDeleteBoundary": "同時清理可歸因的摘要與搜尋記錄；聊天歷史不會刪除。",
+      "privateDeleteBoundary": "同時清理可歸因的摘要與搜尋記錄；對話歷史不會刪除。",
       "enabled": "開啟記憶",
       "disabledHint": "已關閉，不會讀取或儲存記憶",
       "aboutMe": "關於我的記憶",
@@ -20074,7 +20074,7 @@
         "explainFirst": "先講講",
         "anotherQuestion": "換一道題"
       },
-      "unbound": "這場對話尚未連結進行中的學習目標",
+      "unbound": "這場對話沒有綁定進行中的學習目標",
       "localOnly": "學習目標只在這台電腦上的對話裡顯示",
       "passed": "過關",
       "passedNames": "過關：{{names}}",

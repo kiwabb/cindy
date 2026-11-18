@@ -10577,7 +10577,7 @@
       "previewUnavailable": "需明确选择本机或同账号另一台电脑的 OpenAI 订阅及 Codex 模型。来源不可用时暂停整理，不会改用公司或后备模型；选择变更后请关闭再开启。",
       "previewError": "设置未能保存或已发生变化，请重新打开记忆页读取当前设置。",
       "privateHint": "这份记忆只属于当前伙伴，项目内其他任务不使用它。查看或编辑不会启用自动整理。",
-      "privateDeleteBoundary": "同时清理可归因的摘要和检索记录；聊天历史不会删除。",
+      "privateDeleteBoundary": "同时清理可归因的摘要和检索记录；对话历史不会删除。",
       "enabled": "开启记忆",
       "disabledHint": "已关闭，不会读取或保存记忆",
       "aboutMe": "关于我的记忆",

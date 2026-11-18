@@ -316,17 +316,6 @@ export class MakerMemoryStore {
   ): Promise<MemoryRecord> {
     this.assertScopeOk();
     await this.init();
-    if (this.factJournal) {
-      const revision = this.factJournal.revision();
-      const records = await this.list();
-      const current = records.find(r => r.filename === filename);
-      if (!current) throw new MemoryError('not-found', 'Memory not found');
-      if (current.frontmatter.updatedAt !== expectedUpdatedAt) throw new MemoryError('version-conflict', 'Memory changed');
-      await this.applyFacts(revision, [
-        { write: { ...changes, type: current.frontmatter.type, name: current.slug, mode: 'update' } },
-      ]);
-      return this.read(filename);
-    }
     const saved = await this.storage.update(filename, expectedUpdatedAt, changes);
     await this.syncWrite({ ok: true, filename });
     return saved;
@@ -363,16 +352,11 @@ export class MakerMemoryStore {
   async delete(filename: string, expectedUpdatedAt?: string): Promise<void> {
     this.assertScopeOk();
     await this.init();
+    await this.storage.delete(filename, expectedUpdatedAt);
     if (this.factJournal) {
-      const revision = this.factJournal.revision();
-      const records = await this.list();
-      const current = records.find(r => r.filename === filename);
-      if (!current) throw new MemoryError('not-found', 'Memory not found');
-      if (expectedUpdatedAt !== undefined && current.frontmatter.updatedAt !== expectedUpdatedAt) throw new MemoryError('version-conflict', 'Memory changed');
-      await this.applyFacts(revision, [{ delete: filename }]);
+      await this.syncWrite({ ok: true, filename });
       return;
     }
-    await this.storage.delete(filename, expectedUpdatedAt);
     // storage await 后、FTS 同步前复核 (review #2388 Codex 15th P1)
     this.assertScopeOk();
     try {

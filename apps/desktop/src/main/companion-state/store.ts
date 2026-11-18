@@ -23,11 +23,17 @@ export function createStateStore(ownerRoot: string, scope: Scope, assertCurrent:
     assertCurrent();
     try {
       if ((await fs.realpath(directory)) !== directory) throw new Error('COMPANION_PRIVATE_ROOT_REDIRECTED');
+      const before = await fs.lstat(file);
+      if (before.isSymbolicLink() || !before.isFile() || before.nlink !== 1)
+        throw new Error('COMPANION_STATE_INVALID_FILE');
       const handle = await fs.open(file, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
       let data: State;
       try {
         const stat = await handle.stat();
-        if (!stat.isFile() || stat.nlink !== 1 || stat.size > MAX_BYTES) throw new Error('COMPANION_STATE_INVALID_FILE');
+        const after = await fs.lstat(file);
+        if (after.isSymbolicLink() || stat.dev !== before.dev || stat.ino !== before.ino
+          || after.dev !== stat.dev || after.ino !== stat.ino
+          || !stat.isFile() || stat.nlink !== 1 || stat.size > MAX_BYTES) throw new Error('COMPANION_STATE_INVALID_FILE');
         data = JSON.parse(await handle.readFile('utf8')) as State;
       } finally { await handle.close(); }
       validateState(data);

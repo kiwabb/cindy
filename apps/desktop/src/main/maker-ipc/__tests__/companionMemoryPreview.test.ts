@@ -116,7 +116,8 @@ it.each(['disable', 'dispose', 'owner'] as const)(
     else if (action === 'dispose') f.preview.dispose();
     else f.changeOwner();
     release();
-    await expect(work).rejects.toThrow();
+    if (action === 'disable') await expect(work).resolves.toBeUndefined();
+    else await expect(work).rejects.toThrow();
     expect(f.deps.ensure).not.toHaveBeenCalled();
     expect(f.deps.deactivate).toHaveBeenLastCalledWith('session-fixture');
   },
@@ -177,4 +178,28 @@ it('unavailable source detaches memory without falling back or blocking ordinary
   expect(f.deps.deactivate).toHaveBeenCalledWith('session-fixture');
   expect(f.deps.activate).not.toHaveBeenCalled(); expect(f.deps.ensure).not.toHaveBeenCalled();
   f.changeOwner(); await expect(f.preview.ensure('session-fixture')).rejects.toThrow('OWNER_CHANGED');
+});
+
+it.each(['missing-directory', 'redirected-directory', 'invalid-config'])('disabled preview cannot block ordinary sends: %s', async kind => {
+  const f = fixture();
+  const directory = path.join(f.root, 'bots', 'bot-fixture');
+  if (kind === 'missing-directory') fs.rmSync(directory, { recursive: true });
+  if (kind === 'redirected-directory') {
+    const target = path.join(f.root, 'redirect-target'); fs.renameSync(directory, target);
+    fs.symlinkSync(target, directory, 'junction');
+  }
+  if (kind === 'invalid-config') fs.writeFileSync(path.join(directory, 'companion-memory-preview.json'), '{broken');
+  await expect(f.preview.ensure('session-fixture')).resolves.toBeUndefined();
+  expect(f.deps.activate).not.toHaveBeenCalled(); expect(f.deps.ensure).not.toHaveBeenCalled();
+});
+it('an unavailable private store detaches memory without blocking ordinary sends', async () => {
+  const f=fixture(); await f.preview.set('bot-fixture', true, 'none');
+  f.deps.activate.mockRejectedValue(new Error('COMPANION_SHARED_WORKSPACE'));
+  await expect(f.preview.ensure('session-fixture')).resolves.toBeUndefined();
+  expect(f.deps.deactivate).toHaveBeenCalledWith('session-fixture');
+});
+it('memory failure does not swallow an owner change', async () => {
+  const f=fixture(); await f.preview.set('bot-fixture', true, 'none');
+  f.deps.activate.mockImplementation(async()=>{f.changeOwner();throw Error('STORE_FAILED');});
+  await expect(f.preview.ensure('session-fixture')).rejects.toThrow('OWNER_CHANGED');
 });

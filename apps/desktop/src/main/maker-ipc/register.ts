@@ -2,7 +2,7 @@ import { createCompanionMemoryPreview, installCompanionMemoryPreview } from './c
 import { createCompanionSubscriptionPort } from '../maker-host/companion-subscription-port.js';
 import { getDeviceId as getStableCompanionDeviceId } from '../authManager.js';
 import { bindDesktopCompanionState, localCompanionBindingId, type CompanionStateAssemblyInput } from './companionStateAssembly.js';
-import { CompanionMemoryRuntime, type CompanionMemorySelection } from './companionMemoryRuntime.js';
+import { CompanionMemoryRuntime } from './companionMemoryRuntime.js';
 import { createDesktopFactResponsesPort } from '../maker-host/fact-analysis-responses.desktop.js';
 import { setNativeMemorySelectionResolver } from './nativeMemoryTurn.js';
 import { requestBotRuntimeEpochRefresh } from './botRuntimeEpochRefreshSignal.js';
@@ -6237,16 +6237,11 @@ const memoryPreview = createCompanionMemoryPreview({
   },
   activate: selection => companionMemoryRuntime.activate(selection), ensure: id => companionMemoryRuntime.ensure(id),
   deactivate: id => companionMemoryRuntime.deactivate(id),
+  reportFailure: (sessionId, error) => log.warn('Companion memory unavailable; ordinary send continues', { sessionId, error: error instanceof Error ? error.name : 'unknown' }),
 });
 installCompanionMemoryPreview(memoryPreview);
 setNativeMemorySelectionResolver(id => companionMemoryRuntime.hasSelection(id));
 onAppSessionInvalidated(() => { memoryPreview.dispose(); companionMemoryRuntime.dispose(); invalidateBotMemoryAccess(); });
-/** Main-only developer/product composition entry. Not registered as IPC, MCP or a default switch. */
-export function activateCompanionMemory(selection: CompanionMemorySelection): Promise<void> {
-  return companionMemoryRuntime.activate(selection);
-}
-export function deactivateCompanionMemory(sessionId: string): void { companionMemoryRuntime.deactivate(sessionId); }
-
 /** Called only when the outgoing Maker is actually discarded, not on any error status. */
 export function releaseSessionBindingsForOwnerBoundary(): void {
   memoryPreview.dispose();
@@ -13894,7 +13889,7 @@ export function registerMakerIpc(maker: Maker, options: RegisterMakerIpcOptions)
     restartRuntime: restartBotCanonicalRuntime,
     onBeforeDelete: async (botId) => {
       companionMemoryRuntime.deleteBot(botId);
-      invalidateBotMemoryAccess();
+      invalidateBotMemoryAccess(botId);
       // 伙伴自有的 IM 机器人连接先停掉并清凭证: 伙伴没了, 它的 bot 不能继续收消息。
       await removeBotImConnectionsForBot(botId);
       await prepareCompanionImportDeletion(botId);

@@ -15,7 +15,7 @@ function setup(){
  const record={filename:'user_fixture.md',body:'fixture body',frontmatter:{type:'user',title:'fixture',updatedAt:'2026-11-17'}};
  const store:any={getStorageIdentity:()=>identity,list:async()=>[record],search:async()=>[{filename:record.filename,type:'user'}],read:async()=>record};
  const owner={root,canonicalSessionId:'fixture-session',projectMode:true,privateCompanion:true,assertCurrent:vi.fn(),assertExclusiveWorkspace:vi.fn(async()=>{})};
- const getStore=vi.fn(async()=>store);const access=createBotMemoryAccess({readBot:async()=>owner,getStore,requestRefresh:async()=>{}});
+ const getStore=vi.fn(async(_scope: string)=>store);const access=createBotMemoryAccess({readBot:async()=>owner,getStore,requestRefresh:async()=>{}});
  return {root,bot,workspace,identity,owner,store,getStore,access};
 }
 it('native list/search and automatic mechanism share private store even with projectMode',async()=>{
@@ -87,4 +87,9 @@ it('fresh access after restart keeps private inspection independent of the nonpe
  await fresh.privateService.list(f.bot);expect(f.getStore).toHaveBeenLastCalledWith('bot:fixture');
  await expect(fresh.resolveCompanion(f.bot)).rejects.toThrow('PRIVATE_SELECTION_REQUIRED');
  fresh.invalidate();await fresh.privateService.list(f.bot);expect(f.getStore).toHaveBeenLastCalledWith('bot:fixture');
+});
+it('deleting one bot does not invalidate another bot store fence', async()=>{
+ const f=setup(); const active=await f.access.resolveCompanion(f.bot);
+ f.access.invalidate('other-bot');expect(()=>active.owner.assertCurrent()).not.toThrow();
+ f.access.invalidate(f.bot);expect(()=>active.owner.assertCurrent()).toThrow('INVALIDATED');
 });

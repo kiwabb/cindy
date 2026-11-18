@@ -20,6 +20,7 @@ export function createCompanionMemoryPreview(deps: {
   activate(selection: CompanionMemorySelection): Promise<void>;
   ensure(sessionId: string): Promise<void>;
   deactivate(sessionId: string): void;
+  reportFailure?(sessionId: string, error: unknown): void;
 }) {
   const serial = new Map<string, Promise<unknown>>();
   const active = new Map<string, string>();
@@ -146,50 +147,61 @@ export function createCompanionMemoryPreview(deps: {
       if (active.has(sessionId)) stop(sessionId);
       return;
     }
-    const { file } = context(botId),
-      config = read(file);
-    if (!config.enabled) {
-      if (active.has(sessionId)) stop(sessionId);
-      return;
-    }
-    const assertConfig = () => {
-      assertEpoch();
-      if (read(file).revision !== config.revision || !read(file).enabled) {
-        stop(sessionId);
-        throw Error('MEMORY_PREVIEW_CHANGED');
+    // A disabled optional feature must not require a materialized/canonical bot directory.
+    // Keep strict filesystem checks for activation and the explicit settings API only.
+    try {
+      if (!/^[a-zA-Z0-9_-]{1,128}$/.test(botId)) throw Error('MEMORY_PREVIEW_INVALID_BOT');
+      const file = path.join(owner.root, 'bots', botId, 'companion-memory-preview.json');
+      const config = read(file);
+      if (!config.enabled) {
+        if (active.has(sessionId)) stop(sessionId);
+        return;
       }
-    };
-    let target: CompanionMemorySelection;
-    try { target = await deps.target(botId); }
-    catch {
-      assertConfig();
-      // Preserve the explicit selection, but detach recall/extraction while its source is unavailable.
-      stop(sessionId);
-      return;
-    }
-    assertConfig();
-    if (
-      target.sessionId !== sessionId ||
-      target.ownerId !== owner.id ||
-      JSON.stringify(target) !== JSON.stringify(config.selection)
-    ) {
-      stop(sessionId);
-      return;
-    }
-    const key = `${owner.root}:${config.revision}`;
-    if (active.get(sessionId) !== key) {
-      stop(sessionId);
-      await deps.activate(target);
-      try {
+      context(botId);
+      const assertConfig = () => {
+        assertEpoch();
+        if (read(file).revision !== config.revision || !read(file).enabled) {
+          stop(sessionId);
+          throw Error('MEMORY_PREVIEW_CHANGED');
+        }
+      };
+      let target: CompanionMemorySelection;
+      try { target = await deps.target(botId); }
+      catch {
         assertConfig();
-      } catch (error) {
+        // Preserve the explicit selection, but detach recall/extraction while its source is unavailable.
         stop(sessionId);
-        throw error;
+        return;
       }
-      active.set(sessionId, key);
+      assertConfig();
+      if (
+        target.sessionId !== sessionId ||
+        target.ownerId !== owner.id ||
+        JSON.stringify(target) !== JSON.stringify(config.selection)
+      ) {
+        stop(sessionId);
+        return;
+      }
+      const key = `${owner.root}:${config.revision}`;
+      if (active.get(sessionId) !== key) {
+        stop(sessionId);
+        await deps.activate(target);
+        try {
+          assertConfig();
+        } catch (error) {
+          stop(sessionId);
+          throw error;
+        }
+        active.set(sessionId, key);
+      }
+      await deps.ensure(sessionId);
+      assertConfig();
+    } catch (error) {
+      stop(sessionId);
+      // Memory failures detach recall/extraction; never relax the account/disposal fence.
+      assertEpoch();
+      deps.reportFailure?.(sessionId, error);
     }
-    await deps.ensure(sessionId);
-    assertConfig();
   }
   function ensure(sessionId: string): Promise<void> {
     const previous = pending.get(sessionId) ?? Promise.resolve();

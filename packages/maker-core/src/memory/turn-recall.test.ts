@@ -1,4 +1,5 @@
 import { it, expect, vi } from 'vitest';
+import { HOST_TURN_CONTEXT } from '../agents/shared/host-turn-context.js';
 import { searchTurnMemories } from './turn-context.js';
 const hit = { filename: 'reference_alpha.md', title: 'alpha', snippet: 'fixture', score: 1, type: 'reference' as const };
 it('recalls a named item from a full question after strict FTS misses, without model calls', async () => {
@@ -19,7 +20,6 @@ it('does not continue fallback queries after cancellation', async () => {
 });
 it('hydrates a title-only FTS hit from the scoped body before preparing hidden context', async () => {
   const { MemoryTurnContext } = await import('./turn-context.js');
-  const { HOST_TURN_CONTEXT } = await import('../agents/shared/host-turn-context.js');
   const memory = { search: vi.fn(async () => [hit]), read: vi.fn(async () => ({ body: 'actual stored test fact' })) };
   const controller = new MemoryTurnContext({ scope: 'unit', memory,
     receipts: { get: async () => null, commitOnce: async () => {} }, assertCurrent: () => {} });

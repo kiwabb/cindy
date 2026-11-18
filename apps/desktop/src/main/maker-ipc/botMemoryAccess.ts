@@ -21,25 +21,31 @@ export interface BotMemoryAccessDeps {
 /** Owner-local session metadata only; aliases cannot hide a shared workspace. */
 export function assertExclusiveBotWorkspace(workspace: string, canonicalSessionId: string,
   sessions: ReadonlyArray<{ id: string; workingDir: string | null; projectDir: string | null }>): void {
+  const comparable = (value: string) => process.platform === 'win32' ? value.toLowerCase() : value;
+  let target = path.resolve(workspace);
+  try { target = fs.realpathSync(target); } catch { /* Compare missing paths lexically. */ }
   for (const session of sessions) {
     if (session.id === canonicalSessionId) continue;
     for (const candidate of [session.workingDir, session.projectDir]) {
       if (!candidate) continue;
       let resolved = path.resolve(candidate);
       try { resolved = fs.realpathSync(resolved); } catch { /* A missing path still cannot reuse the exact target. */ }
-      if (resolved === workspace) throw new Error('COMPANION_SHARED_WORKSPACE');
+      if (comparable(resolved) === comparable(target)) throw new Error('COMPANION_SHARED_WORKSPACE');
     }
   }
 }
 /** Single production resolver for native memory service and the companion send assembly. */
 export function createBotMemoryAccess(deps: BotMemoryAccessDeps) {
   let epoch = 0;
+  const botEpochs = new Map<string, number>();
+  const canonicalSessions = new Map<string, string>();
   const resolve = async (botId: string, mode: 'default' | 'private' | 'companion' = 'default') => {
-    const capturedEpoch = epoch;
+    const capturedEpoch = epoch, capturedBotEpoch = botEpochs.get(botId) ?? 0;
     const privateAccess = mode !== 'default';
     const owner = await deps.readBot(botId);
     if (!owner) throwIpcError('NOT_FOUND', 'Teammate not found');
     owner.assertCurrent();
+    if (owner.canonicalSessionId) canonicalSessions.set(botId, owner.canonicalSessionId);
     if (!botId || path.basename(botId) !== botId) throw new Error('COMPANION_PRIVATE_STORE_REQUIRED');
     const workspace = path.join(owner.root, 'bots', botId, 'workspace');
     if (mode === 'companion' && !owner.privateCompanion) throw new Error('COMPANION_PRIVATE_SELECTION_REQUIRED');
@@ -55,7 +61,7 @@ export function createBotMemoryAccess(deps: BotMemoryAccessDeps) {
     const store = await deps.getStore(scopeKey); owner.assertCurrent();
     const assertStore = () => {
       owner.assertCurrent();
-      if (capturedEpoch !== epoch) throw new Error('BOT_MEMORY_ACCESS_INVALIDATED');
+      if (capturedEpoch !== epoch || capturedBotEpoch !== (botEpochs.get(botId) ?? 0)) throw new Error('BOT_MEMORY_ACCESS_INVALIDATED');
       if (mode === 'companion') owner.assertCompanionSelected?.();
       if (privateAccess) assertPrivateCompanionStore(owner.root, botId, store.getStorageIdentity());
     };
@@ -67,5 +73,13 @@ export function createBotMemoryAccess(deps: BotMemoryAccessDeps) {
   const privateService = createBotMemoryService({ getStore: deps.getStore, readBot: async () => { throw new Error('USE_SHARED_RESOLVER'); },
     resolveStore: botId => resolve(botId, 'private'), requestRefresh: deps.requestRefresh });
   return { service, privateService, resolve, resolveCompanion: (botId: string) => resolve(botId, 'companion'),
-    invalidate: () => { epoch++; service.disposePendingRefresh(); privateService.disposePendingRefresh(); } };
+    invalidate: (botId?: string) => {
+      if (botId !== undefined) {
+        botEpochs.set(botId, (botEpochs.get(botId) ?? 0) + 1);
+        const sessionId = canonicalSessions.get(botId);
+        if (sessionId) { service.disposePendingRefresh(sessionId); privateService.disposePendingRefresh(sessionId); }
+        canonicalSessions.delete(botId); return;
+      }
+      epoch++; canonicalSessions.clear(); botEpochs.clear(); service.disposePendingRefresh(); privateService.disposePendingRefresh();
+    } };
 }

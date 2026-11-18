@@ -71,7 +71,7 @@ export function StepList({
             </button>
             <span
               className={cn(
-                'min-w-0 flex-1 break-words text-13 leading-[1.4]',
+                'min-w-0 flex-1 break-words text-13 leading-[18px]',
                 step.done
                   ? 'text-[var(--text-tertiary)] line-through'
                   : 'text-[var(--text-primary)]',

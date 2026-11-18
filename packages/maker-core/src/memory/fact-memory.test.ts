@@ -221,3 +221,15 @@ describe('opt-in fact memory, fixture analysis only', () => {
     expect(await store.list()).toEqual([]);
   });
 });
+
+it('retains legacy manual shard editing after fact preview has been disabled and reopened', async () => {
+  const filename='user_user_legacy.md';
+  await fs.writeFile(path.join(dir,'memory',filename),'---\ntype: user\ntitle: Legacy\ndescription: Manual legacy record\nupdatedAt: "2026-11-01T00:00:00.000Z"\n---\noriginal');
+  queue.dispose();
+  store = new MakerMemoryStore({storageDir:path.join(dir,'memory'),absWorkdir:buildBotMemoryScopeKey(scope.botId),db,logger,scopeCheck:assertCurrentScope});
+  const original=await store.read(filename);
+  const updated=await store.update(filename,original.frontmatter.updatedAt,{title:'Edited',description:'Manual edit',body:'corrected'});
+  expect(updated.filename).toBe(filename);expect(updated.body).toBe('corrected');
+  await store.delete(filename,updated.frontmatter.updatedAt);
+  expect((await store.list()).some(record=>record.filename===filename)).toBe(false);
+});

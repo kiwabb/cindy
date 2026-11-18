@@ -335,7 +335,7 @@ export class MemoryStorage {
       const current = await this.checkVersion(filename, expectedUpdatedAt);
       await this.writeFile({
         ...changes, type: current.frontmatter.type, name: current.slug, mode: 'update',
-      }, filename);
+      }, filename, true);
       // Return the revision this edit wrote, never a subsequent tool write.
       return this.read(filename);
     }, undefined, [filename]);
@@ -380,8 +380,10 @@ export class MemoryStorage {
     return current;
   }
 
-  private async writeFile(opts: WriteOptions, filename: string): Promise<WriteResult> {
-    this.validateOpts(opts);
+  private async writeFile(opts: WriteOptions, filename: string, existingFilename = false): Promise<WriteResult> {
+    this.assertSafeFilename(filename);
+    // Existing shards may predate current slug rules; validate content without renaming them.
+    this.validateOpts(existingFilename ? { ...opts, name: 'existing-shard' } : opts);
     const fullPath = path.join(this.dir, filename);
 
     let nextBody = opts.body;

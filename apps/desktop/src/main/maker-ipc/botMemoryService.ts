@@ -208,7 +208,10 @@ export function createBotMemoryService(deps: BotMemoryServiceDeps) {
   }
 
   return {
-    disposePendingRefresh(): void { for (const timer of pendingRefresh.values()) clearTimer(timer); pendingRefresh.clear(); },
+    disposePendingRefresh(sessionId?: string): void {
+      if (sessionId !== undefined) { const timer = pendingRefresh.get(sessionId); if (timer !== undefined) clearTimer(timer); pendingRefresh.delete(sessionId); return; }
+      for (const timer of pendingRefresh.values()) clearTimer(timer); pendingRefresh.clear();
+    },
     /** Deterministic source-document import; uses the same index, FTS and owner fence as settings. */
     async importDocument(botId: string, id: string, title: string, text: string, type: 'user' | 'reference' = 'reference'): Promise<void> {
       if (!/^[a-z0-9_-]{1,40}$/.test(id) || !text.trim()) throwIpcError('INVALID_PARAMS', 'Invalid imported memory');
