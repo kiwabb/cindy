@@ -25,6 +25,9 @@ vi.mock('@/components/ui/toast', () => ({
   toast: { success: mocks.toastSuccess, error: mocks.toastError },
 }));
 
+import { setDataOwnerGeneration } from '@/contexts/dataOwnerGeneration';
+import { BotSettingsTargetContext } from '../botSettingsTarget';
+import { localBotSettingsTarget } from '../localBotSettingsTarget';
 import { BotMemorySettings } from '../BotMemorySettings';
 
 const summaries: BotMemorySummary[] = [
@@ -54,7 +57,7 @@ function renderMemory(memoryEnabled = true) {
   const backRef: MutableRefObject<(() => Promise<boolean>) | null> = { current: null };
   const leaveRef: MutableRefObject<(() => Promise<boolean>) | null> = { current: null };
   const onMemoryEnabledChange = vi.fn();
-  render(
+  const rendered = render(
     <BotMemorySettings
       botId="bot-1"
       botName="Cindy"
@@ -65,7 +68,7 @@ function renderMemory(memoryEnabled = true) {
       leaveRef={leaveRef}
     />,
   );
-  return { backRef, leaveRef, onMemoryEnabledChange };
+  return { backRef, leaveRef, onMemoryEnabledChange, rendered };
 }
 
 async function openDetail() {
@@ -74,6 +77,7 @@ async function openDetail() {
 }
 
 beforeEach(() => {
+  setDataOwnerGeneration('fixture-owner', 1);
   for (const fn of Object.values(api)) fn.mockClear();
   api.list.mockImplementation(async () => summaries);
   api.read.mockImplementation(async () => detail);
@@ -326,4 +330,62 @@ describe('BotMemorySettings', () => {
     await waitFor(() => expect(mocks.confirm).toHaveBeenCalled());
     expect(api.delete).not.toHaveBeenCalled();
   });
+});
+
+function installPrivateFixture() {
+ let value:BotMemoryDetail|null={...detail,title:'Private fixture',body:'Private fixture body'};
+ const wrap=(item:BotMemoryDetail)=>({source:'bot-private' as const,botId:'bot-1',item});
+ const privateApi={
+  list:vi.fn(async(_input?:unknown)=>({source:'bot-private' as const,botId:'bot-1',items:value?[{...value,preview:value.body}]:[]})),
+  read:vi.fn(async(_input?:unknown)=>wrap(value!)),
+  update:vi.fn(async(input:any)=>{value={...value!,title:input.title,body:input.body,updatedAt:'private-v2'};return wrap(value)}),
+  delete:vi.fn(async(_input?:unknown)=>{value=null;return {source:'bot-private' as const,botId:'bot-1',deleted:true as const}}),
+ };
+ Object.assign(window.electronAPI.localDb.bots,{privateFacts:privateApi,memoryPreview:{get:vi.fn(async()=>({botId:'bot-1',enabled:false,revision:'none',model:'fixture',available:true,reason:null})),set:vi.fn()}});return privateApi;
+}
+async function showPrivate(){fireEvent.click(screen.getByRole('button',{name:'bots.memory.sourcePrivate'}));await screen.findByRole('button',{name:/Private fixture/});}
+describe('explicit private memory source UI fixtures',()=>{
+ it('uses real preload API member shape for private list/search/edit/delete and returns to existing memory',async()=>{
+  const privateApi=installPrivateFixture();const {onMemoryEnabledChange}=renderMemory();
+  await screen.findByRole('button',{name:/说结论前核实/});expect(privateApi.list).not.toHaveBeenCalled();
+  await showPrivate();expect(screen.getByRole('switch',{name:'bots.memory.previewLabel'}).getAttribute('aria-checked')).toBe('false');expect(window.electronAPI.localDb.bots.memoryPreview.set).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByRole('textbox',{name:'bots.memory.search'}),{target:{value:'fixture'}});
+  await waitFor(()=>expect(privateApi.list).toHaveBeenLastCalledWith({botId:'bot-1',query:'fixture'}));
+  fireEvent.click(screen.getByRole('button',{name:/Private fixture/}));await screen.findByTestId('markdown');
+  fireEvent.click(screen.getByRole('button',{name:'bots.memory.edit'}));
+  fireEvent.change(screen.getByRole('textbox',{name:'bots.memory.bodyLabel'}),{target:{value:'Corrected private fixture'}});
+  fireEvent.click(screen.getByRole('button',{name:'bots.memory.done'}));await waitFor(()=>expect(screen.getByTestId('markdown').textContent).toBe('Corrected private fixture'));
+  expect(privateApi.update).toHaveBeenCalledWith(expect.objectContaining({botId:'bot-1',filename:detail.filename,expectedUpdatedAt:detail.updatedAt}));expect(api.update).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button',{name:'bots.memory.delete'}));await screen.findByText('bots.memory.empty');
+  expect(mocks.confirm).toHaveBeenCalledWith(expect.objectContaining({description:expect.stringContaining('bots.memory.privateDeleteBoundary')}));expect(privateApi.delete).toHaveBeenCalledWith({botId:'bot-1',filename:detail.filename,expectedUpdatedAt:'private-v2'});
+  fireEvent.click(screen.getByRole('button',{name:'bots.memory.sourceDefault'}));await screen.findByRole('button',{name:/说结论前核实/});expect(screen.getByRole('switch')).toBeTruthy();expect(onMemoryEnabledChange).not.toHaveBeenCalled();
+  await openDetail();expect(screen.getByTestId('markdown').textContent).toBe(detail.body);expect(api.read).toHaveBeenCalledWith('bot-1',detail.filename);
+ });
+ it('protects an invalid unsaved private draft when switching sources',async()=>{
+  const privateApi=installPrivateFixture();renderMemory();await showPrivate();fireEvent.click(screen.getByRole('button',{name:/Private fixture/}));await screen.findByTestId('markdown');fireEvent.click(screen.getByRole('button',{name:'bots.memory.edit'}));
+  fireEvent.change(screen.getByRole('textbox',{name:'bots.memory.bodyLabel'}),{target:{value:''}});mocks.confirm.mockResolvedValueOnce(false);
+  fireEvent.click(screen.getByRole('button',{name:'bots.memory.sourceDefault'}));await waitFor(()=>expect(mocks.confirm).toHaveBeenCalled());expect(screen.getByRole('textbox',{name:'bots.memory.bodyLabel'})).toBeTruthy();
+  await waitFor(()=>expect(screen.getByRole('button',{name:'bots.memory.sourceDefault'}).hasAttribute('disabled')).toBe(false));
+  fireEvent.click(screen.getByRole('button',{name:'bots.memory.sourceDefault'}));await screen.findByRole('button',{name:/说结论前核实/});expect(privateApi.update).not.toHaveBeenCalled();
+ });
+ it('drops late private data after owner epoch changes and resets the source',async()=>{
+  const privateApi=installPrivateFixture();let resolve!:(value:any)=>void;privateApi.list.mockImplementation(()=>new Promise(r=>resolve=r));renderMemory();await screen.findByRole('button',{name:/说结论前核实/});
+  fireEvent.click(screen.getByRole('button',{name:'bots.memory.sourcePrivate'}));await waitFor(()=>expect(privateApi.list).toHaveBeenCalled());
+  act(()=>setDataOwnerGeneration('fixture-owner-two',2));await screen.findByRole('button',{name:/说结论前核实/});
+  await act(async()=>resolve({source:'bot-private',botId:'bot-1',items:[{...detail,title:'Late private secret',preview:'late'}]}));
+  expect(screen.queryByText('Late private secret')).toBeNull();expect(screen.getByRole('button',{name:'bots.memory.sourceDefault'}).getAttribute('aria-pressed')).toBe('true');
+ });
+ it('keeps a conflicting private edit without writing an unconfirmed replacement',async()=>{
+  const privateApi=installPrivateFixture();privateApi.update.mockRejectedValueOnce(createIpcError('PRECONDITION_FAILED',BOT_MEMORY_CHANGED));renderMemory();await showPrivate();
+  fireEvent.click(screen.getByRole('button',{name:/Private fixture/}));await screen.findByTestId('markdown');fireEvent.click(screen.getByRole('button',{name:'bots.memory.edit'}));
+  fireEvent.change(screen.getByRole('textbox',{name:'bots.memory.bodyLabel'}),{target:{value:'Unconfirmed edit'}});fireEvent.click(screen.getByRole('button',{name:'bots.memory.done'}));
+  await screen.findByText('bots.memory.changedTitle:{"name":"Cindy"}');expect(privateApi.update).toHaveBeenCalledTimes(1);expect(api.update).not.toHaveBeenCalled();
+  mocks.confirm.mockResolvedValueOnce(false);fireEvent.click(screen.getByRole('button',{name:'bots.memory.sourceDefault'}));await waitFor(()=>expect(mocks.confirm).toHaveBeenCalled());
+  expect(screen.getByRole('textbox',{name:'bots.memory.bodyLabel'}).getAttribute('value')??(screen.getByRole('textbox',{name:'bots.memory.bodyLabel'}) as HTMLTextAreaElement).value).toBe('Unconfirmed edit');expect(privateApi.update).toHaveBeenCalledTimes(1);
+ });
+ it('never exposes local private source on a remote target',async()=>{
+  const privateApi=installPrivateFixture();const ref={current:null};
+  render(<BotSettingsTargetContext.Provider value={{...localBotSettingsTarget,kind:'remote',deviceId:'mac-fixture',openPrivateMemory:undefined}}><BotMemorySettings botId="bot-1" botName="Cindy" memoryEnabled onMemoryEnabledChange={()=>{}} aboutMe={{value:'',onChange(){},onBlur(){}}} backRef={ref} leaveRef={{current:null}} /></BotSettingsTargetContext.Provider>);
+  await screen.findByRole('button',{name:/说结论前核实/});expect(screen.queryByRole('button',{name:'bots.memory.sourcePrivate'})).toBeNull();expect(privateApi.list).not.toHaveBeenCalled();
+ });
 });

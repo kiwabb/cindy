@@ -19,6 +19,7 @@
  *  不宣称保护外部编辑器或其它进程直接修改文件。
  */
 
+import type { FactMutation } from './fact-memory.js';
 import { createHash, randomBytes } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
@@ -242,6 +243,7 @@ export class MemoryStorage {
      * owner 根后报成功。由 store 透传 manager 注入的 scopeCheck。
      */
     private readonly beforeFileWrite?: () => void,
+    private readonly beforeMutation?: (filenames: readonly string[]) => void,
   ) {}
 
   /** mkdir -p + 写 meta.json (如缺失). 幂等。 */
@@ -320,7 +322,7 @@ export class MemoryStorage {
    */
   async write(opts: WriteOptions): Promise<WriteResult> {
     this.validateOpts(opts);
-    return this.mutate(() => this.writeFile(opts, buildFilename(opts.type, opts.name)));
+    return this.mutate(() => this.writeFile(opts, buildFilename(opts.type, opts.name)), undefined, [buildFilename(opts.type, opts.name)]);
   }
 
   /** Edit a known file in place, including legacy names rejected for new shards. */
@@ -336,13 +338,32 @@ export class MemoryStorage {
       }, filename);
       // Return the revision this edit wrote, never a subsequent tool write.
       return this.read(filename);
-    });
+    }, undefined, [filename]);
   }
 
-  private async mutate<T>(run: () => Promise<T>): Promise<T> {
+  /** Shares the ordinary editor/tool mutation queue; guard and mutation cannot interleave. */
+  async applyFactMutations(guard: () => void, mutations: FactMutation[]): Promise<void> {
+    // Validate the complete write batch before changing any file.
+    for (const op of mutations) {
+      if ('write' in op) this.validateOpts(op.write);
+      else this.assertSafeFilename(op.delete);
+    }
+    return this.mutate(async () => {
+      for (const op of mutations) {
+        if ('write' in op) await this.writeFile(op.write, buildFilename(op.write.type, op.write.name));
+        else await this.deleteFile(op.delete);
+      }
+    }, guard, mutations.map(op => 'write' in op ? buildFilename(op.write.type, op.write.name) : op.delete));
+  }
+
+  private async mutate<T>(run: () => Promise<T>, guard?: () => void, filenames: readonly string[] = []): Promise<T> {
     const key = path.resolve(this.dir);
     const previous = mutationQueues.get(key) ?? Promise.resolve();
-    const next = previous.catch(() => {}).then(run);
+    const next = previous.catch(() => {}).then(() => {
+      guard?.();
+      this.beforeMutation?.(filenames);
+      return run();
+    });
     mutationQueues.set(key, next);
     try {
       return await next;
@@ -437,7 +458,7 @@ export class MemoryStorage {
     return this.mutate(async () => {
       if (expectedUpdatedAt !== undefined) await this.checkVersion(filename, expectedUpdatedAt);
       await this.deleteFile(filename);
-    });
+    }, undefined, [filename]);
   }
 
   private async deleteFile(filename: string): Promise<void> {
@@ -688,6 +709,8 @@ interface ParsedShard {
 function parseRawShard(raw: string, filenameForErr: string): ParsedShard {
   const parsed = matter(raw);
   const data = parsed.data as Partial<MemoryFrontmatter>;
+  // YAML decodes unquoted ISO timestamps as Date objects; preserve their version.
+  const timestamp: unknown = data.updatedAt;
   if (!data.title || !data.description || !isMemoryType(data.type)) {
     throw new MemoryError(
       'invalid-frontmatter',
@@ -699,7 +722,9 @@ function parseRawShard(raw: string, filenameForErr: string): ParsedShard {
       title: data.title,
       description: data.description,
       type: data.type,
-      updatedAt: typeof data.updatedAt === 'string' ? data.updatedAt : new Date().toISOString(),
+      updatedAt: typeof timestamp === 'string' ? timestamp
+        : timestamp instanceof Date && Number.isFinite(timestamp.getTime()) ? timestamp.toISOString()
+        : new Date().toISOString(),
       ...(Number.isSafeInteger(data.bodyLength) && data.bodyLength! >= 0 ? { bodyLength: data.bodyLength } : {}),
     },
     // gray-matter appends one newline. Remove only that exact serialization

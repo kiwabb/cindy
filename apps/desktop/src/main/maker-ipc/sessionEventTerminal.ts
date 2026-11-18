@@ -1,3 +1,6 @@
+import { finishCompanionStateTurn } from '../companion-state/nativeTurns.js';
+import { settleNativeMemoryTurn } from './nativeMemoryTurn.js';
+import { finishNativeFactMemoryTurn } from './nativeFactMemory.js';
 import { botLearningTracker } from './botLearningTracker.js';
 import { learningTurnIdentity } from './botLearningFeedback.js';
 import { settleBotGroupLaneTerminal, type BotGroupChatService, type BotGroupLaneTerminal } from './botGroupChatService.js';
@@ -319,6 +322,11 @@ export function finishSessionTerminalEvent(
       if (terminalOwner) deps.deferUnsuccessfulProductTurn?.(terminalOwner);
     };
     const notifyUnsuccessfulProductTurn = (): void => {
+      if (terminalOwner?.instanceId === session.instanceId) {
+        settleNativeMemoryTurn(session, { ...event, type: 'error' });
+        finishNativeFactMemoryTurn(session, terminalOwner.generation, 'failed');
+        finishCompanionStateTurn(session, terminalOwner.generation, 'failed', turnAssistantPersistId);
+      }
       const callback = deps.onUnsuccessfulProductTurn;
       if (!callback || !terminalOwner) return;
       void callback(session.id, terminalOwner).catch(() =>
@@ -657,6 +665,11 @@ export function finishSessionTerminalEvent(
       !deps.agentInputCoordinatorHolder?.isAutoResumePending(session.id) &&
       !deps.agentInputCoordinatorHolder?.isAutoResumeDeferred(session.id)
     ) {
+      if (terminalOwner?.instanceId === session.instanceId) {
+        settleNativeMemoryTurn(session, event);
+        finishNativeFactMemoryTurn(session, terminalOwner.generation, 'completed');
+        finishCompanionStateTurn(session, terminalOwner.generation, 'completed', turnAssistantPersistId);
+      }
       const callback = deps.onSuccessfulProductTurn;
       if (callback && terminalOwner) {
         void callback(session.id, terminalOwner).catch(() =>

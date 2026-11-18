@@ -207,6 +207,7 @@ export interface OwnerProviderRouteBinding {
 }
 
 export interface RemoteAgentHostDeps {
+  companionText?(input:{model:string;prompt:string;assertCurrent():void}):Promise<{providerId:string;model:string;text:string}>;
   /**
    * 这台自己的 Cindy 托管 Skill(启用中的；命令名与 SKILL.md 所在目录)。caps 据此报指纹，任务所在电脑报「用你自己那份」
    * 时据此复制；组所在电脑中转时据此替组内电脑补文件。
@@ -648,6 +649,7 @@ function describeHandle(handle: AgentSessionHandle, shadowDir: string, mirrorRoo
     writableDirs,
     virtualWorkspace,
     imessageSendContext: true,
+    supportsHostTurnContext: handle.supportsHostTurnContext === true,
     ...(previousMirrorRoots.length ? { previousMirrorRoots } : {}),
     methods,
     ...(handle.requestSessionId ? { requestSessionId: handle.requestSessionId } : {}),
@@ -1709,6 +1711,21 @@ export function createRemoteAgentHost(deps: RemoteAgentHostDeps) {
         return;
       }
       run.handle = handle;
+      // Only an already-authorized same-account run may use its exact subscription.
+      // No new remote channel, credentials, storage access or provider selection from the caller.
+      if (run.trust !== 'guest' && run.kind === 'codex' && run.providerId === 'openai' && deps.companionText) {
+        handle.requestCompanionText = async prompt => {
+          const model = run.authorizedModel;
+          const current = () => {
+            if (!model || run.closing || run.handle !== handle || !deps.isOwnerCurrent(run.owner)
+              || !deps.isControllerAuthorized(run.controller) || deps.isControllerModelUseRevoked?.(run.controller)
+              || run.providerId !== 'openai' || run.authorizedModel !== model
+              || !deps.providerAccess?.isAllowed('openai',run.controller,model,run.sessionId))
+              throw Error('COMPANION_SUBSCRIPTION_REVOKED');
+          };
+          current();const result=await deps.companionText!({model:model!,prompt,assertCurrent:current});current();return result;
+        };
+      }
       if (run.trust === 'guest' || run.forkWorkspaceIds.length) {
         await timing.measure('session-registration', () =>
           recordGuestSession(run.controller, run.relayKey, hostSessionId, [handle.id, handle.requestSessionId], undefined, run.forkWorkspaceIds),

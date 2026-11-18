@@ -3329,6 +3329,33 @@ describe('codex proxy host', () => {
     expect(mockState.stripNonAnthropicFields).toHaveBeenCalledWith(body, { url: '/responses' });
   });
 
+  it('scopes subscription recall to the registered parent and clears it on disable/dispose', async () => {
+    const { configureUserDataDir } = await import('../../userDataPath.js');
+    configureUserDataDir(fs.mkdtempSync(path.join(os.tmpdir(), 'companion-ws-fixture-')));
+    const host = await freshCodexProxyHost();
+    mockState.createAnthropicCompatProxy.mockResolvedValueOnce({url:'http://127.0.0.1:43210',dispose:vi.fn(async()=>undefined)});
+    await host.ensureCodexProxyReady();
+    const opts = mockState.createAnthropicCompatProxy.mock.calls[0][0];
+    const {createWebSocketMessageTransform} = await vi.importActual<typeof import('@cindy/anthropic-compat-proxy')>('@cindy/anthropic-compat-proxy');
+    const body={type:'response.create',model:'gpt-6.1-terra',instructions:'native plan',input:[{role:'user',content:'unchanged'}]};
+    const send=async(thread:string)=>{
+      const payload=Buffer.from(JSON.stringify(body));const header=Buffer.alloc(14);
+      header[0]=129;header[1]=255;header.writeBigUInt64BE(BigInt(payload.length),2);
+      const {outbound}=opts.webSocketTransforms({url:'/backend-api/codex/responses',headers:{'thread-id':thread}});
+      const chunks:Buffer[]=[];outbound.on('data',(chunk:Buffer)=>chunks.push(chunk));
+      const ended=once(outbound,'end');outbound.end(Buffer.concat([header,payload]));await ended;
+      let result:unknown;const reader=createWebSocketMessageTransform(true,message=>{result=JSON.parse(message.toString());return message;});
+      reader.resume();const read=once(reader,'end');reader.end(Buffer.concat(chunks));await read;return result;
+    };
+    host.registerComposed('scope','parent','base',{webSocketTurnContext:'frozen data'});
+    expect(await send('parent')).toEqual({...body,instructions:'native plan\n\nfrozen data'});
+    expect(await send('other')).toEqual(body);
+    host.registerComposed('scope','parent','base',{webSocketTurnContext:''});
+    expect(await send('parent')).toEqual(body);
+    host.registerComposed('scope','parent','base',{webSocketTurnContext:'new data'});
+    host.unregister('scope');expect(await send('parent')).toEqual(body);
+  });
+
   // #7055: ChatGPT closes WebSocket messages over ~16 MiB with 1009. A reconnect resends the
   // whole image-heavy history, so every retry was rejected until the turn timed out.
   it('fits an oversized WebSocket request under the upstream message limit before forwarding', async () => {

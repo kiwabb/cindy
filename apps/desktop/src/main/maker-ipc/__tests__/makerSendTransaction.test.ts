@@ -4868,3 +4868,39 @@ describe('Agent prewarm', () => {
     expect(live?.send).toHaveBeenCalledOnce();
   });
 });
+
+describe('companion registered send assembly regression', () => {
+  it('carries Main queue source through the real transaction and rebinds a rebuilt session', async () => {
+    const { bindNativeFactMemory, finishNativeFactMemoryTurn } = await import('../nativeFactMemory.js');
+    const { bindCompanionStateTurns, finishCompanionStateTurn } = await import('../../companion-state/nativeTurns.js');
+    const completedState=vi.fn(async(_turn:unknown,_source:unknown)=>{});let unbindState=()=>{};
+    const prepare = vi.fn((source: unknown) => source);
+    const finish = vi.fn();const drain = vi.fn(async () => {});
+    const queue = {prepare,finish,drain,dispose:vi.fn()};
+    let live = createSession();let unbind = () => {};
+    const ensure = vi.fn(async () => {
+      unbindState();unbindState=bindCompanionStateTurns(live as any,{binding:{ownerId:'fixture-owner',ownerEpoch:'fixture-epoch',botId:'fixture-bot',sessionId:live.id,instanceId:live.instanceId,deviceId:'fixture-device'},assertCurrent(){},completed:completedState,reportFailure(){throw Error('STATE_OBSERVER_FAILED')}});
+      unbind();unbind = bindNativeFactMemory(live as any,queue as any,()=>{},()=>{});
+    });
+    const {deps}=createDeps({getSession:()=>live,ensureCompanionMemory:ensure});
+    const tx=createMakerSendTransaction(deps);
+    try {
+      for (let generation=1;generation<=2;generation++) {
+        if(generation===2)live=createSession({instanceId:'rebuilt-fixture-instance'});
+        vi.mocked(live.send).mockImplementation(async(_message,opts)=>{
+          opts?.onTurnReserved?.(generation);await opts?.onAccepted?.();return {accepted:true};
+        });
+        const text=`fixture authored queue ${generation}`;
+        await tx.sendToAgentAccepted(live.id,text,undefined,{
+          persistUserMessage:{clientId:`fixture-client-${generation}`,content:text},
+          [AUTO_REVIEW_SOURCE_CONTENT]:text,
+        });
+        expect(prepare).toHaveBeenLastCalledWith(expect.objectContaining({userText:text,userMessageId:`fixture-client-${generation}`,generation,sessionId:live.id}));
+        finishNativeFactMemoryTurn(live as any,generation,'completed');
+        finishCompanionStateTurn(live as any,generation,'completed',`assistant-${generation}`);
+      }
+      expect(ensure).toHaveBeenCalledTimes(2);expect(finish).toHaveBeenCalledTimes(2);expect(drain).toHaveBeenCalledTimes(2);expect(completedState).toHaveBeenCalledTimes(2);
+      expect(completedState.mock.calls[1][0]).toMatchObject({instanceId:'rebuilt-fixture-instance',generation:2,logicalTurnId:'fixture-client-2'});
+    } finally {unbind();unbindState();}
+  });
+});

@@ -8,6 +8,11 @@ export interface DataOwnerGeneration {
   readonly generation: number;
 }
 
+const listeners = new Set<() => void>();
+export function subscribeDataOwnerGeneration(listener: () => void): () => void {
+  listeners.add(listener); return () => { listeners.delete(listener); };
+}
+
 let current: DataOwnerGeneration = {
   dataOwnerId: null,
   generation: 0,
@@ -24,6 +29,7 @@ export function setDataOwnerGeneration(dataOwnerId: string | null, generation?: 
     dataOwnerId,
     generation: nextGeneration,
   };
+  for (const listener of listeners) listener();
 }
 
 export function getDataOwnerGeneration(): DataOwnerGeneration {

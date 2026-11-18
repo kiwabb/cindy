@@ -1,3 +1,4 @@
+import { HOST_TURN_CONTEXT } from '@cindy/maker-core';
 /**
  * 远程 Agent 的本机会话句柄(控制端)。
  *
@@ -52,6 +53,7 @@ export interface RemoteStartedInfo {
   virtualWorkspace?: boolean;
   /** Execution host can decode iMessage permission and Main-owned origins. */
   imessageSendContext?: boolean;
+  supportsHostTurnContext?: boolean;
   methods: string[];
   state: Record<string, unknown>;
   requestSessionId?: string;
@@ -73,6 +75,7 @@ export function parseStartedInfo(value: Record<string, unknown>, kind: AgentKind
     shadowDir: str(value.shadowDir) ?? '',
     virtualWorkspace: value.virtualWorkspace === true,
     imessageSendContext: value.imessageSendContext === true,
+    supportsHostTurnContext: value.supportsHostTurnContext === true,
     ...(str(value.mirrorRoot) ? { mirrorRoot: str(value.mirrorRoot) } : {}),
     previousMirrorRoots: Array.isArray(value.previousMirrorRoots) ? value.previousMirrorRoots.filter((item): item is string => typeof item === 'string') : [],
     extraDirs: Array.isArray(value.extraDirs) ? value.extraDirs.filter((item): item is string => typeof item === 'string') : [],
@@ -276,6 +279,7 @@ export interface RemoteAgentHandleController {
 export function createRemoteAgentHandle(deps: RemoteHandleDeps): RemoteAgentHandleController {
   const { started } = deps;
   let imessageSendContext = started.imessageSendContext === true;
+  let hostTurnContext = started.supportsHostTurnContext === true;
   const link = deps.link ?? fixedRemoteAgentLink(deps.client!);
   const queue = new EventQueue();
   const projection = new RemoteEventProjection(deps.workspace);
@@ -391,6 +395,7 @@ export function createRemoteAgentHandle(deps: RemoteHandleDeps): RemoteAgentHand
         message: '[REMOTE_AGENT_PEER_TOO_OLD] Update Cindy on the computer providing this supplier to preserve iMessage permissions.',
       });
     }
+    if (opts?.[HOST_TURN_CONTEXT] && !hostTurnContext) throw Error('HOST_TURN_CONTEXT_UNSUPPORTED: update the selected model computer');
     const callId = deps.newId();
     if (encoded.onTranscriptUserEntry || encoded.onInteractionStateChange) {
       sendCallbacks.set(callId, {
@@ -462,6 +467,15 @@ export function createRemoteAgentHandle(deps: RemoteHandleDeps): RemoteAgentHand
       return Array.isArray(state.disabledSkillPaths) ? state.disabledSkillPaths as string[] : undefined;
     },
 
+    requestCompanionText: async prompt => {
+      const end=link.begin();
+      try {
+        const live=await link.live();
+        if(!live)throw Error('COMPANION_SUBSCRIPTION_OFFLINE');
+        return await live.call('requestCompanionText',[prompt]) as {providerId:string;model:string;text:string};
+      } finally {end();}
+    },
+    get supportsHostTurnContext() { return hostTurnContext; },
     send: (message, opts) => sendLikeTracked('send', message, opts),
     steer: (message, opts) => sendLikeTracked('steer', message, opts),
     // 已让出名额时对方没有在跑的回合，停止什么也不用做。
@@ -626,6 +640,7 @@ export function createRemoteAgentHandle(deps: RemoteHandleDeps): RemoteAgentHand
       && !(typeof state.pendingWake === 'number' && state.pendingWake > 0),
     onReconnected(next) {
       imessageSendContext = next.imessageSendContext === true;
+      hostTurnContext = next.supportsHostTurnContext === true;
       const previousUsage = state.usage;
       state = { ...state, ...next.state };
       if (!isEmptyUsage(previousUsage) && isEmptyUsage(state.usage) && state.turnRunning !== true) {

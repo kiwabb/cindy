@@ -1,3 +1,4 @@
+import { HOST_TURN_CONTEXT } from './agents/shared/host-turn-context.js';
 import { parseOutputLimitDetails, type OutputLimitDetails } from '@cindy/maker-shared';
 /**
  * Session — 单次 agent 会话的上层包装。
@@ -1050,6 +1051,7 @@ export class Session {
       if (afterTurnReserved) await afterTurnReserved();
       const cancelledAfterReservation = finishCancelledBeforeDispatch();
       if (cancelledAfterReservation !== null) return cancelledAfterReservation;
+      if (handleOpts[HOST_TURN_CONTEXT] && !this.handle.supportsHostTurnContext) throw new Error('HOST_TURN_CONTEXT_UNSUPPORTED');
       this.handle.validateSendOptions?.(handleOpts);
       if (turnLifecycleObserver) {
         try {
@@ -1892,6 +1894,15 @@ export class Session {
    * The engine's own view of one MCP server in this session. Null when the
    * engine has no per-session MCP status entry; never starts or calls a server.
    */
+  async requestCompanionText(prompt:string) {
+    this.ensureActive();
+    if (!this.handle.requestCompanionText) throw Error('COMPANION_SUBSCRIPTION_PEER_TOO_OLD');
+    const handle = this.handle;
+    const result = await handle.requestCompanionText!(prompt);
+    this.ensureActive(); if (this.handle !== handle) throw Error('COMPANION_SUBSCRIPTION_SESSION_CHANGED');
+    return result;
+  }
+
   async readMcpServerTools(serverName: string): Promise<AgentMcpServerToolsReport | null> {
     this.ensureActive();
     return await this.handle.readMcpServerTools?.(serverName) ?? null;
@@ -1935,6 +1946,8 @@ export class Session {
   }
 
   /** Codex-only: 当前会话绑定的 app-server host 是否经 loopback proxy 出口。 */
+  get supportsHostTurnContext(): boolean { return this.handle.supportsHostTurnContext === true; }
+
   get codexProxyActive(): boolean | undefined {
     return this.handle.codexProxyActive;
   }

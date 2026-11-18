@@ -2021,6 +2021,7 @@ export function getMaker(): Maker {
         await ownerCodexThreadLocations().record(threadId, rolloutPath, storageHome);
       },
       registerCodexSystemPromptForThread: ({
+        webSocketTurnContext,
         sessionId,
         threadId,
         text,
@@ -2029,6 +2030,7 @@ export function getMaker(): Maker {
         reasoningEffort,
       }) =>
         registerCodexProxyComposed(sessionId, threadId, text, {
+          webSocketTurnContext,
           ...(subagentRoute ? { subagentRoute } : {}),
           // 共享的 app-server 目录不带档位。只给这条线程的智能路由盖上父任务当前档位，
           // 避免恢复后子代理掉回目录默认 low。优先用登记时带上的活档位：冷恢复

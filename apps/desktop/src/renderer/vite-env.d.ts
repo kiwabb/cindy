@@ -5276,6 +5276,16 @@ interface ElectronAPI {
         ) => Promise<import('../shared/botMemory').BotMemoryDetail>;
         delete: (body: import('../shared/botMemory').BotMemoryDeleteInput) => Promise<void>;
       };
+      memoryPreview: {
+        get: (body: {botId:string}) => Promise<import('../shared/botMemory').MemoryPreviewStatus>;
+        set: (body: {botId:string;enabled:boolean;expectedRevision:string}) => Promise<import('../shared/botMemory').MemoryPreviewStatus>;
+      };
+      privateFacts: {
+        list: (body: {botId: string; query?: string}) => Promise<{source: 'bot-private'; botId: string; items: import('../shared/botMemory').BotMemorySummary[]}>;
+        read: (body: {botId: string; filename: string}) => Promise<{source: 'bot-private'; botId: string; item: import('../shared/botMemory').BotMemoryDetail}>;
+        update: (body: import('../shared/botMemory').BotMemoryUpdateInput) => Promise<{source: 'bot-private'; botId: string; item: import('../shared/botMemory').BotMemoryDetail}>;
+        delete: (body: import('../shared/botMemory').BotMemoryDeleteInput) => Promise<{source: 'bot-private'; botId: string; deleted: true}>;
+      };
     };
     conversations: {
       search: (

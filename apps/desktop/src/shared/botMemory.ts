@@ -53,3 +53,13 @@ export interface BotMemoryDeleteInput {
  * renderer 据此重新读取并展示最新内容;账号切换等其它前置失败不带它。
  */
 export const BOT_MEMORY_CHANGED = 'bot-memory-changed';
+
+/** Local owner-only preview preference, separate from existing project memory. */
+export interface MemoryPreviewStatus {
+  botId: string;
+  enabled: boolean;
+  revision: string;
+  model: string | null;
+  available: boolean;
+  reason: string | null;
+}

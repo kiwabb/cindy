@@ -1,3 +1,4 @@
+import { HOST_TURN_CONTEXT, type HostTurnContext } from './shared/host-turn-context.js';
 /**
  * BaseAgent — Claude Code / Codex 等具体 agent 的统一抽象。
  *
@@ -1377,6 +1378,8 @@ export interface AgentDeps {
    * 缺省 / undefined → CodexAgent 不启用 proxy prompt 通道,继续走老 developerInstructions。
    */
   registerCodexSystemPromptForThread?: (args: {
+    /** Per-turn data for the subscription WebSocket body; never copied to child threads. */
+    webSocketTurnContext?: string;
     sessionId: string;
     threadId: string;
     text: string;
@@ -2205,6 +2208,7 @@ export interface MainOwnedSendContext {
 export const PI_CACHE_RECOVERY_EXPECTATION = Symbol('pi-cache-recovery-expectation');
 
 export interface SendOptions {
+  readonly [HOST_TURN_CONTEXT]?: HostTurnContext;
   readonly [PI_CACHE_RECOVERY_EXPECTATION]?: import('./pi/cache-compatibility.js').PiCacheCompatibility;
   readonly [ASYNC_QUESTION_ANSWER]?: true;
   readonly [SUPERSEDE_ASYNC_QUESTIONS]?: true;
@@ -2443,6 +2447,9 @@ export interface AgentMcpServerToolsReport {
 }
 
 export interface AgentSessionHandle {
+  readonly supportsHostTurnContext?: boolean;
+  /** Explicit same-account subscription analysis on the selected execution host. */
+  requestCompanionText?(prompt:string):Promise<{providerId:string;model:string;text:string}>;
   /** Canonical physical Skill identities frozen at native runtime startup. */
   readonly disabledSkillPaths?: readonly string[];
   getCodexContextWindowInfo?(): Promise<CodexContextWindowInfo | null>;

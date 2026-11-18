@@ -1,3 +1,4 @@
+import { injectWebSocketTurnContext } from './codex-turn-context.js';
 
 import { captureUsagePricing, createUsagePricingObserver } from './model-usage-pricing.js';
 import { rewriteFastModel } from './model-fast-mode.js';
@@ -240,6 +241,7 @@ const imageGenerationLog = log.child('imagegen'); function setCodexAppliedCustom
 }
 
 const registry = createInstructionsRegistry();
+const webSocketTurnContexts = new Map<string, string>();
 const sessionToThread = new Map<string, string>();
 const sessionToThreads = new Map<string, Set<string>>();
 const threadToSession = new Map<string, string>();
@@ -3578,7 +3580,8 @@ async function createCodexProxyHandle(
       const body: unknown = JSON.parse(message.toString('utf8'));
       const context = providerContextForRequest(ctx.headers, isPlainObject(body) && typeof body.model === 'string' ? body.model : '');
       const next = restrictSubscriptionRequest(body, context.sessionId ?? guestSessionId, context.providerId ?? guestProviderId ?? 'openai');
-      const request = next ? Buffer.from(JSON.stringify(next)) : message;
+      const enriched = injectWebSocketTurnContext(next ?? body, webSocketTurnContexts.get(selectedThreadIdFromHeaders(ctx.headers) ?? ''));
+      const request = enriched !== body ? Buffer.from(JSON.stringify(enriched)) : message;
       return request.length > CODEX_WEBSOCKET_MESSAGE_LIMIT_BYTES ? fitWebSocketRequest(request, ctx, signal) : request;
     }),
     transformResponse: (ctx) => {
@@ -3908,10 +3911,13 @@ async function createCodexProxyHandle(
   opts: {
     subagentRoute?: CodexSubagentRouteSnapshot;
     smartSubagentRoutes?: readonly CodexSubagentRouteSnapshot[];
+    webSocketTurnContext?: string;
   } = {},
 ): void {
   bindThreadToSession(sessionId, threadId);
   registry.set(threadId, text);
+  if (opts.webSocketTurnContext) webSocketTurnContexts.set(threadId, opts.webSocketTurnContext);
+  else webSocketTurnContexts.delete(threadId);
   const providerId = opts.subagentRoute?.providerId.trim();
   const catalogModel = opts.subagentRoute?.catalogModel.trim();
   if (providerId && catalogModel) {
@@ -4044,6 +4050,7 @@ function clearSessionThreads(sessionId: string): string[] {
       }
       threadToSession.delete(threadId);
       registry.delete(threadId);
+      webSocketTurnContexts.delete(threadId);
       subagentRouteByParentThread.delete(threadId);
       subagentRouteByThread.delete(threadId);
       smartSubagentRoutesByParentThread.delete(threadId);
@@ -4072,6 +4079,7 @@ function clearSessionThreads(sessionId: string): string[] {
   dumpSeq = 0;
   for (const threadId of threadToSession.keys()) {
     registry.delete(threadId);
+      webSocketTurnContexts.delete(threadId);
     responsesReasoningContentStripController.clear(threadId);
     responsesToolCallHistoryStripController.clear(threadId);
   }

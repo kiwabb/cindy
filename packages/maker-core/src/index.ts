@@ -125,3 +125,10 @@ export { LIBRARY_READ_ROOT, parseLibraryAssetRef, resolveLibraryAssetPath } from
 export { VoiceCallContext, type VoiceCallRecord, type VoiceCallTurn, type VoiceCallHandoff } from './voice-call.js';
 
 export { ASYNC_QUESTION_ANSWER, SUPERSEDE_ASYNC_QUESTIONS } from './agents/base-agent.js';
+
+export { FactMemoryQueue, validateFactRoute, validateFactSelection, type FactScope, type FactSource, type FactRoute, type FactAnalysisPort, type FactTurnToken } from './memory/fact-memory.js';
+
+export * from './agents/shared/host-turn-context.js';
+export * from './memory/turn-context.js';
+export * from './memory/turn-snapshot-store.js';
+export * from './memory/turn-receipt-store.js';

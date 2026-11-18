@@ -6304,6 +6304,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
         delete: (body: unknown): Promise<void> =>
           ipcRenderer.invoke('local-db:bots:memory:delete', body),
       },
+      memoryPreview: {
+        get: (body: {botId:string}) => ipcRenderer.invoke('local-db:bots:memory-preview:get',body),
+        set: (body: {botId:string;enabled:boolean;expectedRevision:string}) => ipcRenderer.invoke('local-db:bots:memory-preview:set',body),
+      },
+      privateFacts: {
+        list: (body: {botId: string; query?: string}): Promise<unknown> => ipcRenderer.invoke('local-db:bots:private-facts:list', body),
+        read: (body: {botId: string; filename: string}): Promise<unknown> => ipcRenderer.invoke('local-db:bots:private-facts:read', body),
+        update: (body: import('../shared/botMemory').BotMemoryUpdateInput): Promise<unknown> => ipcRenderer.invoke('local-db:bots:private-facts:update', body),
+        delete: (body: import('../shared/botMemory').BotMemoryDeleteInput): Promise<unknown> => ipcRenderer.invoke('local-db:bots:private-facts:delete', body),
+      },
     },
     conversations: {
       search: (request: unknown): Promise<unknown> =>
