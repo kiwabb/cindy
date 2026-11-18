@@ -5164,7 +5164,12 @@ interface ElectronAPI {
     };
     personalTodos: {
       list: () => Promise<import('../shared/personalTodo').PersonalTodo[]>;
-      update: (input: import('../shared/personalTodo').PersonalTodoUpdate) => Promise<import('../shared/personalTodo').PersonalTodo>;
+      update: (input: import('../shared/personalTodo').PersonalTodoWriteRequest) => Promise<import('../shared/personalTodo').PersonalTodo>;
+      /** Puts `ids` in this order as one block at `place` (default: where the first of them is); returns the todos whose rank changed. */
+      reorder: (
+        ids: string[],
+        place?: import('../shared/personalTodo').PersonalTodoPlace,
+      ) => Promise<import('../shared/personalTodo').PersonalTodo[]>;
       onChanged: (listener: (ownerStamp?: import('../shared/dataOwnerPush').DataOwnerPushStamp) => void) => () => void;
       /** Multi-computer sync of personal todos (trusted app renderer only). */
       sync: {

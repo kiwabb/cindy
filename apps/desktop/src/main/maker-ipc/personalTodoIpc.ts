@@ -5,8 +5,9 @@ import { isDeviceLinkInvoke } from '../device-link/invoke-context.js';
 import { captureDataOwnerBroadcastScope } from '../device-link/broadcast-tap.js';
 import { throwIpcError } from '../utils/ipcValidate.js';
 import type {
+  PersonalTodoPlace,
   PersonalTodoSyncChoice,
-  PersonalTodoUpdate,
+  PersonalTodoWriteRequest,
 } from '../../shared/personalTodo.js';
 import { onSharedDatasetStatusChanged } from '../shared-datasets/api.js';
 import {
@@ -16,14 +17,15 @@ import {
   PersonalTodoOwnerChangedError,
   personalTodoSyncActions,
   readPersonalTodoSyncStatus,
+  reorderPersonalTodos,
   writePersonalTodo,
 } from './personalTodoAccess.js';
 
 export function registerPersonalTodoIpc() {
-  for (const operation of ['list', 'update'] as const) {
+  for (const operation of ['list', 'update', 'reorder'] as const) {
     ipcMain.handle(
       `local-db:personal-todos:${operation}`,
-      async (event, input: PersonalTodoUpdate) => {
+      async (event, input: PersonalTodoWriteRequest, place?: PersonalTodoPlace) => {
         assertTrustedAppRendererEvent(event);
         // Remote controllers use the personal-todos remote resource, never this channel.
         if (isDeviceLinkInvoke())
@@ -32,6 +34,10 @@ export function registerPersonalTodoIpc() {
           if (operation === 'update') {
             // One write entry for every surface; a replica queues the edit for the main computer.
             return (await writePersonalTodo(input, captureDataOwnerBroadcastScope())).todo;
+          }
+          if (operation === 'reorder') {
+            // `input` is the id list here: the todos in their new order, placed as one block.
+            return (await reorderPersonalTodos(input, place, captureDataOwnerBroadcastScope())).todos;
           }
           const { store, assertCurrent } = openPersonalTodoStore();
           const result = await store.list();

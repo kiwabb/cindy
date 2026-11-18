@@ -28,9 +28,10 @@ const instant = (offset: number, hour: number, minute = 0) => {
   return { kind: 'instant' as const, date, at: at.toISOString(), timeZone: zone };
 };
 function mine(id: string, title: string, patch: Partial<PersonalTodo> = {}): PersonalTodo {
+  const createdAt = `2026-11-0${Number(id.replace(/\D/g, '')) % 9 + 1}T08:00:00Z`;
   return {
     id, revision: 1, title, notes: '', deadline: null, status: 'open', deferredUntil: null,
-    createdAt: `2026-11-0${Number(id.replace(/\D/g, '')) % 9 + 1}T08:00:00Z`, updatedAt: '2026-11-10T08:00:00Z',
+    createdAt, rank: Date.parse(createdAt), updatedAt: '2026-11-10T08:00:00Z',
     priority: 0, tagIds: [], reminder: 'default', subtasks: [], ownership: 'self', source: 'manual', ...patch,
   };
 }
@@ -97,7 +98,7 @@ mountPage({
   route: '/bots/todos',
   host: (ctx) => ({
     localDb: {
-      personalTodos: { list: async () => personal(ctx.case), update: forbid('personalTodos.update'), onChanged: subscription('personalTodos'), ...syncApi(ctx.case) },
+      personalTodos: { list: async () => personal(ctx.case), update: forbid('personalTodos.update'), reorder: forbid('personalTodos.reorder'), onChanged: subscription('personalTodos'), ...syncApi(ctx.case) },
       taskTags: {
         execute: async () => ({ tags: TAGS, sessions: [], supportedColors: [...TASK_TAG_COLORS] }),
         onChanged: subscription('taskTags'),

@@ -12,7 +12,13 @@ import {
 } from '@cindy/maker-shared/teammate-todo';
 import type { TaskTag } from '@cindy/maker-shared';
 
-import type { PersonalTodo, PersonalTodoSyncStatus, PersonalTodoUpdate } from '../../../shared/personalTodo';
+import {
+  comparePersonalTodoRank,
+  type PersonalTodo,
+  type PersonalTodoPlace,
+  type PersonalTodoSyncStatus,
+  type PersonalTodoUpdate,
+} from '../../../shared/personalTodo';
 import { dayDiff } from './todoDates';
 import {
   deadlineBucket,
@@ -24,9 +30,10 @@ import {
 } from './teammateTodoBoard';
 
 export type PersonalGrouping = 'due' | 'priority' | 'tag' | 'none';
-export type PersonalOrder = 'priority' | 'due' | 'created';
+/** `manual` is the owner's own order (dragged on the page, or set by an Agent). */
+export type PersonalOrder = 'manual' | 'priority' | 'due' | 'created';
 export const PERSONAL_GROUPINGS: readonly PersonalGrouping[] = ['due', 'priority', 'tag', 'none'];
-export const PERSONAL_ORDERS: readonly PersonalOrder[] = ['priority', 'due', 'created'];
+export const PERSONAL_ORDERS: readonly PersonalOrder[] = ['manual', 'priority', 'due', 'created'];
 export const DEFAULT_PERSONAL_GROUPING: PersonalGrouping = 'due';
 export const DEFAULT_PERSONAL_ORDER: PersonalOrder = 'priority';
 /** Highest first. */
@@ -139,11 +146,45 @@ const higherPriorityFirst = (a: PersonalTodo, b: PersonalTodo) =>
 
 export function comparePersonalTodos(order: PersonalOrder) {
   return (a: PersonalTodo, b: PersonalTodo): number =>
-    order === 'priority'
+    order === 'manual'
+      ? comparePersonalTodoRank(a, b)
+      : order === 'priority'
       ? higherPriorityFirst(a, b) || compareDeadlines(a, b) || newerFirst(a, b)
       : order === 'due'
         ? compareDeadlines(a, b) || higherPriorityFirst(a, b) || newerFirst(a, b)
         : newerFirst(a, b);
+}
+
+/** Rows of a list can be dragged only in manual order, and not among completed todos. */
+export function personalCanReorder(order: PersonalOrder, view: TodoBoardView): boolean {
+  return order === 'manual' && view !== 'done';
+}
+
+/**
+ * The move a drop makes: given a section's ids before and after the drag, the todo that moved and
+ * where it now sits (right after the todo above it, else right before the one below). Rows that
+ * cannot be placed (`fixed`, e.g. a refused draft) are neither moved nor used as anchors.
+ */
+export function personalDropMove(
+  before: readonly string[],
+  after: readonly string[],
+  fixed: (id: string) => boolean = () => false,
+): { id: string; place: PersonalTodoPlace } | null {
+  if (before.length !== after.length) return null;
+  const start = before.findIndex((id, i) => id !== after[i]);
+  if (start < 0) return null;
+  const without = (list: readonly string[], id: string) => list.filter((item) => item !== id);
+  const same = (a: readonly string[], b: readonly string[]) =>
+    a.length === b.length && a.every((id, i) => id === b[i]);
+  const id = [before[start], after[start]].find((candidate) =>
+    same(without(before, candidate), without(after, candidate)),
+  );
+  if (!id || fixed(id)) return null;
+  const at = after.indexOf(id);
+  const above = after.slice(0, at).reverse().find((other) => !fixed(other));
+  if (above) return { id, place: { after: above } };
+  const below = after.slice(at + 1).find((other) => !fixed(other));
+  return below ? { id, place: { before: below } } : null;
 }
 
 function completionTime(todo: PersonalTodo): number {

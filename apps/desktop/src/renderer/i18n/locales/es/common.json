@@ -20074,6 +20074,7 @@
     "deleteConfirm": "¿Eliminar este pendiente?",
     "empty": "No hay pendientes en esta vista",
     "saveFailed": "No se pudo guardar. Tu entrada se conserva. Vuelve a guardar.",
+    "reorderFailed": "No se pudo guardar el nuevo orden. Inténtalo de nuevo.",
     "loadFailed": "No se pudieron cargar tus pendientes.",
     "conflict": "Actualizado en otro lugar",
     "reloadVersion": "Cargar la versión que se sobrescribirá",
@@ -20123,6 +20124,7 @@
     },
     "order": {
       "label": "Orden dentro del grupo",
+      "manual": "Mi orden (arrastra para ordenar)",
       "priority": "Mayor prioridad primero",
       "due": "Fecha límite más próxima primero",
       "created": "Añadidos recientemente primero"

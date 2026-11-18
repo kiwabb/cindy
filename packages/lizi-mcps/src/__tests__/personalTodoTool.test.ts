@@ -159,4 +159,42 @@ describe('personal todo tools', () => {
     expect(parse(await reg.call('update_personal_todo', { id: 'a', link: { sessionId: 's', path: '/x' } })).ok).toBe(false);
     expect(callback).not.toHaveBeenCalled();
   });
+
+  // 手动排序交给伙伴（docs/product-rules/personal-todos.md「手动排序」）：列表默认按宿主给的手动顺序并带 position；
+  // 单条移动与一批重排都把位置原样交给宿主；位置参数给了多个时不碰宿主，直接告诉模型只能三选一。
+  it('lists in manual order with positions, sorts on request and forwards moves and batch reorders', async () => {
+    const items = [
+      { id: 'a', revision: 1, title: 'A', notes: '', deadline: null, status: 'open', deferredUntil: null, priority: 1, rank: 10 },
+      { id: 'b', revision: 1, title: 'B', notes: '', deadline: null, status: 'done', deferredUntil: null, priority: 0, rank: 20 },
+      { id: 'c', revision: 1, title: 'C', notes: '', deadline: { kind: 'date', date: '2026-11-20', timeZone: 'Asia/Shanghai' }, status: 'open', deferredUntil: null, priority: 3, rank: 30 },
+    ];
+    const callback = vi.fn<PersonalTodoCallbacks>(async (operation) =>
+      operation === 'list' ? { ok: true as const, items } : { ok: true as const, todos: [] },
+    );
+    const reg = new XdtHelperToolRegistry();
+    registerPersonalTodoTools(reg, callback);
+    const listed = (await reg.call('list_personal_todos', {}).then(parse)).items as Array<Record<string, unknown>>;
+    expect(listed.map((t) => [t.id, t.position])).toEqual([['a', 1], ['c', 3]]);
+    expect(listed[0]).not.toHaveProperty('rank');
+    const sorted = async (sort: string) =>
+      ((await reg.call('list_personal_todos', { view: 'all', sort }).then(parse)).items as Array<{ id: string }>).map((t) => t.id);
+    expect(await sorted('priority')).toEqual(['c', 'a', 'b']);
+    expect(await sorted('due')).toEqual(['c', 'a', 'b']);
+
+    await reg.call('update_personal_todo', { id: 'c', expectedRevision: 1, moveTo: 'top' });
+    expect(callback).toHaveBeenLastCalledWith('update', { id: 'c', expectedRevision: 1, place: { to: 'top' } });
+    await reg.call('update_personal_todo', { creationRequestId: 'n1', title: 'N', afterId: 'a' });
+    expect(callback).toHaveBeenLastCalledWith('update', { creationRequestId: 'n1', title: 'N', place: { after: 'a' } });
+    expect(parse(await reg.call('reorder_personal_todos', { ids: ['c', 'a'], beforeId: 'b' })).ok).toBe(true);
+    expect(callback).toHaveBeenLastCalledWith('reorder', { ids: ['c', 'a'], place: { before: 'b' } });
+    await reg.call('reorder_personal_todos', { ids: ['b', 'a', 'c'] });
+    expect(callback).toHaveBeenLastCalledWith('reorder', { ids: ['b', 'a', 'c'] });
+
+    callback.mockClear();
+    const both = parse(await reg.call('reorder_personal_todos', { ids: ['a'], moveTo: 'top', afterId: 'b' }));
+    expect(both).toMatchObject({ ok: false, errorCode: 'INVALID_INPUT' });
+    expect(parse(await reg.call('update_personal_todo', { id: 'a', beforeId: 'b', afterId: 'c' })).ok).toBe(false);
+    expect((await reg.call('reorder_personal_todos', { ids: [] })).isError).toBe(true);
+    expect(callback).not.toHaveBeenCalled();
+  });
 });

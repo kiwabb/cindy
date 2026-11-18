@@ -26,6 +26,8 @@ import {
   stepsProgress,
   toggledSteps,
   type PersonalListInput,
+  personalCanReorder,
+  personalDropMove,
   personalTodoSyncLabels,
 } from '../personalTodoModel';
 
@@ -38,9 +40,10 @@ const at = (iso: string, date = iso.slice(0, 10)): TodoDeadline => ({ kind: 'ins
 let seq = 0;
 function todo(id: string, patch: Partial<PersonalTodo> = {}): PersonalTodo {
   seq++;
+  const createdAt = `2026-11-0${(seq % 9) + 1}T00:00:00Z`;
   return {
     id, revision: 1, title: id, notes: '', deadline: null, status: 'open', deferredUntil: null,
-    createdAt: `2026-11-0${(seq % 9) + 1}T00:00:00Z`, updatedAt: '2026-11-10T00:00:00Z',
+    createdAt, rank: Date.parse(createdAt), updatedAt: '2026-11-10T00:00:00Z',
     priority: 0, tagIds: [], reminder: 'default', subtasks: [], ownership: 'self', source: 'manual', ...patch,
   };
 }
@@ -194,5 +197,30 @@ describe('personalTodoSyncLabels', () => {
     expect(texts({ ...base, lastError: 'REMOTE_DISABLED' })).toEqual(['mainComputer:Desk', 'homeRemoteOff']);
     expect(texts({ ...base, role: 'home', homeName: undefined })).toEqual(['mainComputer:thisComputer']);
     expect(texts({ ...base, role: 'off' })).toEqual([]);
+  });
+});
+
+// 手动排序（docs/product-rules/personal-todos.md「手动排序」）：列表按顺序值排，拖放换算成「放到哪条后面」，
+// 冲突草稿既不能拖也不当锚点；已完成视图不能拖。
+describe('personal manual order', () => {
+  it('lists by rank in manual order and allows dragging only there and outside the done view', () => {
+    const list = [todo('x', { rank: 30 }), todo('y', { rank: 10, priority: 3 }), todo('z', { rank: 20 })];
+    const sections = personalSections({ items: list, view: 'open', grouping: 'none', order: 'manual', catalog, filter: { kind: 'all' }, now });
+    expect(sections[0].items.map((item) => item.id)).toEqual(['y', 'z', 'x']);
+    expect(personalCanReorder('manual', 'open')).toBe(true);
+    expect(personalCanReorder('manual', 'later')).toBe(true);
+    expect(personalCanReorder('manual', 'done')).toBe(false);
+    expect(personalCanReorder('priority', 'open')).toBe(false);
+  });
+
+  it('turns a drop into a move after the row above, else before the row below, skipping fixed rows', () => {
+    // Swapping neighbours reads as moving the first of the two that differ; either move gives this order.
+    expect(personalDropMove(['a', 'b', 'c'], ['a', 'c', 'b'])).toEqual({ id: 'b', place: { after: 'c' } });
+    expect(personalDropMove(['a', 'b', 'c'], ['c', 'a', 'b'])).toEqual({ id: 'c', place: { before: 'a' } });
+    expect(personalDropMove(['a', 'b', 'c'], ['b', 'c', 'a'])).toEqual({ id: 'a', place: { after: 'c' } });
+    const draft = (id: string) => id.startsWith('draft');
+    expect(personalDropMove(['draft1', 'a', 'b'], ['b', 'draft1', 'a'], draft)).toEqual({ id: 'b', place: { before: 'a' } });
+    expect(personalDropMove(['a', 'draft1'], ['draft1', 'a'], draft)).toBeNull();
+    expect(personalDropMove(['a', 'b'], ['a', 'b'])).toBeNull();
   });
 });

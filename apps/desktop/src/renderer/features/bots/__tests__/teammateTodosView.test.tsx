@@ -94,7 +94,7 @@ const { TeammateTodosView } = await import('../TeammateTodosView');
 
 const mine = (id: string, patch: Partial<PersonalTodo> = {}): PersonalTodo => ({
   id, revision: 1, title: id, notes: '', deadline: null, status: 'open', deferredUntil: null,
-  createdAt: '2026-11-01T00:00:00Z', updatedAt: '2026-11-01T00:00:00Z', priority: 0, tagIds: [],
+  createdAt: '2026-11-01T00:00:00Z', updatedAt: '2026-11-01T00:00:00Z', rank: 0, priority: 0, tagIds: [],
   reminder: 'default', subtasks: [], ownership: 'self', source: 'manual', ...patch,
 });
 const tag = (id: string, name: string, sortOrder: number): TaskTag => ({

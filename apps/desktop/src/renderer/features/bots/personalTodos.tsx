@@ -3,6 +3,7 @@ import {
   getPersonalTodoSnapshot,
   ensurePersonalTodos,
   refreshPersonalTodos,
+  reorderPersonalTodos,
   updatePersonalTodo,
 } from './personalTodoCache';
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
@@ -106,6 +107,7 @@ export function usePersonalTodos() {
     ...snapshot,
     refresh: refreshPersonalTodos,
     update: updatePersonalTodo,
+    reorder: reorderPersonalTodos,
     grouping,
     selectGrouping,
     order,

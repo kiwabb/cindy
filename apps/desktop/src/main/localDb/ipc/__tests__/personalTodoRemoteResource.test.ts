@@ -7,7 +7,7 @@
  * - 最小失败输入：带 creationRequestId 的新建与过期 revision 的更新；账号在写入过程中切换。
  * - tier：unit（真实 registry 与待办文件，electron / 账号边界用内存替身）。
  */
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { copyFile, mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -52,7 +52,12 @@ vi.mock('../../../device-link/broadcast-tap.js', () => ({
 }));
 
 import { remoteResourceRegistry } from '../../../device-link/remoteResourceRegistry';
-import { openPersonalTodoStore } from '../../../maker-ipc/personalTodoAccess';
+import {
+  openPersonalTodoStore,
+  reorderPersonalTodos,
+  writePersonalTodo,
+} from '../../../maker-ipc/personalTodoAccess';
+import { comparePersonalTodoRank } from '../../../../shared/personalTodo';
 import { personalTodosDataset } from '../../../maker-ipc/personalTodoSharedDataset';
 import { registerPersonalTodoRemoteResource } from '../personalTodoRemoteResource';
 import { emitTaskTagCatalogChanged } from '../taskTagChanges';
@@ -323,3 +328,95 @@ it('carries completed and deferred todos over faithfully and skips deleted ones'
   expect(await store.list()).toHaveLength(3);
   await rm(env.dir, { recursive: true, force: true });
 });
+
+// 手动排序（docs/product-rules/personal-todos.md「手动排序」）：没排过的待办按创建先后，伙伴依次新建的一批天然是正序；
+// 位置在写入口换成顺序值，一批重排只写顺序变了的条目、只通知一次；手机投影与手机写入不碰顺序。
+describe('manual order', () => {
+  const order = async () =>
+    (await openPersonalTodoStore().store.list()).sort(comparePersonalTodoRank).map((todo) => todo.title);
+  const todo = async (title: string) =>
+    (await openPersonalTodoStore().store.list()).find((item) => item.title === title)!;
+  /** Four todos created one after another, like an Agent writing a list one call at a time. */
+  const createFour = async () => {
+    for (const title of ['A', 'B', 'C', 'D']) {
+      // Each in its own millisecond, as separate tool calls always are (the store's lock needs a real clock).
+      const started = Date.now();
+      while (Date.now() === started) await new Promise((resolve) => setImmediate(resolve));
+      await writePersonalTodo({ creationRequestId: `order-${title}`, title });
+    }
+  };
+
+  it('keeps creation order, moves by place and reorders a batch writing only the moved todos', async () => {
+    await createFour();
+    expect(await order()).toEqual(['A', 'B', 'C', 'D']);
+    const [a, c] = [await todo('A'), await todo('C')];
+    env.tap.mockReset();
+
+    // No place: the block starts where its first member already is.
+    const moved = await reorderPersonalTodos([(await todo('D')).id, (await todo('B')).id], undefined);
+    expect(await order()).toEqual(['A', 'D', 'B', 'C']);
+    expect(moved.todos.map((t) => t.title)).toEqual(['D', 'B']);
+    expect((await todo('A')).revision).toBe(a.revision);
+    expect((await todo('C')).revision).toBe(c.revision);
+    expect(env.tap).toHaveBeenCalledTimes(1);
+    // The order already holds: nothing is written.
+    expect((await reorderPersonalTodos([(await todo('D')).id, (await todo('B')).id], undefined)).todos).toEqual([]);
+
+    await writePersonalTodo({ creationRequestId: 'order-E', title: 'E', place: { before: a.id } });
+    const current = await todo('C');
+    await writePersonalTodo({ id: current.id, expectedRevision: current.revision, place: { to: 'top' } });
+    expect(await order()).toEqual(['C', 'E', 'A', 'D', 'B']);
+
+    // The phone neither sees the order nor loses it when it edits.
+    const phone = (await read()).items.find((item) => item.title === 'A')!;
+    expect(phone).not.toHaveProperty('rank');
+    await update({ id: phone.id, expectedRevision: phone.revision, title: 'A2' });
+    expect(await order()).toEqual(['C', 'E', 'A2', 'D', 'B']);
+
+    await expect(writePersonalTodo({ id: current.id, place: { after: 'nope' } })).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    await expect(writePersonalTodo({ id: current.id, rank: 1, place: { to: 'top' } })).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+    await expect(reorderPersonalTodos([current.id, current.id], undefined)).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+  });
+
+  it('renumbers the list when no room is left between the new neighbours', async () => {
+    await createFour();
+    for (const title of ['A', 'B']) {
+      const item = await todo(title);
+      await writePersonalTodo({ id: item.id, expectedRevision: item.revision, rank: 5 });
+    }
+    expect(await order()).toEqual(['A', 'B', 'C', 'D']);
+    await reorderPersonalTodos([(await todo('D')).id], { after: (await todo('A')).id });
+    expect(await order()).toEqual(['A', 'D', 'B', 'C']);
+    const ranks = (await openPersonalTodoStore().store.list()).map((item) => item.rank);
+    expect(new Set(ranks).size).toBe(4);
+  });
+
+  // 副本（docs/dev-rules/protocol-compatibility/shared-datasets.md）：位置在副本上就换成顺序值，队列里只有
+  // {id, expectedRevision, rank} 这种普通修改；只在最后一条等主力电脑；带过去与「用我的」只在需要时带 rank。
+  it('on a replica queues plain rank edits and carries the rank only when there is one', async () => {
+    await createFour();
+    env.role = 'replica';
+    env.enqueue.mockImplementation(async (_dataset: string, queued: Record<string, unknown>) => personalTodosDataset.applySubmit(queued));
+    const result = await reorderPersonalTodos([(await todo('D')).id, (await todo('C')).id], { to: 'top' });
+    expect(await order()).toEqual(['D', 'C', 'A', 'B']);
+    expect(result.sync).toBe('pending');
+    const calls = env.enqueue.mock.calls as Array<[string, Record<string, unknown>, { waitMs?: number }]>;
+    expect(calls.map(([, queued]) => Object.keys(queued).sort())).toEqual([
+      ['expectedRevision', 'id', 'rank'],
+      ['expectedRevision', 'id', 'rank'],
+    ]);
+    expect(calls.map(([, , options]) => options.waitMs)).toEqual([0, 3000]);
+    await writePersonalTodo({ creationRequestId: 'order-F', title: 'F', place: { after: (await todo('D')).id } });
+    const creation = calls[2][1];
+    expect(creation).not.toHaveProperty('place');
+    expect(typeof creation.rank).toBe('number');
+
+    const raw = await personalTodosDataset.readItems();
+    const [placed, plain] = [raw.find((item) => item.title === 'D')!, raw.find((item) => item.title === 'A')!];
+    expect(personalTodosDataset.creationUpdate(placed, 'x')).toHaveProperty('rank', placed.rank);
+    expect(personalTodosDataset.creationUpdate(plain, 'y')).not.toHaveProperty('rank');
+    expect(personalTodosDataset.reviseUpdate!(plain, plain)).not.toHaveProperty('rank');
+    expect(personalTodosDataset.reviseUpdate!(placed, { ...placed, rank: undefined })).toHaveProperty('rank', placed.rank);
+  });
+});
+

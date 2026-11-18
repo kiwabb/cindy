@@ -19815,6 +19815,7 @@
     "deleteConfirm": "删除这条待办？",
     "empty": "此视图暂无待办",
     "saveFailed": "保存失败，输入已保留。请再次保存。",
+    "reorderFailed": "顺序没有保存成功，请重试。",
     "loadFailed": "个人待办读取失败。",
     "conflict": "已在别处更新",
     "reloadVersion": "读取最新版本以覆盖保存",
@@ -19864,6 +19865,7 @@
     },
     "order": {
       "label": "组内顺序",
+      "manual": "手动排序（可拖动）",
       "priority": "优先级高的在前",
       "due": "截止早的在前",
       "created": "最近添加的在前"

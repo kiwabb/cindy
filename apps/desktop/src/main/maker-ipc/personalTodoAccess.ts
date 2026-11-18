@@ -11,14 +11,17 @@ import {
   type DataOwnerBroadcastScope,
 } from '../device-link/broadcast-tap.js';
 import type { TaskTag } from '@cindy/maker-shared';
-import { settleTodoSubtaskTimes } from '@cindy/maker-shared/teammate-todo';
+import { settleTodoSubtaskTimes, TodoError } from '@cindy/maker-shared/teammate-todo';
 import { executeTaskTags } from '../localDb/ipc/taskTags.js';
-import type {
-  PersonalTodo,
-  PersonalTodoSyncChoice,
-  PersonalTodoSyncConflict,
-  PersonalTodoSyncStatus,
-  PersonalTodoUpdate,
+import {
+  normalizePersonalTodoPlace,
+  planPersonalTodoOrder,
+  type PersonalTodo,
+  type PersonalTodoSyncChoice,
+  type PersonalTodoSyncConflict,
+  type PersonalTodoSyncStatus,
+  type PersonalTodoUpdate,
+  type PersonalTodoWriteRequest,
 } from '../../shared/personalTodo.js';
 import {
   writeSharedDataset,
@@ -127,10 +130,110 @@ export interface PersonalTodoWriteResult {
  * resource all come through it. Off / home write the account file directly (the home's change
  * push is driven by `notifyPersonalTodosChanged`); a replica applies the edit to its mirror and
  * queues it for the home instead, so there is never a second writer.
+ *
+ * A `place` (top / bottom / before or after another todo) is resolved here, against the list this
+ * computer shows, into an absolute `rank`, the same way step times are settled here: an edit queued
+ * on a replica then reaches the main computer as plain values, never as ids it may not know yet.
  */
 export async function writePersonalTodo(
-  request: PersonalTodoUpdate,
+  request: PersonalTodoWriteRequest,
   scope = captureDataOwnerBroadcastScope(),
+): Promise<PersonalTodoWriteResult> {
+  if (!request || typeof request !== 'object' || Array.isArray(request) || request.place === undefined)
+    return writeOne(request, scope);
+  const { place: rawPlace, ...update } = request;
+  const place = normalizePersonalTodoPlace(rawPlace);
+  if (update.rank !== undefined)
+    throw new TodoError('INVALID_INPUT', 'INVALID_INPUT: send either place or rank, not both');
+  if (update.operation === 'delete')
+    throw new TodoError('INVALID_INPUT', 'INVALID_INPUT: a deleted todo has no place');
+  const { store } = openPersonalTodoStore();
+  const items = await store.list();
+  // A new todo takes part in the plan as if it were already at the bottom of the list.
+  const target = update.id ?? 'new-todo:placeholder';
+  const ranked = update.id
+    ? items
+    : [...items, { id: target, rank: Date.now(), createdAt: new Date().toISOString() }];
+  const plan = planPersonalTodoOrder(ranked, [target], place);
+  const own = plan.find((change) => change.id === target);
+  const written = await writeOne({ ...update, ...(own ? { rank: own.rank } : {}) }, scope);
+  // Only when no room was left between the neighbours: the others are renumbered as well.
+  const others = plan.filter((change) => change.id !== target);
+  if (others.length) await writeRanks(others, items, scope);
+  return written;
+}
+
+export interface PersonalTodoReorderResult {
+  /** The todos whose rank changed, as written (new revisions). Empty when the order already held. */
+  todos: PersonalTodo[];
+  /** Replica only: `synced` when the main computer took every change within the short wait. */
+  sync?: 'pending' | 'synced';
+}
+
+/** Most todos one reorder takes; larger lists are reordered in parts. */
+export const PERSONAL_TODO_REORDER_MAX = 200;
+
+/**
+ * Puts `ids` in this order as one block at `place` (without one, where the first of them already
+ * is). Each todo whose rank changes is one ordinary edit through `writePersonalTodo`'s path, so a
+ * replica queues them like any other edit; one change notification follows the whole batch.
+ */
+export async function reorderPersonalTodos(
+  ids: unknown,
+  rawPlace: unknown,
+  scope = captureDataOwnerBroadcastScope(),
+): Promise<PersonalTodoReorderResult> {
+  if (
+    !Array.isArray(ids) ||
+    ids.length > PERSONAL_TODO_REORDER_MAX ||
+    ids.some((id) => typeof id !== 'string' || !id || id.length > 512)
+  )
+    throw new TodoError(
+      'INVALID_INPUT',
+      `INVALID_INPUT: ids must be a list of at most ${PERSONAL_TODO_REORDER_MAX} todo ids`,
+    );
+  const place = rawPlace === undefined ? undefined : normalizePersonalTodoPlace(rawPlace);
+  const { store } = openPersonalTodoStore();
+  const items = await store.list();
+  const plan = planPersonalTodoOrder(items, ids as string[], place);
+  return writeRanks(plan, items, scope);
+}
+
+/** Rank-only edits, each against the revision it was planned from; one notification at the end. */
+async function writeRanks(
+  plan: ReadonlyArray<{ id: string; rank: number }>,
+  items: readonly PersonalTodo[],
+  scope: DataOwnerBroadcastScope,
+): Promise<PersonalTodoReorderResult> {
+  const todos: PersonalTodo[] = [];
+  let pending = false;
+  let queued = false;
+  let local = false;
+  try {
+    for (const [index, change] of plan.entries()) {
+      const item = items.find((todo) => todo.id === change.id);
+      if (!item) throw new TodoError('NOT_FOUND');
+      // A replica waits once, on the last edit: the earlier ones go out in the same flush.
+      const result = await writeOne(
+        { id: item.id, expectedRevision: item.revision, rank: change.rank },
+        scope,
+        { waitMs: index === plan.length - 1 ? REPLICA_WRITE_WAIT_MS : 0, notify: false },
+      );
+      todos.push(result.todo);
+      if (result.sync) queued = true;
+      else local = true;
+      if (result.sync === 'pending') pending = true;
+    }
+  } finally {
+    if (local) notifyPersonalTodosChanged(scope);
+  }
+  return { todos, ...(queued ? { sync: pending ? 'pending' : 'synced' } : {}) };
+}
+
+async function writeOne(
+  request: PersonalTodoUpdate,
+  scope: DataOwnerBroadcastScope,
+  options: { waitMs?: number; notify?: boolean } = {},
 ): Promise<PersonalTodoWriteResult> {
   const { store, assertCurrent } = openPersonalTodoStore();
   const input = await withStepTimes(request, store);
@@ -139,11 +242,11 @@ export async function writePersonalTodo(
   const outcome = await writeSharedDataset(
     PERSONAL_TODOS_DATASET_ID,
     { ...input },
-    { waitMs: REPLICA_WRITE_WAIT_MS, localWrite: () => store.update(input) },
+    { waitMs: options.waitMs ?? REPLICA_WRITE_WAIT_MS, localWrite: () => store.update(input) },
   );
   assertCurrent();
   if (outcome.local) {
-    notifyPersonalTodosChanged(scope);
+    if (options.notify !== false) notifyPersonalTodosChanged(scope);
     return { todo: outcome.value };
   }
   const queued = outcome.result;

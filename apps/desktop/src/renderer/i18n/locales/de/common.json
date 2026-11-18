@@ -19887,6 +19887,7 @@
     "deleteConfirm": "Dieses To-do löschen?",
     "empty": "Keine To-dos in dieser Ansicht",
     "saveFailed": "Speichern fehlgeschlagen. Ihre Eingabe bleibt erhalten. Erneut speichern.",
+    "reorderFailed": "Reihenfolge konnte nicht gespeichert werden. Bitte erneut versuchen.",
     "loadFailed": "Persönliche To-dos konnten nicht geladen werden.",
     "conflict": "Anderswo aktualisiert",
     "reloadVersion": "Neueste Version zum Überschreiben laden",
@@ -19936,6 +19937,7 @@
     },
     "order": {
       "label": "Reihenfolge in der Gruppe",
+      "manual": "Eigene Reihenfolge (ziehen)",
       "priority": "Höchste Priorität zuerst",
       "due": "Früheste Fälligkeit zuerst",
       "created": "Zuletzt hinzugefügt zuerst"
