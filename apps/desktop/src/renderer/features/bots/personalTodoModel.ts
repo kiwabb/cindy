@@ -34,13 +34,10 @@ export type PersonalGrouping = 'due' | 'priority' | 'tag' | 'none';
 export type PersonalOrder = 'manual' | 'priority' | 'due' | 'created';
 export const PERSONAL_GROUPINGS: readonly PersonalGrouping[] = ['due', 'priority', 'tag', 'none'];
 export const PERSONAL_ORDERS: readonly PersonalOrder[] = ['manual', 'priority', 'due', 'created'];
-/** Defaults for an account that has never picked a grouping or an order on this computer. */
+/** The defaults; only explicit picks are stored, so an unpicked choice follows these. */
 export const DEFAULT_PERSONAL_GROUPING: PersonalGrouping = 'none';
 export const DEFAULT_PERSONAL_ORDER: PersonalOrder = 'manual';
-/**
- * The defaults before manual order existed. An account that already picked one of the two keeps
- * seeing the other at its old default, so the view it chose does not change under it.
- */
+/** The defaults before manual order existed; kept for an account that picked one of the two before then. */
 export const EARLIER_PERSONAL_GROUPING: PersonalGrouping = 'due';
 export const EARLIER_PERSONAL_ORDER: PersonalOrder = 'priority';
 /** Highest first. */

@@ -55,14 +55,33 @@ import {
 } from './personalTodoVisuals';
 import { quickDate } from './todoDates';
 
+const GROUPING_CHOICE = 'personal-todo-grouping';
+const ORDER_CHOICE = 'personal-todo-order';
+const VIEW_DEFAULTS_SETTLED = 'personal-todo-view-defaults';
+
 const storedKey = (name: string, dataOwnerId: string | null | undefined) =>
   `${name}:${dataOwnerId ?? 'local'}`;
 
-function storedValue(key: string): string | null {
+/**
+ * One-time compatibility for the new defaults (manual order, no groups; 2026-11-18). Only explicit
+ * picks are stored, and before this an account could have picked one of grouping and order while
+ * seeing the other at the earlier default. Such an account gets that other one written once at the
+ * earlier default, so its view stays as it was. After the marker, an unpicked choice follows the
+ * current default.
+ */
+function settleEarlierViewDefaults(dataOwnerId: string | null | undefined) {
   try {
-    return localStorage.getItem(key);
+    const marker = storedKey(VIEW_DEFAULTS_SETTLED, dataOwnerId);
+    if (localStorage.getItem(marker) !== null) return;
+    const grouping = storedKey(GROUPING_CHOICE, dataOwnerId);
+    const order = storedKey(ORDER_CHOICE, dataOwnerId);
+    const pickedGrouping = localStorage.getItem(grouping) !== null;
+    const pickedOrder = localStorage.getItem(order) !== null;
+    if (pickedOrder && !pickedGrouping) localStorage.setItem(grouping, EARLIER_PERSONAL_GROUPING);
+    if (pickedGrouping && !pickedOrder) localStorage.setItem(order, EARLIER_PERSONAL_ORDER);
+    localStorage.setItem(marker, '1');
   } catch {
-    return null;
+    /* Without preference storage there is nothing earlier to keep. */
   }
 }
 
@@ -71,12 +90,16 @@ function useStoredChoice<T extends string>(
   name: string,
   dataOwnerId: string | null | undefined,
   allowed: readonly T[],
-  fallback: () => T,
+  fallback: T,
 ) {
   const key = storedKey(name, dataOwnerId);
   const load = (): T => {
-    const saved = storedValue(key);
-    return allowed.find((value) => value === saved) ?? fallback();
+    try {
+      const saved = localStorage.getItem(key);
+      return allowed.find((value) => value === saved) ?? fallback;
+    } catch {
+      return fallback;
+    }
   };
   const [value, setValue] = useState<T>(load);
   useEffect(() => setValue(load()), [key]);
@@ -100,41 +123,29 @@ export function usePersonalTodos() {
     getPersonalTodoSnapshot,
   );
   useEffect(ensurePersonalTodos, [dataOwnerId, ownerGeneration]);
-  // Manual order without grouping is the default only for an account that never picked either;
-  // one that picked one of them keeps the other at its earlier default.
-  const pickedBefore = () =>
-    storedValue(storedKey('personal-todo-grouping', dataOwnerId)) !== null ||
-    storedValue(storedKey('personal-todo-order', dataOwnerId)) !== null;
+  // Before the stored choices are read, so an earlier account keeps the view it had.
+  settleEarlierViewDefaults(dataOwnerId);
   const [grouping, selectGrouping] = useStoredChoice<PersonalGrouping>(
-    'personal-todo-grouping',
+    GROUPING_CHOICE,
     dataOwnerId,
     PERSONAL_GROUPINGS,
-    () => (pickedBefore() ? EARLIER_PERSONAL_GROUPING : DEFAULT_PERSONAL_GROUPING),
+    DEFAULT_PERSONAL_GROUPING,
   );
   const [order, selectOrder] = useStoredChoice<PersonalOrder>(
-    'personal-todo-order',
+    ORDER_CHOICE,
     dataOwnerId,
     PERSONAL_ORDERS,
-    () => (pickedBefore() ? EARLIER_PERSONAL_ORDER : DEFAULT_PERSONAL_ORDER),
+    DEFAULT_PERSONAL_ORDER,
   );
-  // Picking one keeps the other as it is now, so the next load does not fall back to the earlier default.
-  const chooseGrouping = (next: PersonalGrouping) => {
-    selectGrouping(next);
-    selectOrder(order);
-  };
-  const chooseOrder = (next: PersonalOrder) => {
-    selectOrder(next);
-    selectGrouping(grouping);
-  };
   return {
     ...snapshot,
     refresh: refreshPersonalTodos,
     update: updatePersonalTodo,
     reorder: reorderPersonalTodos,
     grouping,
-    selectGrouping: chooseGrouping,
+    selectGrouping,
     order,
-    selectOrder: chooseOrder,
+    selectOrder,
     dataOwnerId,
   };
 }

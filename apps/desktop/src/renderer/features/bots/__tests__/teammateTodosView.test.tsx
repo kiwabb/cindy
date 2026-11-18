@@ -451,8 +451,9 @@ describe('personal todo list', () => {
     const checked = (name: string) => screen.getByRole('menuitemradio', { name }).getAttribute('aria-checked');
     expect(checked('personalTodos.group.none')).toBe('true');
     expect(checked('personalTodos.order.manual')).toBe('true');
-    // Picking only a grouping keeps manual order the next time the list opens.
+    // Picking only a grouping stores just that pick; the order keeps following the default when the list opens again.
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'personalTodos.group.priority' }));
+    expect(localStorage.getItem('personal-todo-order:other-owner')).toBeNull();
     cleanup();
     render(<TeammateTodosView />);
     expect(checked('personalTodos.group.priority')).toBe('true');
