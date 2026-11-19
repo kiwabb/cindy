@@ -23,6 +23,8 @@ import { BotAddToGroupMenu } from './BotAddToGroupMenu';
 import { BotAvatar } from './BotAvatar';
 import { BotGlanceButton } from './BotGlancePopover';
 import { useCompanionCloud } from './companionCloudStore';
+import { ConversationMarksEntryButton } from '@/features/conversation-marks/ConversationMarksEntryButton';
+import type { ConversationMarkScope } from '../../../shared/conversationMarks';
 
 export interface BotChatIdentity {
   id: string;
@@ -38,7 +40,14 @@ export interface BotChatIdentity {
   canonicalChat?: boolean;
 }
 
-export function BotSessionContentHeader({ bot }: { bot: BotChatIdentity }) {
+export function BotSessionContentHeader({
+  bot,
+  marks,
+}: {
+  bot: BotChatIdentity;
+  /** This conversation's marks entry; absent for tutor conversations (their marks sit beside 今天). */
+  marks?: ConversationMarkScope | null;
+}) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
@@ -70,6 +79,7 @@ export function BotSessionContentHeader({ bot }: { bot: BotChatIdentity }) {
         <span className="min-w-0 truncate">{bot.name}</span>
       </button>
       <div className="ml-auto flex shrink-0 items-center gap-1">
+        {marks ? <ConversationMarksEntryButton scope={marks} /> : null}
         {bot.canonicalChat && !bot.deviceId ? <BotAddToGroupMenu botId={bot.id} /> : null}
         {bot.sessionId ? <BotGlanceButton bot={bot} cloudHome={homeKnown} /> : null}
         <button
@@ -91,8 +101,11 @@ export function BotSessionContentHeader({ bot }: { bot: BotChatIdentity }) {
  * mounting registers, unmounting clears, and only the route-owning chat instance
  * renders it.
  */
-export function BotSessionContentHeaderRegistration(props: { bot: BotChatIdentity }) {
-  const { bot } = props;
-  useRegisterContentHeader(useMemo(() => <BotSessionContentHeader bot={bot} />, [bot]));
+export function BotSessionContentHeaderRegistration(props: {
+  bot: BotChatIdentity;
+  marks?: ConversationMarkScope | null;
+}) {
+  const { bot, marks } = props;
+  useRegisterContentHeader(useMemo(() => <BotSessionContentHeader bot={bot} marks={marks} />, [bot, marks]));
   return null;
 }

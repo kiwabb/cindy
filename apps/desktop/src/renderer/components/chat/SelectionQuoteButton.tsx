@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { MessageSquarePlus } from 'lucide-react';
+import { Highlighter, MessageSquarePlus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import type { ChatQuote } from '@/lib/chatQuotes';
@@ -35,6 +35,44 @@ interface SelectionAnchor {
   x: number;
   y: number;
   placement: 'above' | 'below';
+  /** Set when the whole selection sits inside one chat message (the only case that can be marked). */
+  mark?: SelectionMarkTarget;
+}
+
+/** Where a selection lives inside one chat message: its clientId and the excerpt's text offsets. */
+export interface SelectionMarkTarget {
+  messageClientId: string;
+  start?: number;
+  end?: number;
+}
+
+/**
+ * The message (and its text body) a range lies in. Offsets count the body's text nodes in
+ * document order, the same walk the highlight painter uses to rebuild the range.
+ */
+export function readSelectionMarkTarget(range: Range): SelectionMarkTarget | null {
+  const elementOf = (node: Node) => (node instanceof Element ? node : node.parentElement);
+  const startMessage = elementOf(range.startContainer)?.closest<HTMLElement>('[data-message-client-id]');
+  const endMessage = elementOf(range.endContainer)?.closest<HTMLElement>('[data-message-client-id]');
+  if (!startMessage || startMessage !== endMessage) return null;
+  const messageClientId = startMessage.dataset.messageClientId;
+  if (!messageClientId) return null;
+  const body = markBodyOf(startMessage, range.startContainer);
+  if (!body.contains(range.startContainer) || !body.contains(range.endContainer)) return { messageClientId };
+  const before = document.createRange();
+  before.setStart(body, 0);
+  before.setEnd(range.startContainer, range.startOffset);
+  const start = before.toString().length;
+  const end = start + range.toString().length;
+  return end > start ? { messageClientId, start, end } : { messageClientId };
+}
+
+/** The text body a mark's offsets are counted in: the quote body around `node`, else the message. */
+export function markBodyOf(message: HTMLElement, node?: Node): HTMLElement {
+  const element = node ? (node instanceof Element ? node : node.parentElement) : null;
+  const around = element?.closest<HTMLElement>('[data-selection-quote-body]');
+  if (around && message.contains(around)) return around;
+  return message.querySelector<HTMLElement>('[data-selection-quote-body]') ?? message;
 }
 
 const BUTTON_GAP_PX = 8;
@@ -250,8 +288,14 @@ export function SelectionQuoteButton({
   getQuoteText,
   getQuoteMetadata,
   onAskInSideChat,
+  onMark,
 }: {
   onAskInSideChat?: (quote: string) => Promise<boolean>;
+  /**
+   * Chat streams that support marks pass this; the pill then offers 标记 after 添加到对话 for a
+   * selection inside one message. Other hosts (file browser) never show it.
+   */
+  onMark?: (selection: SelectionMarkTarget & { text: string }) => void;
   sessionId: string;
   /**
    * 引用来源文件(workdir 相对路径)。文件浏览器宿主传入;聊天消息流不传。
@@ -281,6 +325,7 @@ export function SelectionQuoteButton({
   }, [anchor, openingSideChat, onAskInSideChat, t]);
   const anchorRef = useRef<SelectionAnchor | null>(null);
   anchorRef.current = anchor;
+  const canMark = Boolean(onMark);
 
   const commitQuote = useCallback((selectionAnchor: SelectionAnchor) => {
     const text =
@@ -322,8 +367,9 @@ export function SelectionQuoteButton({
       const text = raw.replace(/^[\r\n]+/, '').replace(/[\r\n]+$/, '');
       const floatingAnchor = getFloatingAnchor(sel, range);
       if (!floatingAnchor) return null;
+      const mark = canMark ? readSelectionMarkTarget(range) : null;
 
-      return { text, ...floatingAnchor };
+      return { text, ...floatingAnchor, ...(mark ? { mark } : {}) };
     };
 
     const onMouseUp = () => {
@@ -359,7 +405,7 @@ export function SelectionQuoteButton({
         delete container.dataset.selectionQuoteContext;
       }
     };
-  }, [commitQuote, containerRef, getQuoteText]);
+  }, [canMark, commitQuote, containerRef, getQuoteText]);
 
   if (!anchor) return null;
 
@@ -392,6 +438,22 @@ export function SelectionQuoteButton({
         <MessageSquarePlus className="h-3.5 w-3.5" />
         {t('chat.quote.addToChat')}
       </Button>
+      {onMark && anchor.mark && (
+        <Button
+          variant="secondary"
+          size="sm"
+          compact
+          type="button"
+          onClick={() => {
+            onMark({ ...anchor.mark!, text: anchor.text });
+            window.getSelection()?.removeAllRanges();
+            setAnchor(null);
+          }}
+        >
+          <Highlighter className="h-3.5 w-3.5" />
+          {t('conversationMarks.mark')}
+        </Button>
+      )}
       {onAskInSideChat && <Button variant="secondary" size="sm" compact type="button" disabled={openingSideChat}
         onClick={async () => {
           setOpeningSideChat(true);

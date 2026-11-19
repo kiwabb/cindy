@@ -1,4 +1,9 @@
-import type { PersonalTodo, PersonalTodoUpdate } from '../../../shared/personalTodo';
+import {
+  planPersonalTodoOrder,
+  type PersonalTodo,
+  type PersonalTodoPlace,
+  type PersonalTodoWriteRequest,
+} from '../../../shared/personalTodo';
 import {
   getDataOwnerGeneration,
   isDataOwnerGenerationCurrent,
@@ -118,7 +123,46 @@ export function subscribePersonalTodos(listener: () => void) {
     }
   };
 }
-export async function updatePersonalTodo(input: PersonalTodoUpdate) {
+/**
+ * Moves todos in the manual order. The new ranks show at once (the same plan the main process
+ * makes), so a dropped row stays where it was dropped; the saved todos then replace them, and a
+ * failure re-reads the list. Returns the saved todos (new revisions).
+ */
+export async function reorderPersonalTodos(ids: string[], place: PersonalTodoPlace) {
+  current();
+  const capturedOwner = owner;
+  try {
+    const ranks = new Map(
+      planPersonalTodoOrder(state.items, ids, place).map((change) => [change.id, change.rank]),
+    );
+    if (ranks.size) {
+      state = {
+        ...state,
+        items: state.items.map((item) =>
+          ranks.has(item.id) ? { ...item, rank: ranks.get(item.id)! } : item,
+        ),
+      };
+      emit();
+    }
+  } catch {
+    // The list here may be behind; the main process plans against the stored one.
+  }
+  let saved: PersonalTodo[];
+  try {
+    saved = await window.electronAPI.localDb.personalTodos.reorder(ids, place);
+  } catch (error) {
+    if (isDataOwnerGenerationCurrent(capturedOwner)) void refreshPersonalTodos();
+    throw error;
+  }
+  current();
+  if (!isDataOwnerGenerationCurrent(capturedOwner)) throw new Error('OWNER_CHANGED');
+  const byId = new Map(saved.map((todo) => [todo.id, todo]));
+  if (pending) for (const todo of saved) duringRead.set(todo.id, { item: todo, deleted: false });
+  state = { ...state, items: state.items.map((item) => byId.get(item.id) ?? item) };
+  emit();
+  return saved;
+}
+export async function updatePersonalTodo(input: PersonalTodoWriteRequest) {
   current();
   const capturedOwner = owner;
   let saved: PersonalTodo;

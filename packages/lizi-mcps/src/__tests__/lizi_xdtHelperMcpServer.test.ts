@@ -203,7 +203,7 @@ describe("cindy_helper MCP server", () => {
       expect(local.map((c) => c.name)).toContain('todos');
       expect(JSON.stringify(local.find((c) => c.name === 'todos'))).toContain('当前登录账号');
       const tools = parsePayload(await client.callTool({ name: 'list_tools', arguments: { category: 'todos' } }));
-      expect((tools.tools as Array<{ name: string }>).map((t) => t.name)).toEqual(['list_personal_todos', 'update_personal_todo']);
+      expect((tools.tools as Array<{ name: string }>).map((t) => t.name)).toEqual(['list_personal_todos', 'update_personal_todo', 'reorder_personal_todos']);
       expect(parsePayload(await client.callTool({ name: 'call_tool', arguments: { name: 'list_personal_todos', args: {} } }))).toMatchObject({ ok: true, items: [] });
       remote = { agentKind: 'pi', remoteHostId: 'ssh-host' };
       expect((await categories()).map((c) => c.name)).toContain('todos');

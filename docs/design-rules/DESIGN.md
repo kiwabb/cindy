@@ -1093,6 +1093,15 @@ The existing IDs and explicit theme overrides remain supported. Exact values liv
 `packages/design-tokens/src/reference/color.json` and generate `themes/colors.ts`;
 this decision does not grant new uses of warning/status colors.
 
+**Conversation marks (2026-11-19, owner-approved prototype):** a further use of the search-match
+family, registered here. Not-yet-discussed marks paint `search-match-bg` at reduced opacity
+(light 0.38, dark 0.9 over the darker dark-mode fill) with a 1.5px `search-match-active-bg`
+underline at reduced opacity; discussed marks use the neutral `surface-chip` fill with a
+`text-placeholder` underline. Text keeps its own color, and the underline is the non-color cue.
+Painted with the CSS Custom Highlight API (`::highlight(cindy-conversation-mark*)` in
+`globals.css`); see [conversation marks](../product-rules/conversation-marks.md). The jump to a
+mark reuses the existing message focus flash unchanged.
+
 ### Built-in Themes
 
 The implementation truth is `builtinThemes` in `apps/desktop/src/renderer/themes/registry.ts`; adding or removing themes does not require updating this document. The default light/dark (base) themes are exactly the §2 palette.

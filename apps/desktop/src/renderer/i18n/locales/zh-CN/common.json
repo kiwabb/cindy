@@ -1,4 +1,29 @@
 {
+  "conversationMarks": {
+    "mark": "标记",
+    "title": "标记",
+    "entryAria": "标记，{{count}} 条未聊",
+    "groupOpen": "未聊",
+    "groupDiscussed": "已聊",
+    "me": "我",
+    "yesterday": "昨天 {{time}}",
+    "talkAboutThis": "就聊这点",
+    "markDiscussed": "标为已聊",
+    "markOpen": "改回未聊",
+    "jumpToSource": "跳到原文",
+    "delete": "删除标记",
+    "deleted": "已删除标记",
+    "undo": "撤销",
+    "empty": "还没有标记",
+    "saveFailed": "标记没有保存，请重试",
+    "syncSynced": "已同步",
+    "syncSyncing": "同步中",
+    "syncOffline": "离线",
+    "syncOfflinePending_one": "离线 · {{count}} 条待同步",
+    "syncOfflinePending_other": "离线 · {{count}} 条待同步",
+    "pending": "待同步",
+    "backToConversation": "返回对话"
+  },
   "sharedTaskRecovery": {
     "title": "无法在原电脑上恢复任务",
     "description": "可以选择其他电脑或供应商，通过上下文交接继续。原消息保留，但切换不会迁移原电脑上的完整运行状态。",
@@ -19826,6 +19851,7 @@
     "deleteConfirm": "删除这条待办？",
     "empty": "此视图暂无待办",
     "saveFailed": "保存失败，输入已保留。请再次保存。",
+    "reorderFailed": "顺序没有保存成功，请重试。",
     "loadFailed": "个人待办读取失败。",
     "conflict": "已在别处更新",
     "reloadVersion": "读取最新版本以覆盖保存",
@@ -19875,6 +19901,7 @@
     },
     "order": {
       "label": "组内顺序",
+      "manual": "手动排序（可拖动）",
       "priority": "优先级高的在前",
       "due": "截止早的在前",
       "created": "最近添加的在前"

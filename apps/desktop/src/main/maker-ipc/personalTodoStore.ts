@@ -73,6 +73,7 @@ export function createPersonalTodoStore(file: string, assertCurrent = () => {}) 
         reminder: input.reminder,
         subtasks: withSubtaskIds(input.subtasks),
         link: input.link,
+        rank: input.rank,
         ...(input.deadline !== undefined ? { deadlineOverride: { value: input.deadline } } : {}),
         ...(!input.id ? { key, outcome: input.title } : {}),
         ...(input.operation === 'complete'
@@ -85,7 +86,8 @@ export function createPersonalTodoStore(file: string, assertCurrent = () => {}) 
       if (receipt.todo) return projectPersonalTodo(receipt.todo);
       const existing = (await store.read()).items.find((todo) => todo.key === key);
       if (!existing || existing.decision?.kind === 'deleted') throw new TodoError('NOT_FOUND');
-      // Reusing a request after editing the draft must not silently discard those edits.
+      // Reusing a request after editing the draft must not silently discard those edits. The rank
+      // is left out: a retried creation resolves its place again against a list that now holds it.
       if (
         existing.title !== input.title?.trim() ||
         existing.progress !== (input.notes ?? '') ||

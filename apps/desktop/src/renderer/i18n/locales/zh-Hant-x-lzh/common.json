@@ -1,4 +1,29 @@
 {
+  "conversationMarks": {
+    "mark": "誌",
+    "title": "誌",
+    "entryAria": "誌，{{count}} 則未議",
+    "groupOpen": "未議",
+    "groupDiscussed": "已議",
+    "me": "吾",
+    "yesterday": "昨 {{time}}",
+    "talkAboutThis": "且議此",
+    "markDiscussed": "標為已議",
+    "markOpen": "復為未議",
+    "jumpToSource": "往觀原文",
+    "delete": "刪此誌",
+    "deleted": "誌已刪",
+    "undo": "撤回",
+    "empty": "尚無所誌",
+    "saveFailed": "誌未存，請再試",
+    "syncSynced": "已同",
+    "syncSyncing": "同之中",
+    "syncOffline": "離線",
+    "syncOfflinePending_one": "離線 · {{count}} 則待同",
+    "syncOfflinePending_other": "離線 · {{count}} 則待同",
+    "pending": "待同",
+    "backToConversation": "還於對話"
+  },
   "sharedTaskRecovery": {
     "title": "無法在原電腦上恢復任務",
     "description": "可以選擇其他電腦或供應商，透過上下文交接繼續。原訊息保留，但切換不會移轉原電腦上的完整執行狀態。",
@@ -19826,6 +19851,7 @@
     "deleteConfirm": "刪此待辦？",
     "empty": "此處暫無待辦",
     "saveFailed": "儲存未成，輸入仍存。請再儲存。",
+    "reorderFailed": "次序未存，請再試。",
     "loadFailed": "個人待辦未能讀取。",
     "conflict": "已在別處更新",
     "reloadVersion": "讀取最新版本以覆蓋儲存",
@@ -19875,6 +19901,7 @@
     },
     "order": {
       "label": "組內之序",
+      "manual": "手排之序（可拖移）",
       "priority": "急者居前",
       "due": "期近者居前",
       "created": "新添者居前"

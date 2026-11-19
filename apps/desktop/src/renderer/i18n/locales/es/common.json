@@ -1,4 +1,30 @@
 {
+  "conversationMarks": {
+    "mark": "Marcar",
+    "title": "Marcas",
+    "entryAria": "Marcas, {{count}} sin tratar",
+    "groupOpen": "Sin tratar",
+    "groupDiscussed": "Tratadas",
+    "me": "Yo",
+    "yesterday": "Ayer {{time}}",
+    "talkAboutThis": "Hablar de esto",
+    "markDiscussed": "Marcar como tratada",
+    "markOpen": "Marcar como sin tratar",
+    "jumpToSource": "Ir al mensaje original",
+    "delete": "Eliminar marca",
+    "deleted": "Marca eliminada",
+    "undo": "Deshacer",
+    "empty": "Aún no hay marcas",
+    "saveFailed": "No se guardó la marca. Inténtalo de nuevo.",
+    "syncSynced": "Sincronizado",
+    "syncSyncing": "Sincronizando",
+    "syncOffline": "Sin conexión",
+    "syncOfflinePending_one": "Sin conexión · {{count}} pendiente de sincronizar",
+    "syncOfflinePending_other": "Sin conexión · {{count}} pendientes de sincronizar",
+    "syncOfflinePending_many": "Sin conexión · {{count}} pendientes de sincronizar",
+    "pending": "Pendiente de sincronizar",
+    "backToConversation": "Volver a la conversación"
+  },
   "sharedTaskRecovery": {
     "title": "No se puede reanudar en el ordenador original",
     "description": "Elige otro ordenador o proveedor para continuar con un traspaso de contexto. Tus mensajes se conservan, pero no se transfiere el estado de ejecución completo del ordenador original.",
@@ -20085,6 +20111,7 @@
     "deleteConfirm": "¿Eliminar este pendiente?",
     "empty": "No hay pendientes en esta vista",
     "saveFailed": "No se pudo guardar. Tu entrada se conserva. Vuelve a guardar.",
+    "reorderFailed": "No se pudo guardar el nuevo orden. Inténtalo de nuevo.",
     "loadFailed": "No se pudieron cargar tus pendientes.",
     "conflict": "Actualizado en otro lugar",
     "reloadVersion": "Cargar la versión que se sobrescribirá",
@@ -20134,6 +20161,7 @@
     },
     "order": {
       "label": "Orden dentro del grupo",
+      "manual": "Mi orden (arrastra para ordenar)",
       "priority": "Mayor prioridad primero",
       "due": "Fecha límite más próxima primero",
       "created": "Añadidos recientemente primero"

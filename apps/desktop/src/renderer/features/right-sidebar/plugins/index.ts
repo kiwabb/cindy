@@ -23,3 +23,4 @@ import './resource-usage';
 import './plugin-view';
 import './plugin-task';
 import './learning-today';
+import './conversation-marks';

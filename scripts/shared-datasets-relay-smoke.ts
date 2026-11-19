@@ -478,13 +478,79 @@ async function oldPeerOnlyWorld(bundle: string, temp: string) {
   }
 }
 
+/**
+ * Conversation marks, the second dataset (docs/product-rules/conversation-marks.md): no switch of its
+ * own, it follows the todo switch; a mark keeps naming its conversation (host computer + session +
+ * message) on the other computer; offline discuss / delete / undo flush once.
+ * `SMOKE_ONLY=marks` runs just this world (about a minute).
+ */
+async function marksWorld(bundle: string, temp: string) {
+  const world = await startRelay(['dev-H', 'dev-R'], temp);
+  const [H, R] = world.credentials.map((c) =>
+    new Device(c.deviceId, { bundle, wsUrl: world.wsUrl, credential: c.credential, userData: path.join(temp, `ud3-${c.deviceId}`) }));
+  const conv = { sessionId: 'session-on-H', hostDeviceId: 'dev-H' };
+  const marksRole = async (d: Device) => (await d.rpc('marksStatus')).role as string;
+  try {
+    await Promise.all([H.start(), R.start()]);
+    await peersSeen(H, ['dev-R']);
+    await peersSeen(R, ['dev-H']);
+    // R marks a conversation that lives on H (seen remotely) before any sync is on.
+    await R.rpc('markAdd', { ...conv, messageClientId: 'msg-1', quote: 'before sync' });
+    check('M0 marks stay off while todo sync is off', (await marksRole(H)) === 'off' && (await marksRole(R)) === 'off', {
+      H: await marksRole(H), R: await marksRole(R),
+    });
+
+    await H.rpc('enable');
+    await waitFor('H marks follow todo sync (home)', async () => (await marksRole(H)) === 'home', 90_000);
+    await R.rpc('enable');
+    await waitFor('R marks follow todo sync (replica)', async () => (await marksRole(R)) === 'replica', 90_000);
+    await waitFor('R pre-sync mark reaches H', async () => (await H.rpc('marks', conv)).length === 1, 60_000);
+    const onH = (await H.rpc('marks', conv))[0];
+    check('M1 enabling todo sync turns marks on (H home, R replica); the earlier mark from R reaches H with its conversation keys',
+      onH.quote === 'before sync' && onH.hostDeviceId === 'dev-H' && onH.sessionId === 'session-on-H' && onH.messageClientId === 'msg-1',
+      onH);
+    // On H the conversation is local: the same mark is listed without naming a host.
+    const localOnH = await H.rpc('marks', { sessionId: 'session-on-H' });
+    check('M2 on the host computer the remote-made mark shows in its own (local) conversation', localOnH.length === 1, localOnH);
+
+    const added = await H.rpc('markAdd', { sessionId: 'session-on-H', messageClientId: 'msg-2', quote: 'made on home' });
+    await waitFor('H mark mirrored on R', async () => (await R.rpc('marks', conv)).length === 2, 60_000);
+    check('M3 a mark made on the home appears on the replica, stamped with the home id', added.hostDeviceId === 'dev-H', added);
+
+    await R.rpc('block');
+    const target = (await R.rpc('marks', conv)).find((m: any) => m.quote === 'made on home');
+    const discussed = await R.rpc('markOp', { id: target.id, expectedRevision: target.revision, operation: 'discuss' });
+    const deleted = await R.rpc('markOp', { id: target.id, expectedRevision: discussed.revision, operation: 'delete' });
+    await R.rpc('markOp', { id: target.id, expectedRevision: deleted.revision, operation: 'restore' });
+    const offline = await R.rpc('marksStatus');
+    check('M4 R offline: discuss, delete and undo queue up; status line reads offline with 3 pending',
+      offline.line?.phase === 'offline' && offline.line?.pending === 3, offline);
+    await R.rpc('unblock');
+    await waitFor('R queue flushed', async () => (await R.rpc('marksStatus')).line?.phase === 'synced', 90_000);
+    const final = (await H.rpc('marks', conv)).find((m: any) => m.id === target.id);
+    check('M5 back online: H has the mark discussed and restored, applied once', final?.state === 'discussed' && final.revision === target.revision + 3, final);
+
+    await H.rpc('disable');
+    await waitFor('H marks follow todo switch off', async () => (await marksRole(H)) === 'off', 90_000);
+    check('M6 switching todo sync off on H switches marks off there, marks kept locally', (await H.rpc('marks', conv)).length === 2, await H.rpc('marks', conv));
+  } finally {
+    for (const d of [H, R]) if (d.alive) await d.rpc('quit').catch(() => undefined);
+    await sleep(300);
+    for (const d of [H, R]) if (d.alive) await d.kill();
+    await world.relay.close();
+  }
+}
+
 async function main() {
   const temp = await mkdtemp(path.join(os.tmpdir(), 'cindy-shared-datasets-smoke-'));
   const bundle = path.join(temp, 'device.cjs');
   try {
     await buildDeviceBundle(bundle);
-    await mainWorld(bundle, temp);
-    await oldPeerOnlyWorld(bundle, temp);
+    if (process.env.SMOKE_ONLY !== 'marks') {
+      await mainWorld(bundle, temp);
+      await oldPeerOnlyWorld(bundle, temp);
+    }
+    await marksWorld(bundle, temp);
   } catch (error) {
     check('harness', false, String((error as Error).stack ?? error).slice(0, 1500));
   } finally {

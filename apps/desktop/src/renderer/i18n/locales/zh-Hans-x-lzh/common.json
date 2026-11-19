@@ -1,4 +1,29 @@
 {
+  "conversationMarks": {
+    "mark": "志",
+    "title": "志",
+    "entryAria": "志，{{count}} 则未议",
+    "groupOpen": "未议",
+    "groupDiscussed": "已议",
+    "me": "吾",
+    "yesterday": "昨 {{time}}",
+    "talkAboutThis": "且议此",
+    "markDiscussed": "标为已议",
+    "markOpen": "复为未议",
+    "jumpToSource": "往观原文",
+    "delete": "删此志",
+    "deleted": "志已删",
+    "undo": "撤回",
+    "empty": "尚无所志",
+    "saveFailed": "志未存，请再试",
+    "syncSynced": "已同",
+    "syncSyncing": "同之中",
+    "syncOffline": "离线",
+    "syncOfflinePending_one": "离线 · {{count}} 则待同",
+    "syncOfflinePending_other": "离线 · {{count}} 则待同",
+    "pending": "待同",
+    "backToConversation": "还于对话"
+  },
   "sharedTaskRecovery": {
     "title": "无法在原电脑上恢复任务",
     "description": "可以选择其他电脑或供应商，通过上下文交接继续。原消息保留，但切换不会迁移原电脑上的完整运行状态。",
@@ -19826,6 +19851,7 @@
     "deleteConfirm": "删此待办？",
     "empty": "此处暂无待办",
     "saveFailed": "保存未成，输入仍存。请再保存。",
+    "reorderFailed": "次序未存，请再试。",
     "loadFailed": "个人待办未能读取。",
     "conflict": "已在别处更新",
     "reloadVersion": "读取最新版本以覆盖保存",
@@ -19875,6 +19901,7 @@
     },
     "order": {
       "label": "组内之序",
+      "manual": "手排之序（可拖移）",
       "priority": "急者居前",
       "due": "期近者居前",
       "created": "新添者居前"

@@ -1,4 +1,29 @@
 {
+  "conversationMarks": {
+    "mark": "Markieren",
+    "title": "Markierungen",
+    "entryAria": "Markierungen, {{count}} nicht besprochen",
+    "groupOpen": "Nicht besprochen",
+    "groupDiscussed": "Besprochen",
+    "me": "Ich",
+    "yesterday": "Gestern {{time}}",
+    "talkAboutThis": "Darüber sprechen",
+    "markDiscussed": "Als besprochen markieren",
+    "markOpen": "Als nicht besprochen markieren",
+    "jumpToSource": "Zur ursprünglichen Nachricht",
+    "delete": "Markierung löschen",
+    "deleted": "Markierung gelöscht",
+    "undo": "Rückgängig",
+    "empty": "Noch keine Markierungen",
+    "saveFailed": "Die Markierung wurde nicht gespeichert. Versuche es erneut.",
+    "syncSynced": "Synchronisiert",
+    "syncSyncing": "Wird synchronisiert",
+    "syncOffline": "Offline",
+    "syncOfflinePending_one": "Offline · {{count}} wartet auf Synchronisierung",
+    "syncOfflinePending_other": "Offline · {{count}} warten auf Synchronisierung",
+    "pending": "Wartet auf Synchronisierung",
+    "backToConversation": "Zurück zur Unterhaltung"
+  },
   "sharedTaskRecovery": {
     "title": "Fortsetzen auf dem ursprünglichen Computer nicht möglich",
     "description": "Wähle einen anderen Computer oder Anbieter, um mit einer Kontextübergabe fortzufahren. Deine Nachrichten bleiben erhalten, der vollständige Ausführungszustand des ursprünglichen Computers wird jedoch nicht übertragen.",
@@ -19898,6 +19923,7 @@
     "deleteConfirm": "Dieses To-do löschen?",
     "empty": "Keine To-dos in dieser Ansicht",
     "saveFailed": "Speichern fehlgeschlagen. Ihre Eingabe bleibt erhalten. Erneut speichern.",
+    "reorderFailed": "Reihenfolge konnte nicht gespeichert werden. Bitte erneut versuchen.",
     "loadFailed": "Persönliche To-dos konnten nicht geladen werden.",
     "conflict": "Anderswo aktualisiert",
     "reloadVersion": "Neueste Version zum Überschreiben laden",
@@ -19947,6 +19973,7 @@
     },
     "order": {
       "label": "Reihenfolge in der Gruppe",
+      "manual": "Eigene Reihenfolge (ziehen)",
       "priority": "Höchste Priorität zuerst",
       "due": "Früheste Fälligkeit zuerst",
       "created": "Zuletzt hinzugefügt zuerst"
