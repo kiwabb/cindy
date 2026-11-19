@@ -696,6 +696,7 @@ import {
   handleDeviceLinkSystemResume,
   getControllerName,
   revokeController,
+  getSelfDeviceId,
 } from './device-link';
 import { closeSharedTasksBeforeLogout } from './device-link/sharedTaskRuntime.js';
 import { closeSharedTasksBeforeAccountHandover } from './device-link/sharedTaskAccountBoundary.js';
@@ -1283,6 +1284,11 @@ import {
 } from './scheduler-host/index.desktop.js';
 import { startPersonalTodoReminders } from './maker-ipc/personalTodoReminders.js';
 import { registerPersonalTodoSharedDataset } from './maker-ipc/personalTodoSharedDataset.js';
+import {
+  registerConversationMarksSharedDataset,
+  setConversationMarksSelfDeviceIdSource,
+  startConversationMarksFollow,
+} from './conversation-marks/access.js';
 import { startSharedDatasets } from './shared-datasets/runtime.js';
 import { voiceCallCoordinator } from './voice-conversation/callCoordinator.js';
 import { hasVoiceConversationLease } from './voice-conversation/lease.js';
@@ -10637,8 +10643,13 @@ app.on('ready', async () => {
   onQuit('personal-todo-reminders', () => personalTodoReminders.stop(), 'sync');
   // 共享数据集（多台电脑同步同一份数据）：没有注册数据集、或数据集未开启时不发任何请求、不起定时器。
   registerPersonalTodoSharedDataset();
+  // 对话标记：第二个共享数据集，跟随个人待办的同步开关与主力电脑。
+  setConversationMarksSelfDeviceIdSource(getSelfDeviceId);
+  registerConversationMarksSharedDataset();
   const stopSharedDatasets = startSharedDatasets();
   onQuit('shared-datasets', () => stopSharedDatasets(), 'sync');
+  const stopConversationMarksFollow = startConversationMarksFollow();
+  onQuit('conversation-marks-follow', () => stopConversationMarksFollow(), 'sync');
 
   // 挂起/锁屏时通知 renderer 释放语音输入的保活麦克风(用户已离开,再占着采集
   // 设备只剩隐私指示灯常亮和 idle-sleep assertion 的代价)。

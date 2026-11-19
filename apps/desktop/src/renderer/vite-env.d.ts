@@ -5162,6 +5162,17 @@ interface ElectronAPI {
       snapshot: () => Promise<import('../shared/learning').LearningSnapshot>;
       onChanged: (listener: () => void) => () => void;
     };
+    /** The owner's marks on conversation excerpts (trusted app renderer only). */
+    conversationMarks: {
+      list: (
+        scope: import('../shared/conversationMarks').ConversationMarkScope,
+      ) => Promise<import('../shared/conversationMarks').ConversationMark[]>;
+      update: (
+        update: import('../shared/conversationMarks').ConversationMarkUpdate,
+      ) => Promise<import('../shared/conversationMarks').ConversationMark>;
+      syncStatus: () => Promise<import('../shared/conversationMarks').ConversationMarkSyncStatus | null>;
+      onChanged: (listener: () => void) => () => void;
+    };
     personalTodos: {
       list: () => Promise<import('../shared/personalTodo').PersonalTodo[]>;
       update: (input: import('../shared/personalTodo').PersonalTodoUpdate) => Promise<import('../shared/personalTodo').PersonalTodo>;

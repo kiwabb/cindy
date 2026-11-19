@@ -1,6 +1,7 @@
 import { companionMemoryPreview, registerCompanionMemoryPreviewIpc } from '../../maker-ipc/companionMemoryPreview.js';
 import { registerBotPrivateFactIpc } from '../../maker-ipc/botPrivateFactIpc.js';
 import { registerPersonalTodoIpc, registerPersonalTodoSyncIpc } from '../../maker-ipc/personalTodoIpc.js';
+import { registerConversationMarksIpc } from '../../conversation-marks/ipc.js';
 import { registerLearningIpc } from '../../learning/learningIpc.js';
 import { emitSessionCreated } from './sessionCreatedBroadcast.js';
 import { isSubagentParentToolUseId } from '@cindy/maker-shared/message-render';
@@ -2889,6 +2890,8 @@ export function registerBotIpc(): void {
   }
   registerPersonalTodoIpc();
   registerPersonalTodoSyncIpc();
+  // The owner's own marks on conversation excerpts (local only, synced with personal todos).
+  registerConversationMarksIpc();
   // Read-only learning goals from tutor teammates' projects (Learning page, Today tab).
   registerLearningIpc();
   // Exact per-task responsibility IDs from the current owner, without message bodies.

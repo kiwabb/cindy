@@ -6190,6 +6190,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return () => ipcRenderer.removeListener('learning:changed', wrapped);
       },
     },
+    conversationMarks: {
+      list: (scope: import('../shared/conversationMarks').ConversationMarkScope) =>
+        ipcRenderer.invoke('conversation-marks:list', scope),
+      update: (update: import('../shared/conversationMarks').ConversationMarkUpdate) =>
+        ipcRenderer.invoke('conversation-marks:update', update),
+      syncStatus: () => ipcRenderer.invoke('conversation-marks:sync-status'),
+      onChanged: (listener: () => void) => {
+        const wrapped = () => listener();
+        ipcRenderer.on('conversation-marks:changed', wrapped);
+        return () => ipcRenderer.removeListener('conversation-marks:changed', wrapped);
+      },
+    },
     personalTodos: {
       list: () => ipcRenderer.invoke('local-db:personal-todos:list'),
       update: (input: import('../shared/personalTodo').PersonalTodoUpdate) => ipcRenderer.invoke('local-db:personal-todos:update', input),

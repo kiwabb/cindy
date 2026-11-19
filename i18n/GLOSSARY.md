@@ -470,6 +470,10 @@ Cindy Make 生成的本机定制应用成品。可与原版切换并沿用同一
 
 模型一次请求可容纳的 token 上限。自定义 Provider 的窗口编辑字段(#386)与用量/压缩相关文案使用;空间紧的 placeholder 可缩写为「上下文 / Context / コンテキスト / 컨텍스트」+ (tokens)。
 
+### Mark
+
+对话标记（docs/product-rules/conversation-marks.md，2026-11-19）：主人在对话里选中一段文字记下来，稍后逐点再聊。动词「标记」与名词同形；状态「未聊 / 已聊」，动作「就聊这点」。不要与 Mermaid 的「标注」（annotate）混用。
+
 ### Crash
 
 应用异常终止。此前只出现在内部日志里, 随日志上报进入用户可见文案, 因此登记。ko 取音译「크래시」而非「충돌」——后者在韩语里更常指冲突/碰撞(如合并冲突), 会与 merge conflict 语境混读。proposed。
