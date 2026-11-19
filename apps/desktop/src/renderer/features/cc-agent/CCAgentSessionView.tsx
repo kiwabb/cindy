@@ -266,6 +266,7 @@ import { openBackgroundTasksTab } from '@/features/right-sidebar/lib/openBackgro
 import { LearningTodayTabAutoOpen } from '@/features/learning/learningTodayAutoOpen';
 import { useBoundGoal } from '@/features/learning/LearningTodayTab';
 import { createConversationMark, useConversationMarks } from '@/features/conversation-marks/conversationMarksClient';
+import { addConversationMarksTabQuietly } from '@/features/conversation-marks/openConversationMarksTab';
 import type { ConversationMarkScope } from '../../../shared/conversationMarks';
 import { openSubagentsTab } from '@/features/right-sidebar/lib/openSubagentsTab';
 import { BotAvatar } from '@/features/bots/BotAvatar';
@@ -1185,6 +1186,11 @@ function CCAgentSessionContent({
         : null,
     [isBotConversation, sessionId, readOnly, rightSidebarDeviceLinkDeviceId],
   );
+  // A tutor conversation (bound to an active learning goal, on this computer) shows marks beside
+  // 今天 instead of in the top bar.
+  const tutorGoal = useBoundGoal(sessionId ?? '');
+  const isTutorConversation =
+    Boolean(tutorGoal && tutorGoal.status === 'active') && rightSidebarDeviceLinkDeviceId === null && !session?.remoteHostId;
   const { marks: conversationMarks } = useConversationMarks(conversationMarkScope);
   const markAuthorName = botChatIdentity?.name;
   const conversationMarksBinding = useMemo(
@@ -1203,16 +1209,13 @@ function CCAgentSessionContent({
                 messageCreatedAt: Number.isFinite(createdAt) ? createdAt : Date.now(),
                 ...(!fromOwner && markAuthorName ? { authorName: markAuthorName } : {}),
               });
+              // A tutor's marks live beside 今天 only; bring the tab back if it was closed.
+              if (isTutorConversation) void addConversationMarksTabQuietly(conversationMarkScope.sessionId).catch(() => undefined);
             },
           }
         : undefined,
-    [conversationMarkScope, conversationMarks, markAuthorName],
+    [conversationMarkScope, conversationMarks, markAuthorName, isTutorConversation],
   );
-  // A tutor conversation (bound to an active learning goal, on this computer) shows marks beside
-  // 今天 instead of in the top bar.
-  const tutorGoal = useBoundGoal(sessionId ?? '');
-  const isTutorConversation =
-    Boolean(tutorGoal && tutorGoal.status === 'active') && rightSidebarDeviceLinkDeviceId === null && !session?.remoteHostId;
   // Every side chat entry uses the sidebar menu's gate, with the resolved origin
   // so shared-task guests fail it before the list snapshot carries it (#9136).
   // null = available; otherwise the reason shown by /side.

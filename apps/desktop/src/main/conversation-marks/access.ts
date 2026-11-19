@@ -76,22 +76,26 @@ export function notifyConversationMarksChanged(): void {
   }
 }
 
-let selfDeviceIdSource: () => string | null = () => null;
+let selfDeviceIdSource: () => readonly (string | null | undefined)[] = () => [];
 
 /**
- * Startup wires this computer's device-link id (null before the first connection). Injected rather
- * than imported so this module stays loadable without the device-link runtime.
+ * Startup wires this computer's ids, preferred first: the device-link id (known once connected)
+ * and the sign-in device id (always known; the self-hosted relay uses it as the device-link id and
+ * the renderer already compares it with other computers' ids). Injected rather than imported so
+ * this module stays loadable without the device-link runtime.
  */
-export function setConversationMarksSelfDeviceIdSource(source: () => string | null): void {
+export function setConversationMarksSelfDeviceIdSource(source: () => readonly (string | null | undefined)[]): void {
   selfDeviceIdSource = source;
 }
 
-/** This computer's device id as other computers know it (null before the first connection). */
-export const selfDeviceId = (): string | null => selfDeviceIdSource();
+const selfDeviceIds = (): string[] => [...new Set(selfDeviceIdSource().filter((id): id is string => !!id))];
+
+/** The id a mark made here is stamped with (null only when no id is known at all). */
+export const selfDeviceId = (): string | null => selfDeviceIds()[0] ?? null;
 
 export async function listConversationMarks(scope: ConversationMarkScope): Promise<ConversationMark[]> {
   const { store, assertCurrent } = openConversationMarkStore();
-  const marks = await store.list(scope, selfDeviceId());
+  const marks = await store.list(scope, selfDeviceIds());
   assertCurrent();
   return marks;
 }

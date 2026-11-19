@@ -14,8 +14,13 @@ import { withCrossProcessLock } from '../device-link/crossProcessLock.js';
 
 /** Deleted marks stay as tombstones this long (undo, and replicas learning about the delete). */
 export const MARK_TOMBSTONE_MS = 30 * 24 * 60 * 60 * 1000;
-/** Live marks per account; keeps the whole set well inside one shared-dataset snapshot. */
+/** Live marks per account. */
 export const MARK_LIVE_LIMIT = 1500;
+/**
+ * The serialized file (tombstones included) a new mark may not push past: the shared-datasets
+ * layer sends the whole set in one snapshot capped at 1.5 MB, so marks stay well inside it.
+ */
+export const MARK_STORE_MAX_BYTES = 1_200_000;
 
 export interface StoredConversationMark extends ConversationMark {
   creationRequestId: string;
@@ -113,12 +118,14 @@ export function projectConversationMark(item: StoredConversationMark): Conversat
   return mark;
 }
 
-/** A mark belongs to the conversation (computer, session); marks from before the computer was known match it on its own computer. */
-export function markInScope(item: ConversationMark, scope: ConversationMarkScope, selfDeviceId: string | null): boolean {
+/**
+ * A mark belongs to the conversation (computer, session). A conversation on this computer matches
+ * marks stamped with any of this computer's ids, and marks written before it knew its id.
+ */
+export function markInScope(item: ConversationMark, scope: ConversationMarkScope, selfDeviceIds: readonly string[]): boolean {
   if (item.sessionId !== scope.sessionId) return false;
-  const host = scope.hostDeviceId ?? selfDeviceId;
-  if (!item.hostDeviceId) return !scope.hostDeviceId;
-  return item.hostDeviceId === host;
+  if (scope.hostDeviceId) return item.hostDeviceId === scope.hostDeviceId;
+  return !item.hostDeviceId || selfDeviceIds.includes(item.hostDeviceId);
 }
 
 /**
@@ -182,6 +189,7 @@ export function createConversationMarkStore(file: string, assertCurrent: () => v
         return existing;
       }
       if (state.items.filter((item) => !item.deletedAt).length >= MARK_LIVE_LIMIT) throw new MarkError('LIMIT');
+      if (Buffer.byteLength(JSON.stringify(state.items)) >= MARK_STORE_MAX_BYTES) throw new MarkError('LIMIT');
       const item: StoredConversationMark = {
         id: `mark:${randomUUID()}`,
         revision: 1,
@@ -224,10 +232,10 @@ export function createConversationMarkStore(file: string, assertCurrent: () => v
     async readAll(): Promise<StoredConversationMark[]> {
       return (await read()).items;
     },
-    async list(scope: ConversationMarkScope, selfDeviceId: string | null): Promise<ConversationMark[]> {
+    async list(scope: ConversationMarkScope, selfDeviceIds: readonly string[]): Promise<ConversationMark[]> {
       const { items } = await read();
       return items
-        .filter((item) => !item.deletedAt && markInScope(item, scope, selfDeviceId))
+        .filter((item) => !item.deletedAt && markInScope(item, scope, selfDeviceIds))
         .map(projectConversationMark);
     },
     /** Creation (no `id`) or a state change; throws MarkError on refusal. */

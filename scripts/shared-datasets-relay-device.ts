@@ -153,7 +153,7 @@ function ports(): SharedDatasetsPorts {
 function startEngine() {
   registerPersonalTodoSharedDataset();
   // Conversation marks: the second dataset, following the todo switch (what bootstrap-electron wires).
-  setConversationMarksSelfDeviceIdSource(() => DEVICE_ID);
+  setConversationMarksSelfDeviceIdSource(() => [DEVICE_ID]);
   registerConversationMarksSharedDataset();
   engine = createSharedDatasetsEngine(ports(), sharedDatasetRegistry);
   installSharedDatasetsEngine(engine);

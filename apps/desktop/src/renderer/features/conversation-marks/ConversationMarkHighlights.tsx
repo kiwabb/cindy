@@ -12,7 +12,25 @@ import type { ConversationMark } from '../../../shared/conversationMarks';
 export const MARK_HIGHLIGHT = 'cindy-conversation-mark';
 export const MARK_DISCUSSED_HIGHLIGHT = 'cindy-conversation-mark-discussed';
 
-const collapse = (text: string) => text.replace(/\s+/g, ' ').trim();
+/**
+ * The stored excerpt carries the line breaks the selection pill added between blocks (paragraphs,
+ * list items) that the DOM text does not have, so excerpt and DOM are compared without whitespace.
+ */
+const squash = (text: string) => text.replace(/\s+/g, '');
+
+/** Finds `wanted` in `text` ignoring whitespace; returns offsets into the original `text`. */
+function findIgnoringWhitespace(text: string, wanted: string): { start: number; end: number } | null {
+  const positions: number[] = [];
+  let flat = '';
+  for (let i = 0; i < text.length; i += 1) {
+    if (/\s/.test(text[i])) continue;
+    positions.push(i);
+    flat += text[i];
+  }
+  const at = flat.indexOf(wanted);
+  if (at < 0) return null;
+  return { start: positions[at], end: positions[at + wanted.length - 1] + 1 };
+}
 
 /** Text nodes of `body` in document order with their starting offset (the same walk as Range#toString). */
 function textNodesOf(body: HTMLElement): { nodes: Text[]; starts: number[]; text: string } {
@@ -53,14 +71,13 @@ function rangeAt(index: ReturnType<typeof textNodesOf>, start: number, end: numb
 export function locateMarkRange(message: HTMLElement, mark: Pick<ConversationMark, 'quote' | 'start' | 'end'>): Range | null {
   const body = markBodyOf(message);
   const index = textNodesOf(body);
-  const wanted = collapse(mark.quote.replace(/…$/, ''));
+  const wanted = squash(mark.quote.replace(/…$/, ''));
   if (!wanted) return null;
   if (mark.start !== undefined && mark.end !== undefined && mark.end <= index.text.length) {
-    if (collapse(index.text.slice(mark.start, mark.end)) === wanted) return rangeAt(index, mark.start, mark.end);
+    if (squash(index.text.slice(mark.start, mark.end)) === wanted) return rangeAt(index, mark.start, mark.end);
   }
-  const at = index.text.indexOf(mark.quote.replace(/…$/, ''));
-  if (at >= 0) return rangeAt(index, at, at + mark.quote.replace(/…$/, '').length);
-  return null;
+  const found = findIgnoringWhitespace(index.text, wanted);
+  return found ? rangeAt(index, found.start, found.end) : null;
 }
 
 export function ConversationMarkHighlights({

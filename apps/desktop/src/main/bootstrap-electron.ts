@@ -10644,7 +10644,7 @@ app.on('ready', async () => {
   // 共享数据集（多台电脑同步同一份数据）：没有注册数据集、或数据集未开启时不发任何请求、不起定时器。
   registerPersonalTodoSharedDataset();
   // 对话标记：第二个共享数据集，跟随个人待办的同步开关与主力电脑。
-  setConversationMarksSelfDeviceIdSource(getSelfDeviceId);
+  setConversationMarksSelfDeviceIdSource(() => [getSelfDeviceId(), authManager.getDeviceId()]);
   registerConversationMarksSharedDataset();
   const stopSharedDatasets = startSharedDatasets();
   onQuit('shared-datasets', () => stopSharedDatasets(), 'sync');

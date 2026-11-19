@@ -174,8 +174,13 @@ describe('conversation marks as a shared dataset', () => {
       new MarkError('CONFLICT'),
     );
     const gone = await store.update({ id: first.id, expectedRevision: done.revision, operation: 'delete' });
-    expect(await store.list({ sessionId: 'session-1' }, null)).toEqual([]);
+    expect(await store.list({ sessionId: 'session-1' }, [])).toEqual([]);
     await store.update({ id: first.id, expectedRevision: gone.revision, operation: 'restore' });
-    expect(await store.list({ sessionId: 'session-1' }, null)).toHaveLength(1);
+    expect(await store.list({ sessionId: 'session-1' }, [])).toHaveLength(1);
+    // Stamped with this computer's device-link id in an earlier run; listed again before the
+    // connection is back, when only the sign-in id is known (both name this computer).
+    await store.update(creation('stamped', { sessionId: 'session-2', hostDeviceId: 'link-id' }));
+    expect(await store.list({ sessionId: 'session-2' }, ['auth-id', 'link-id'])).toHaveLength(1);
+    expect(await store.list({ sessionId: 'session-2', hostDeviceId: 'other' }, ['auth-id'])).toHaveLength(0);
   });
 });
