@@ -10584,6 +10584,8 @@
       "search": "寻记忆",
       "empty": "尚无记忆",
       "noResults": "未得相关记忆",
+      "privateWorkspaceConflict": "此工作区亦为他伴所用，私有记忆暂不可读。请各伴分用工作区，再试。",
+      "privateIsolationFailed": "私有记忆存处未明，已止读取。请查此伴记忆目录是否迁移或链接别处，再试。",
       "loadFailed": "不能读记忆",
       "types": {
         "user": "关于君",

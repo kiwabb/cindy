@@ -46,8 +46,8 @@ it('resolved owner fence rejects a late change before service returns content',a
 
 it('owner session metadata cannot hide shared workspace behind another bot symlink',()=>{
  const f=setup();const alias=path.join(f.root,'other-bot-workspace');fs.symlinkSync(f.workspace,alias);
- expect(()=>assertExclusiveBotWorkspace(f.workspace,'fixture-session',[{id:'other',workingDir:alias,projectDir:null}])).toThrow('SHARED_WORKSPACE');
- expect(()=>assertExclusiveBotWorkspace(f.workspace,'fixture-session',[{id:'fixture-session',workingDir:f.workspace,projectDir:null}])).not.toThrow();
+ expect(()=>assertExclusiveBotWorkspace(f.workspace,f.bot,[{id:'other',botId:'other-bot',workingDir:alias,projectDir:null}])).toThrow('SHARED_WORKSPACE');
+ expect(()=>assertExclusiveBotWorkspace(f.workspace,f.bot,[{id:'fixture-session',botId:f.bot,workingDir:f.workspace,projectDir:null}])).not.toThrow();
 });
 
 it.each([false,true])('ordinary project service never reroutes when companion selection=%s',async enabled=>{
@@ -92,4 +92,31 @@ it('deleting one bot does not invalidate another bot store fence', async()=>{
  const f=setup(); const active=await f.access.resolveCompanion(f.bot);
  f.access.invalidate('other-bot');expect(()=>active.owner.assertCurrent()).not.toThrow();
  f.access.invalidate(f.bot);expect(()=>active.owner.assertCurrent()).toThrow('INVALIDATED');
+});
+
+// Exercise the production guard through both consumers, not an always-allow stub.
+it.each([false, true])('own linked and ordinary project tasks allow private inspection, preview=%s', async enabled => {
+ const f=setup(); f.owner.privateCompanion=enabled;
+ f.owner.assertExclusiveWorkspace.mockImplementation(async()=>assertExclusiveBotWorkspace(f.workspace,f.bot,[
+  {id:'fixture-session',botId:f.bot,workingDir:f.workspace,projectDir:null},
+  {id:'own-delegation',botId:f.bot,workingDir:f.workspace,projectDir:f.workspace},
+  {id:'ordinary-project-task',botId:null,workingDir:f.workspace,projectDir:f.workspace},
+ ]));
+ expect(await f.access.privateService.list(f.bot)).toHaveLength(1);
+ expect(await f.access.privateService.list(f.bot,'fixture')).toHaveLength(1);
+ if(enabled) expect((await f.access.resolveCompanion(f.bot)).store).toBe(f.store);
+ else await expect(f.access.resolveCompanion(f.bot)).rejects.toThrow('PRIVATE_SELECTION_REQUIRED');
+ expect(f.getStore.mock.calls.every(([scope])=>scope==='bot:fixture')).toBe(true);
+});
+it.each(['workingDir','projectDir'] as const)('another bot sharing %s blocks inspection and automatic access before store opens', async field => {
+ const f=setup();
+ f.owner.assertExclusiveWorkspace.mockImplementation(async()=>assertExclusiveBotWorkspace(f.workspace,f.bot,[
+  {id:'other-session',botId:'other-bot',workingDir:null,projectDir:null,[field]:f.workspace},
+ ]));
+ await expect(f.access.privateService.list(f.bot)).rejects.toThrow('COMPANION_SHARED_WORKSPACE');
+ await expect(f.access.resolveCompanion(f.bot)).rejects.toThrow('COMPANION_SHARED_WORKSPACE');
+ await expect(f.access.privateService.read(f.bot,'user_fixture.md')).rejects.toThrow('COMPANION_SHARED_WORKSPACE');
+ await expect(f.access.privateService.update({botId:f.bot,filename:'user_fixture.md',title:'fixture',body:'fixture',expectedUpdatedAt:'2026-11-17'})).rejects.toThrow('COMPANION_SHARED_WORKSPACE');
+ await expect(f.access.privateService.delete({botId:f.bot,filename:'user_fixture.md',expectedUpdatedAt:'2026-11-17'})).rejects.toThrow('COMPANION_SHARED_WORKSPACE');
+ expect(f.getStore).not.toHaveBeenCalled();
 });

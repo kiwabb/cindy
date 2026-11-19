@@ -10629,6 +10629,8 @@
       "search": "Erinnerungen durchsuchen",
       "empty": "Noch keine Erinnerungen",
       "noResults": "Keine passenden Erinnerungen",
+      "privateWorkspaceConflict": "Der private Speicher kann nicht geöffnet werden, da ein anderer Partner diesen Arbeitsbereich nutzt. Verwende für jeden Partner einen eigenen Arbeitsbereich und versuche es erneut.",
+      "privateIsolationFailed": "Der Speicherort des privaten Speichers konnte nicht geprüft werden. Prüfe, ob der Speicherordner dieses Partners verschoben oder mit einem anderen Ort verknüpft wurde, und versuche es erneut.",
       "loadFailed": "Erinnerungen konnten nicht geladen werden",
       "types": {
         "user": "Über dich",

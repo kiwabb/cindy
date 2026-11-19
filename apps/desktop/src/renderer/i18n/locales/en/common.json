@@ -10629,6 +10629,8 @@
       "search": "Search memories",
       "empty": "No memories yet",
       "noResults": "No matching memories",
+      "privateWorkspaceConflict": "Private memory cannot be opened because another teammate uses this workspace. Give each teammate its own workspace, then retry.",
+      "privateIsolationFailed": "Private memory cannot be opened because its storage location could not be verified. Check that this teammate’s memory folder has not been moved or linked to another location, then retry.",
       "loadFailed": "Memories couldn't be loaded",
       "types": {
         "user": "About you",

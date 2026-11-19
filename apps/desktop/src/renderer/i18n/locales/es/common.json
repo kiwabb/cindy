@@ -10713,6 +10713,8 @@
       "search": "buscar recuerdos",
       "empty": "Aún no hay recuerdos",
       "noResults": "No hay recuerdos coincidentes",
+      "privateWorkspaceConflict": "No se puede abrir la memoria privada porque otro compañero usa este espacio de trabajo. Asigna un espacio propio a cada compañero y vuelve a intentarlo.",
+      "privateIsolationFailed": "No se pudo verificar la ubicación de la memoria privada. Comprueba que la carpeta de memoria de este compañero no se haya movido ni enlazado a otra ubicación y vuelve a intentarlo.",
       "loadFailed": "No se pudieron cargar los recuerdos",
       "types": {
         "user": "Sobre ti",

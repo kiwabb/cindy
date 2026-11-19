@@ -183,9 +183,10 @@ export function getBotMemoryAccess(): ReturnType<typeof createBotMemoryAccess> {
       };
       return { root: owner.userDataDir, canonicalSessionId: row.canonicalSessionId, projectMode, privateCompanion, assertCurrent: owner.assertCurrent, assertCompanionSelected,
         assertExclusiveWorkspace: async (workspace: string) => {
-          const users = await getDbClient().drizzle.select({ id: sessions.id, workingDir: sessions.workingDir, projectDir: sessions.projectDir }).from(sessions);
+          const users = await getDbClient().drizzle.select({ id: sessions.id, botId: botSessionLinks.botId, workingDir: sessions.workingDir, projectDir: sessions.projectDir })
+            .from(sessions).leftJoin(botSessionLinks, eq(botSessionLinks.sessionId, sessions.id));
           owner.assertCurrent();
-          assertExclusiveBotWorkspace(workspace, row.canonicalSessionId!, users);
+          assertExclusiveBotWorkspace(workspace, botId, users);
         } };
 
     },
