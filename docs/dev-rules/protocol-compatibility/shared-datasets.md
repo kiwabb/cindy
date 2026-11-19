@@ -31,6 +31,23 @@
 - 条目带过去（加入、降级）：已删除不带；已完成与稍后（`deferredUntil` 仍在未来）在创建后立即应用对应操作，幂等重试不重复。
 - 手机的 `personal-todos` 远程资源不变（字段白名单不变），连上哪台电脑读写哪台电脑的这份清单；副本上手机的写入进待发队列并立即反映在本机镜像。
 
+## 对话标记数据集（2026-11-19）
+
+- 数据集 id `conversation-marks`，`schemaVersion: 1`；条目是 `conversation-marks.v1.json` 里的原始标记（含删除墓碑），
+  没有 `extras`，也没有只在本机有效的字段：标记用「对话所在电脑 id + 任务 id + 消息 `clientId`」指认对话与消息，
+  这三者在两台电脑上相同（远程查看不改写 id）。本机还不知道自己 id 时写下的标记，在加入／降级带过去时由
+  `creationUpdate` 补上本机 id。
+- 接入只提供一个 `SharedDatasetDefinition`（`main/conversation-marks/dataset.ts`），同步层（`shared-datasets/`、
+  `packages/device-link`）未改动，channel、动作与帧格式都不变；回归见
+  `main/conversation-marks/__tests__/conversationMarksSync.test.ts`（真实存储 + 两台引擎）。
+- 写入：新建带 `creationRequestId`（幂等）；修改只有 `discuss / reopen / delete / restore` 四种操作，必须带
+  `expectedRevision`。带过去的已聊标记在新建后立即 `discuss`（私有标记 `carryDiscussed`，不入存储）。
+- 没有单独开关：跟随 `personal-todos` 的角色（开／关；本机成为待办主力电脑时也接管标记），由
+  `conversation-marks/access.ts` 在两者状态变化时与每 60 秒读本地状态对齐一次（不发请求）。
+- 冲突（两台电脑改了同一条）自动按主力电脑为准（`resolveConflict … 'theirs'`），界面不列冲突。
+- 旧版对端没有这个数据集：`caps` 里不列出它，新端不把旧端当作标记的主力电脑或副本；旧端不受影响。
+  回滚到旧版本时 `conversation-marks.v1.json` 与 `shared-datasets/conversation-marks/` 留在原处不再读取。
+
 ## 兼容矩阵
 
 | 主力／发起方 × 对端 | 行为 |

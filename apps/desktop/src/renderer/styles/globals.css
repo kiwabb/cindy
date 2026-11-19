@@ -1852,6 +1852,35 @@ body.resizing-pane [data-ghost-webview] {
   }
 }
 
+/* Conversation marks (DESIGN.md §2 "Search matches" — marks use, 2026-11-19): the owner's
+   marked excerpts inside chat messages, painted with the CSS Custom Highlight API
+   (features/conversation-marks/ConversationMarkHighlights.tsx). Not-yet-discussed marks take the
+   ordinary search-match gold, toned down so a long excerpt stays readable, plus a same-family
+   underline as the non-color cue; discussed marks fall back to the neutral chip fill with a
+   neutral underline. Text keeps its own color in both modes. */
+:root {
+  --conversation-mark-bg-alpha: 0.38;
+  --conversation-mark-line-alpha: 0.75;
+}
+.dark {
+  --conversation-mark-bg-alpha: 0.9;
+  --conversation-mark-line-alpha: 0.55;
+}
+::highlight(cindy-conversation-mark) {
+  background-color: hsl(var(--search-match-bg) / var(--conversation-mark-bg-alpha));
+  text-decoration: underline;
+  text-decoration-color: hsl(var(--search-match-active-bg) / var(--conversation-mark-line-alpha));
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
+::highlight(cindy-conversation-mark-discussed) {
+  background-color: var(--surface-chip);
+  text-decoration: underline;
+  text-decoration-color: var(--text-placeholder);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
+
 /* FileBodyView Ctrl+F — local search highlight inside doc preview.
    Two states:
      .doc-search-mark              → normal match

@@ -89,6 +89,7 @@ import {
 } from '@/lib/rsbWindowTransitions';
 import { routeSidebarCommand } from '@/features/right-sidebar/lib/detachedSidebarRouting';
 import { openTerminalFromShortcut } from '@/features/right-sidebar/lib/openTerminalShortcut';
+import { subscribeRightSidebarFill } from '@/features/right-sidebar/lib/sidebarFillRequests';
 import { executeSidebarCommand } from '@/features/right-sidebar/lib/executeSidebarCommand';
 import { openUrlInSidebarBrowser } from '@/features/right-sidebar/lib/openInSidebarBrowser';
 import { useSidebarResize } from '@/hooks/useSidebarResize';
@@ -1090,6 +1091,8 @@ export function MainLayout() {
   const handleMaximizeRightSidebar = useCallback(() => {
     setIsRightSidebarMaximized((v) => !v);
   }, []);
+  // A tab (conversation marks in a narrow window) can ask to fill the window and to give it back.
+  useEffect(() => subscribeRightSidebarFill((fill) => setIsRightSidebarMaximized(fill)), []);
   // 左 / 上 / 下边页签组:按「组里有没有可见页签」注册 / 注销 pane,并保证树里有它。
   useTabGroupPanes({
     sessionId: rightSidebarSessionId,

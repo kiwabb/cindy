@@ -264,6 +264,10 @@ import {
 } from '@/lib/makerChatStore';
 import { openBackgroundTasksTab } from '@/features/right-sidebar/lib/openBackgroundTasksTab';
 import { LearningTodayTabAutoOpen } from '@/features/learning/learningTodayAutoOpen';
+import { useBoundGoal } from '@/features/learning/LearningTodayTab';
+import { createConversationMark, useConversationMarks } from '@/features/conversation-marks/conversationMarksClient';
+import { addConversationMarksTabQuietly } from '@/features/conversation-marks/openConversationMarksTab';
+import type { ConversationMarkScope } from '../../../shared/conversationMarks';
 import { openSubagentsTab } from '@/features/right-sidebar/lib/openSubagentsTab';
 import { BotAvatar } from '@/features/bots/BotAvatar';
 import { BotSessionContentHeaderRegistration } from '@/features/bots/BotSessionContentHeader';
@@ -1172,6 +1176,46 @@ function CCAgentSessionContent({
   // 冷启动 / bootstrap 竞态期间宁可暂时禁用系统文件打开，也不能把被控端 file:// 交给控制端。
   const rightSidebarDeviceLinkDeviceId =
     remoteDeviceId ?? session?.deviceLinkDeviceId ?? (session ? null : undefined);
+  // Conversation marks (teammate conversations): selected text can be marked and the 标记 tab lists
+  // them. A conversation on another computer keeps its marks here under that computer's id.
+  const isBotConversation = Boolean(botChatIdentity);
+  const conversationMarkScope = useMemo<ConversationMarkScope | null>(
+    () =>
+      isBotConversation && sessionId && !readOnly && rightSidebarDeviceLinkDeviceId !== undefined
+        ? { sessionId, hostDeviceId: rightSidebarDeviceLinkDeviceId }
+        : null,
+    [isBotConversation, sessionId, readOnly, rightSidebarDeviceLinkDeviceId],
+  );
+  // A tutor conversation (bound to an active learning goal, on this computer) shows marks beside
+  // 今天 instead of in the top bar.
+  const tutorGoal = useBoundGoal(sessionId ?? '');
+  const isTutorConversation =
+    Boolean(tutorGoal && tutorGoal.status === 'active') && rightSidebarDeviceLinkDeviceId === null && !session?.remoteHostId;
+  const { marks: conversationMarks } = useConversationMarks(conversationMarkScope);
+  const markAuthorName = botChatIdentity?.name;
+  const conversationMarksBinding = useMemo(
+    () =>
+      conversationMarkScope
+        ? {
+            marks: conversationMarks,
+            onMark: (selection: { text: string; messageClientId: string; start?: number; end?: number }) => {
+              const message = makerChatStore
+                .getSnapshot(conversationMarkScope.sessionId)
+                .messages.find((candidate) => candidate.clientId === selection.messageClientId);
+              const createdAt = message?.createdAt ? Date.parse(message.createdAt) : Number.NaN;
+              const fromOwner = message?.role === 'user';
+              void createConversationMark(conversationMarkScope, selection, {
+                authorRole: fromOwner ? 'user' : 'assistant',
+                messageCreatedAt: Number.isFinite(createdAt) ? createdAt : Date.now(),
+                ...(!fromOwner && markAuthorName ? { authorName: markAuthorName } : {}),
+              });
+              // A tutor's marks live beside 今天 only; bring the tab back if it was closed.
+              if (isTutorConversation) void addConversationMarksTabQuietly(conversationMarkScope.sessionId).catch(() => undefined);
+            },
+          }
+        : undefined,
+    [conversationMarkScope, conversationMarks, markAuthorName, isTutorConversation],
+  );
   // Every side chat entry uses the sidebar menu's gate, with the resolved origin
   // so shared-task guests fail it before the list snapshot carries it (#9136).
   // null = available; otherwise the reason shown by /side.
@@ -5560,6 +5604,7 @@ function CCAgentSessionContent({
       historyVisibleAfter={session?.source === 'side-chat' ? new Date(session.createdAt).getTime() : undefined}
       onAskInSideChat={!readOnly && sessionId && !sideChatBlockedKey
         ? (quote) => openSideChatTab(sessionId, { quote }) : undefined}
+      conversationMarks={conversationMarksBinding}
       cindyMakeSessionId={session?.source === 'cindy-make' ? sessionId : undefined}
       cindyMakeCompletionInComposer={session?.source === 'cindy-make' && (remoteMakeCards.supported || (!remoteDeviceId && !readOnly && typeof window.electronAPI.cindyMakeTest === 'function'))}
       historyLoaded={historyLoaded}
@@ -5617,7 +5662,10 @@ function CCAgentSessionContent({
         // 伙伴对话不是用户经营的任务:它拿的是「跟谁说话 + 进 TA 的设置」,
         // 不是重命名/置顶/归档/导出那一套任务菜单。
         botChatIdentity ? (
-          <BotSessionContentHeaderRegistration bot={botChatIdentity} />
+          <BotSessionContentHeaderRegistration
+            bot={botChatIdentity}
+            marks={isTutorConversation ? null : conversationMarkScope}
+          />
         ) : (
           <SessionContentHeaderRegistration
             session={session}

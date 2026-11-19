@@ -39,7 +39,8 @@ export type BuiltinTabKindId =
   /** 任务页签(跟对话):承载插件的 taskView 页面,存在各任务自己的页签桶里。 */
   | 'plugin-task'
   /** 导师对话的「今天」:绑定了学习目标的本机对话自动加上(features/learning)。 */
-  | 'learning-today';
+  | 'learning-today'
+  | 'conversation-marks';
 export type TabKindId = BuiltinTabKindId | `ghost:${string}`;
 
 /** 一个 tab 运行时实例。`state` 由各 plugin 自管理结构 + 序列化,壳子只搬运。 */

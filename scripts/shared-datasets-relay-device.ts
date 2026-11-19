@@ -48,6 +48,15 @@ import {
   writePersonalTodo,
 } from '../apps/desktop/src/main/maker-ipc/personalTodoAccess';
 import { syncSharedDatasetNow } from '../apps/desktop/src/main/shared-datasets/api';
+import {
+  listConversationMarks,
+  readConversationMarkSyncStatus,
+  registerConversationMarksSharedDataset,
+  setConversationMarksSelfDeviceIdSource,
+  startConversationMarksFollow,
+  writeConversationMark,
+} from '../apps/desktop/src/main/conversation-marks/access';
+import { getSharedDatasetRole } from '../apps/desktop/src/main/shared-datasets/api';
 
 const env = (name: string) => process.env[name] ?? '';
 const DEVICE_ID = env('SMOKE_DEVICE_ID');
@@ -143,6 +152,9 @@ function ports(): SharedDatasetsPorts {
 
 function startEngine() {
   registerPersonalTodoSharedDataset();
+  // Conversation marks: the second dataset, following the todo switch (what bootstrap-electron wires).
+  setConversationMarksSelfDeviceIdSource(() => [DEVICE_ID]);
+  registerConversationMarksSharedDataset();
   engine = createSharedDatasetsEngine(ports(), sharedDatasetRegistry);
   installSharedDatasetsEngine(engine);
   setSharedDatasetsRemoteHandler({
@@ -152,6 +164,7 @@ function startEngine() {
     },
   });
   void engine.resume().catch(() => undefined);
+  startConversationMarksFollow();
 }
 
 wireInboundDispatch(client);
@@ -248,6 +261,28 @@ const commands: Record<string, (args: any) => Promise<unknown>> = {
   },
   async counters() {
     return counters;
+  },
+  /** Conversation marks of one conversation (host computer + session), as the panel lists them. */
+  async marks(args: { sessionId: string; hostDeviceId?: string }) {
+    return listConversationMarks({ sessionId: args.sessionId, hostDeviceId: args.hostDeviceId ?? null });
+  },
+  async markAdd(args: { sessionId: string; hostDeviceId?: string; messageClientId: string; quote: string }) {
+    return writeConversationMark({
+      creationRequestId: `m${randomUUID().replace(/-/g, '')}`,
+      sessionId: args.sessionId,
+      ...(args.hostDeviceId ? { hostDeviceId: args.hostDeviceId } : {}),
+      messageClientId: args.messageClientId,
+      messageCreatedAt: 1_700_000_000_000,
+      authorRole: 'assistant',
+      authorName: 'Teammate',
+      quote: args.quote,
+    });
+  },
+  async markOp(args: { id: string; expectedRevision: number; operation: 'discuss' | 'reopen' | 'delete' | 'restore' }) {
+    return writeConversationMark(args);
+  },
+  async marksStatus() {
+    return { role: await getSharedDatasetRole('conversation-marks'), line: await readConversationMarkSyncStatus() };
   },
   /** Disconnects like a dead link (process and local writes stay alive). */
   async block() {

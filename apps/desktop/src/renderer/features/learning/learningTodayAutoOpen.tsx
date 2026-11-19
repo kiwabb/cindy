@@ -6,11 +6,12 @@ import { useEffect } from 'react';
 
 import { addTab, ensureHydrated, getBucket } from '@/features/right-sidebar/store';
 import { LEARNING_TODAY_TAB_KIND, useBoundGoal } from './LearningTodayTab';
+import { addConversationMarksTabQuietly } from '@/features/conversation-marks/openConversationMarksTab';
 
 const autoOpened = new Set<string>();
 
 /**
- * Adds the Today tab (without focusing it or opening the sidebar) the first time this run a
+ * Adds the Today tab and the marks tab beside it (without focusing them or opening the sidebar) the first time this run a
  * conversation on this computer turns out to be bound to an active learning goal. Closing the tab
  * keeps it closed until the next launch.
  */
@@ -31,8 +32,11 @@ export function LearningTodayTabAutoOpen({
     autoOpened.add(sessionId);
     void (async () => {
       await ensureHydrated(sessionId);
-      if (getBucket(sessionId).tabs.some((tab) => tab.kind === LEARNING_TODAY_TAB_KIND)) return;
-      await addTab(sessionId, LEARNING_TODAY_TAB_KIND, {}, { activate: false });
+      if (!getBucket(sessionId).tabs.some((tab) => tab.kind === LEARNING_TODAY_TAB_KIND)) {
+        await addTab(sessionId, LEARNING_TODAY_TAB_KIND, {}, { activate: false });
+      }
+      // The tutor's marks sit right beside 今天 (ordinary teammate chats open them from the top bar).
+      await addConversationMarksTabQuietly(sessionId);
     })().catch(() => {
       // A full tab bar or a closing session: the tab is a convenience, the conversation is unaffected.
     });

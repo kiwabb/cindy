@@ -61,7 +61,9 @@ import { isCindyMakeCompletionMessage, isCindyMakePreparationMessage } from '@/l
 import { getDataOwnerGeneration } from '@/contexts/dataOwnerGeneration';
 import { createPortal, flushSync } from 'react-dom';
 import { GitFork } from 'lucide-react';
-import { SelectionQuoteButton } from './SelectionQuoteButton';
+import { SelectionQuoteButton, type SelectionMarkTarget } from './SelectionQuoteButton';
+import { ConversationMarkHighlights } from '@/features/conversation-marks/ConversationMarkHighlights';
+import type { ConversationMark } from '../../../shared/conversationMarks';
 import { copyChatSelection } from './chatSelectionClipboard';
 import {
   groupWorkRuns,
@@ -450,6 +452,14 @@ interface MessageStreamProps {
   footer?: ReactNode;
   historyVisibleAfter?: number;
   onAskInSideChat?: (quote: string) => Promise<boolean>;
+  /**
+   * The owner's marks on this conversation (teammate conversations): the selection pill offers
+   * 标记 and the marked excerpts are highlighted in place. Absent = no marks in this stream.
+   */
+  conversationMarks?: {
+    marks: readonly ConversationMark[];
+    onMark: (selection: SelectionMarkTarget & { text: string }) => void;
+  };
   /** Active session id — used to reset scroll state on session switch. */
   sessionId?: string;
   /** Active session title, forwarded to handoff cards for return navigation. */
@@ -2963,6 +2973,7 @@ export function MessageStream({
   pendingMessages,
   renderPendingMessage,
   onAskInSideChat,
+  conversationMarks,
   historyVisibleAfter,
   sessionId,
   sessionTitle,
@@ -6481,7 +6492,15 @@ export function MessageStream({
             {/* chat-text-quote:选中消息文字 → 浮出"添加到对话"按钮(portal 到 body)。
           绑定本流的滚动容器:协同模式多流并存时,选区归属按各自容器判定。 */}
             {sessionId ? (
-              <SelectionQuoteButton sessionId={sessionId} containerRef={scrollRef} onAskInSideChat={onAskInSideChat} />
+              <SelectionQuoteButton
+                sessionId={sessionId}
+                containerRef={scrollRef}
+                onAskInSideChat={onAskInSideChat}
+                onMark={conversationMarks?.onMark}
+              />
+            ) : null}
+            {conversationMarks ? (
+              <ConversationMarkHighlights containerRef={scrollRef} marks={conversationMarks.marks} />
             ) : null}
             {/*
         原生滚动容器:overflow-y-auto + overflow-x-hidden。
