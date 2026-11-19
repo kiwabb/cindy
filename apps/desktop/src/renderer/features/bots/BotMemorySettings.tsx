@@ -1,4 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
+import { MemoryPreviewControl } from './MemoryPreviewControl';
+import { getDataOwnerGeneration, isDataOwnerGenerationCurrent, subscribeDataOwnerGeneration } from '@/contexts/dataOwnerGeneration';
+import type { BotSettingsTarget } from './botSettingsTarget';
+import { createContext, useContext, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type MutableRefObject } from 'react';
 import { Check, PenLine, Search } from 'lucide-react';
 
 import { MarkdownRenderer } from '@/components/chat/MarkdownRenderer';
@@ -36,10 +39,11 @@ export interface AboutMeField {
 }
 type SaveState = 'idle' | 'saving' | 'saved' | 'error' | 'conflict';
 
-/** The teammate's computer serves the memory; the pages never assume it is this one. */
+type MemoryScope = { token: object; memory: BotSettingsTarget['memory']; privateSource: boolean; assertCurrent(): void };
+const MemoryScopeContext = createContext<MemoryScope | null>(null);
 function useMemoryApi() {
-  const target = useBotSettingsTarget();
-  return useCallback(() => target.memory, [target]);
+  const scope = useContext(MemoryScopeContext)!;
+  return useCallback(() => { scope.assertCurrent(); return scope.memory; }, [scope]);
 }
 const isConflict = (error: unknown) => {
   const ipc = extractIpcError(error);
@@ -77,7 +81,13 @@ function useDateLabels() {
  * 伙伴设置里的「记忆」页:列表(分组 / 搜索)→ 详情 → 编辑。
  * 返回与离开由上层设置页的返回键驱动:`backRef` 先在页内回退,`leaveRef` 保证离开前落盘。
  */
-export function BotMemorySettings({
+export function BotMemorySettings(props: Parameters<typeof ScopedBotMemorySettings>[0]) {
+  const owner = useSyncExternalStore(subscribeDataOwnerGeneration, getDataOwnerGeneration, getDataOwnerGeneration);
+  const target = useBotSettingsTarget();
+  return <ScopedBotMemorySettings key={JSON.stringify([owner.dataOwnerId, owner.generation, props.botId, target.kind, target.deviceId, !!target.openPrivateMemory])} {...props} />;
+}
+
+function ScopedBotMemorySettings({
   botId,
   botName,
   memoryEnabled,
@@ -96,6 +106,33 @@ export function BotMemorySettings({
   leaveRef: MutableRefObject<(() => Promise<boolean>) | null>;
 }) {
   const { t } = useBotTranslation();
+  const target = useBotSettingsTarget();
+  const [source, setSource] = useState<'default' | 'private'>('default');
+  const [switching, setSwitching] = useState(false);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const scopeRef = useRef<object | null>(null);
+  const scope = useMemo<MemoryScope>(() => {
+    const owner = getDataOwnerGeneration();
+    const token = {};
+    const assertCurrent = () => {
+      if (!mounted.current || scopeRef.current !== token || !isDataOwnerGenerationCurrent(owner)) throw new Error('MEMORY_VIEW_STALE');
+    };
+    if (source === 'private' && (target.kind !== 'local' || !target.openPrivateMemory)) throw new Error('PRIVATE_MEMORY_UNAVAILABLE');
+    const raw = source === 'private' && target.kind === 'local' && target.openPrivateMemory
+      ? target.openPrivateMemory({botId, assertCurrent}).memory : target.memory;
+    const memory: BotSettingsTarget['memory'] = {
+      list: async (...args) => { assertCurrent(); const result = await raw.list(...args); assertCurrent(); return result; },
+      read: async (...args) => { assertCurrent(); const result = await raw.read(...args); assertCurrent(); return result; },
+      update: async (...args) => { assertCurrent(); const result = await raw.update(...args); assertCurrent(); return result; },
+      delete: async (...args) => { assertCurrent(); await raw.delete(...args); assertCurrent(); },
+    };
+    return {token, memory, privateSource: source === 'private', assertCurrent};
+  }, [source, target, botId]);
+  useLayoutEffect(() => {
+    scopeRef.current = scope.token;
+    return () => { if (scopeRef.current === scope.token) scopeRef.current = null; };
+  }, [scope]);
   const [view, setView] = useState<View>({ kind: 'list' });
   const [detail, setDetail] = useState<BotMemoryDetail | null>(null);
   const editorRef = useRef<{ flush: () => Promise<boolean> } | null>(null);
@@ -124,6 +161,7 @@ export function BotMemorySettings({
     };
   }, [backRef, leaveRef, view]);
 
+  const renderView = () => {
   if (view.kind === 'list') {
     return (
       <MemoryList
@@ -162,6 +200,27 @@ export function BotMemorySettings({
       onMissing={showList}
     />
   );
+  };
+  const changeSource = async (next: 'default' | 'private') => {
+    if (switching || source === next) return;
+    setSwitching(true);
+    try {
+      if (!(await (editorRef.current?.flush() ?? Promise.resolve(true)))) return;
+      scope.assertCurrent();
+      setDetail(null); setView({kind:'list'}); setSource(next);
+    } catch { /* A changed owner or closed view cannot navigate or save another scope. */ }
+    finally { if (mounted.current) setSwitching(false); }
+  };
+  return <MemoryScopeContext.Provider value={scope}>
+    <div className="flex flex-col gap-3">
+      {target.kind === 'local' && target.openPrivateMemory ? <div className="flex flex-wrap gap-2" role="group" aria-label={t('bots.memory.sourceLabel')}>
+        <Button variant="secondary" size="sm" aria-pressed={source === 'default'} disabled={switching} onClick={() => void changeSource('default')}>{t('bots.memory.sourceDefault')}</Button>
+        <Button variant="secondary" size="sm" aria-pressed={source === 'private'} disabled={switching} onClick={() => void changeSource('private')}>{t('bots.memory.sourcePrivate')}</Button>
+      </div> : null}
+      {source === 'private' ? <><p className="text-12 text-[var(--text-secondary)]">{t('bots.memory.privateHint')}</p><MemoryPreviewControl botId={botId} assertCurrent={scope.assertCurrent} /></> : null}
+      <div key={source}>{renderView()}</div>
+    </div>
+  </MemoryScopeContext.Provider>;
 }
 
 function MemoryList({
@@ -178,6 +237,7 @@ function MemoryList({
   onOpen: (filename: string) => void;
 }) {
   const { t } = useBotTranslation();
+  const scope = useContext(MemoryScopeContext)!;
   const memoryApi = useMemoryApi();
   const { day } = useDateLabels();
   const [query, setQuery] = useState('');
@@ -208,7 +268,7 @@ function MemoryList({
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [botId, query, reload]);
+  }, [botId, query, reload, memoryApi]);
 
   const groups = BOT_MEMORY_TYPES.map((type) => ({
     type,
@@ -217,6 +277,7 @@ function MemoryList({
 
   return (
     <div className="flex flex-col gap-4 pt-1">
+      {!scope.privateSource ? <>
       <div className="flex min-h-[52px] items-center justify-between gap-3 rounded-xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-3">
         <div className="min-w-0">
           <p className="text-14 text-[var(--text-primary)]">{t('bots.memory.enabled')}</p>
@@ -247,6 +308,7 @@ function MemoryList({
           className="min-h-24 resize-none p-3 leading-6 [field-sizing:content]"
         />
       </section>
+      </> : null}
       {failed ? (
         <div
           className="flex flex-col items-center gap-3 py-10 text-13 text-[var(--text-secondary)]"
@@ -266,7 +328,7 @@ function MemoryList({
           {t('bots.memory.empty')}
         </p>
       ) : (
-        <div className={cn('flex flex-col gap-4', !memoryEnabled && 'opacity-60')}>
+        <div className={cn('flex flex-col gap-4', !scope.privateSource && !memoryEnabled && 'opacity-60')}>
           <div className="relative">
             <Search
               size={14}
@@ -344,6 +406,7 @@ function MemoryDetail({
   onMissing: () => void;
 }) {
   const { t } = useBotTranslation();
+  const scope = useContext(MemoryScopeContext)!;
   const memoryApi = useMemoryApi();
   const { stamp } = useDateLabels();
   const { confirm } = useConfirmDialog();
@@ -371,14 +434,14 @@ function MemoryDetail({
     return () => {
       cancelled = true;
     };
-  }, [botId, filename, reload, onLoaded, onMissing]);
+  }, [botId, filename, reload, onLoaded, onMissing, memoryApi]);
 
   const remove = async () => {
     if (!detail || busy) return;
     const ok = await confirm({
       presentation: 'standard',
       title: t('bots.memory.deleteTitle'),
-      description: t('bots.memory.deleteDescription', { name: botName, title: detail.title }),
+      description: t('bots.memory.deleteDescription', { name: botName, title: detail.title }) + (scope.privateSource ? ' ' + t('bots.memory.privateDeleteBoundary') : ''),
       confirmText: t('bots.memory.delete'),
       cancelText: t('bots.memory.cancel'),
       confirmVariant: 'destructive',
@@ -389,6 +452,7 @@ function MemoryDetail({
       await memoryApi().delete({ botId, filename, expectedUpdatedAt: detail.updatedAt });
       onDeleted();
     } catch (error) {
+      try { scope.assertCurrent(); } catch { return; }
       if (isConflict(error)) {
         setChanged(true);
         setReload((value) => value + 1);
@@ -558,7 +622,7 @@ function MemoryEditor({
     } finally {
       inFlight.current = null;
     }
-  }, [botId, onSaved]);
+  }, [botId, onSaved, memoryApi]);
 
   // 离开编辑:能保存就保存;保存不了(冲突、超限、写入失败)时由用户决定放弃还是留下。
   const settle = useCallback(async (): Promise<boolean> => {

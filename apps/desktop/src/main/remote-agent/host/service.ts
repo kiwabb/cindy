@@ -1,3 +1,4 @@
+import { requestCompanionSubscriptionText } from '../../maker-host/companion-subscription-text.js';
 import { recordStandbyUsage, flushStandbyUsage } from '../../device-link/providerShareAvailabilityUsage.js';
 import { prepareShareAvailability, acceptShareAvailability, beginShareAvailabilityTurn } from '../../device-link/providerShareAvailability.js';
 import { assertMemberBudget, memberBudgetDenial, memberBudgetAllows } from '../../device-link/providerShareBudgetRuntime.js';
@@ -868,6 +869,7 @@ export function installRemoteAgentHost(options: {
   }, 60_000);
   (directRouteSweep as { unref?: () => void }).unref?.();
   host = createRemoteAgentHost({
+    companionText: requestCompanionSubscriptionText,
     nativeHistory: createNativeHistoryTransfer(path.join(options.userDataDir, 'native-history-transfers'), nativeHistoryStorage(options.userDataDir)),
     fastPolicy: receiveGroupFastPolicy,
     prepareImageEvent: (sessionId, event, upstream, retainForRecovery) => prepareGeneratedImageTransport(`remote:${sessionId}`, event, { upstream, retainForRecovery, invoke: remoteBackgroundInvoke }),

@@ -1,3 +1,8 @@
+import { withCompanionStateTurn } from '../companion-state/nativeTurns.js';
+import { MEMORY_RECOVERY, readMemoryRecovery, type MemoryRecoveryToken } from './memoryRecovery.js';
+import { getNativeMemoryTurnPreparation } from './nativeMemoryTurn.js';
+import type { PreparedMemoryTurn } from '@cindy/maker-core';
+import { withNativeFactMemoryTurn, readNativeFactUserSource } from './nativeFactMemory.js';
 import { TRUSTED_DESKTOP_QUEUE_ORIGIN, type TrustedDesktopQueueOriginReceipt } from './queuedInputOrigin.js';
 export { TRUSTED_DESKTOP_QUEUE_ORIGIN, TRUSTED_DESKTOP_PI_COMMAND_SNAPSHOT, stampTrustedDesktopQueuedOrigin, stampTrustedDeviceLinkQueuedOrigin, restoreTrustedDesktopQueuedOrigin, revokeTrustedDesktopQueuedOrigin } from './queuedInputOrigin.js';
 import { FORWARDED_REQUEST_RECEIPT } from '../../shared/forwardedRequest.js';
@@ -135,6 +140,7 @@ type IpcUserMessage =
 
 
 type MakerSendOptions = {
+  readonly [MEMORY_RECOVERY]?: MemoryRecoveryToken;
   readonly [PI_CACHE_RECOVERY_EXPECTATION]?: import('@cindy/maker-core').SendOptions[typeof PI_CACHE_RECOVERY_EXPECTATION];
   /** Main-only live card guard, never serialized to queue history or provider options. */
   readonly [MCP_APP_MESSAGE_GUARD]?: McpAppMessageGuard;
@@ -270,6 +276,7 @@ export interface MakerSendTransactionLog {
 }
 
 export interface MakerSendTransactionDeps {
+  ensureCompanionMemory?(sessionId: string): Promise<void>;
   getSession(sessionId: string): MakerSendTransactionSession | undefined | null;
   closeSession(sessionId: string): Promise<void>;
   /** 资源漂移回收必须走 Maker 的 runtime-refresh 原因(直接 Session.close 会被
@@ -1724,6 +1731,7 @@ export function createMakerSendTransaction(deps: MakerSendTransactionDeps): Make
       let directPreDispatchHookStarted = false;
       let userPromptPreviewSessionId: string | null = null;
       let userPromptPreviewClientId: string | null = null;
+      let memoryTurn: PreparedMemoryTurn | undefined;
       try {
         let cindyLearnInvocation: CindyLearnInvocationGrant | null = null;
         // Every Cindy harness consumes this exact-path pin at its provider
@@ -1759,10 +1767,32 @@ export function createMakerSendTransaction(deps: MakerSendTransactionDeps): Make
         const transcriptUserClientId = persistUserMessage?.clientId
           ?? (so[PI_CACHE_RECOVERY_EXPECTATION] ? so.retryUserClientId : undefined);
         // Other-task mail is the only non-scheduler turn whose reply IM relays (channelTurnSignal).
-        const sendResult = await withChannelTurnSource(sess.id, channelTurnSourceFor(
+        await deps.ensureCompanionMemory?.(sessionId);
+        const nativeFactUserSource = readNativeFactUserSource(mainOwnedSendContext, persistUserMessage, so.retryUserClientId,
+          { ordinary: isOrdinaryUserTurn, authoredText: so[AUTO_REVIEW_SOURCE_CONTENT], remote: so.fromMobileClient === true || so.fromDeviceLinkClient === true });
+        const prepareMemory = getNativeMemoryTurnPreparation(sess);
+        if (prepareMemory) {
+          const requestId = so.retryUserClientId ?? persistUserMessage?.clientId ?? so.messageUuid;
+          if (!requestId) throw new Error('MEMORY_TURN_REQUEST_ID_REQUIRED');
+          const recovery = so[MEMORY_RECOVERY]
+            ? readMemoryRecovery(so[MEMORY_RECOVERY], sessionId, requestId, message) : undefined;
+          const prepared = await prepareMemory({ requestId, message: normalized, signal: so.signal, recovery,
+            userSource: nativeFactUserSource });
+          if ('kind' in prepared) throw new Error('MEMORY_TURN_ALREADY_COMPLETED');
+          memoryTurn = prepared;
+          void prepared.settled.catch(() => deps.log.warn('Memory completion persistence failed', { sessionId }));
+        }
+        const augmentMemory = (options: SessionSendOptions) => memoryTurn ? memoryTurn.augment(options) : options;
+        const factSource = memoryTurn?.userSource
+          ? { logicalTurnId: memoryTurn.logicalRequestId, userMessageId: memoryTurn.userSource.messageId,
+              userText: memoryTurn.userSource.text, origin: 'user' as const }
+          : nativeFactUserSource
+            ? { logicalTurnId: nativeFactUserSource.messageId, userMessageId: nativeFactUserSource.messageId,
+                userText: nativeFactUserSource.text, origin: 'user' as const } : undefined;
+        const sendResult = await withCompanionStateTurn(sess, factSource, companionReserved => withNativeFactMemoryTurn(sess, factSource, factReserved => withChannelTurnSource(sess.id, channelTurnSourceFor(
           persistUserMessage?.origin,
           persistUserMessage?.botTaskCoordination !== undefined,
-        ), () => sess.send(outgoing as never, {
+        ), () => sess.send(outgoing as never, augmentMemory({
           ...(retryTranscriptUserEntryId ? { retryTranscriptUserEntryId } : {}),
           ...(assertAppCurrent
             ? {
@@ -1810,7 +1840,11 @@ export function createMakerSendTransaction(deps: MakerSendTransactionDeps): Make
           signal: so.signal,
           [ASYNC_QUESTION_ANSWER]: so[ASYNC_QUESTION_ANSWER],
           [PI_CACHE_RECOVERY_EXPECTATION]: so[PI_CACHE_RECOVERY_EXPECTATION],
-          ...(so.onVendorTurnReserved ? { onTurnReserved: so.onVendorTurnReserved } : {}),
+          ...((factReserved || companionReserved) ? { onTurnReserved: (generation: number) => {
+            so.onVendorTurnReserved?.(generation);
+            factReserved?.(generation);
+            companionReserved?.(generation);
+          } } : so.onVendorTurnReserved ? { onTurnReserved: so.onVendorTurnReserved } : {}),
           // scheduler 排队消息:origin 打到本轮 turnOrigin(IM 转播识别自动 turn),
           // 与 runner 直发路径的 session.send({ origin }) 语义对齐。
           ...(so.origin ? { origin: so.origin } : {}),
@@ -1960,7 +1994,8 @@ export function createMakerSendTransaction(deps: MakerSendTransactionDeps): Make
               );
             }
           },
-        }));
+       })))));
+        memoryTurn?.accepted(sendResult);
         if (inputHandoffOwnerNote && sendResult.accepted) deps.inputHandoffOwnerNoteDelivered?.(sessionId);
         sendAccepted = sendResult.accepted;
         if (sendAccepted) {
@@ -2027,6 +2062,7 @@ export function createMakerSendTransaction(deps: MakerSendTransactionDeps): Make
           }),
         );
       } catch (err) {
+        if (!sendAccepted) memoryTurn?.cancel();
         if (!sendAccepted) {
           await rewindPersistedUserMessageAfterClearIfStale();
           await cleanupRejectedMaterialization();

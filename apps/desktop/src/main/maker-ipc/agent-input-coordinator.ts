@@ -1,3 +1,5 @@
+import { MEMORY_RECOVERY, issueMemoryRecovery, bindMemoryRecoveryMessage, type MemoryRecoveryToken } from './memoryRecovery.js';
+import { hasNativeMemoryBinding } from './nativeMemoryTurn.js';
 import { parseOutputLimitDetails, type OutputLimitDetails } from '@cindy/maker-shared';
 import { FORWARDED_REQUEST_RECEIPT, verifiedOwnerRequestText, type ForwardedRequestSource } from '../../shared/forwardedRequest.js';
 import { ASYNC_QUESTION_ANSWER, SUPERSEDE_ASYNC_QUESTIONS, AUTO_REVIEW_SOURCE_CONTENT, AUTO_REVIEW_USER_INTENT } from '@cindy/maker-core';
@@ -218,6 +220,7 @@ function hasRetryableQueuedContent(item: AgentInputQueuedMessage): boolean {
 }
 
 export interface AgentInputSendOpts {
+  readonly [MEMORY_RECOVERY]?: MemoryRecoveryToken;
   readonly [ASYNC_QUESTION_ANSWER]?: true;
   readonly [SUPERSEDE_ASYNC_QUESTIONS]?: true;
   /** Main-only authorization recheck after async steer preparation, before provider dispatch. */
@@ -3519,6 +3522,17 @@ export class AgentInputCoordinator {
             createdAt: new Date().toISOString(),
           },
         });
+        if (hasNativeMemoryBinding(sessionId)) {
+          const generation = this.getState(sessionId).generation;
+          (continueItem as typeof continueItem & { [MEMORY_RECOVERY]?: MemoryRecoveryToken })[MEMORY_RECOVERY] = issueMemoryRecovery({
+            sessionId, attemptId: clientId, sourceRequestId: recovery.item.clientId,
+            sourceIsContinuation: recovery.item.originalSyntheticTrigger === 'continue'
+              || !!recovery.item.retrySourceClientId || recovery.item.text.startsWith('[UI_ACTION_TRIGGER]'),
+            assertCurrent: () => {
+              if (this.getState(sessionId).generation !== generation) throw new Error('MEMORY_RECOVERY_STALE_GENERATION');
+            },
+          });
+        }
       }
     }
     // Only the verified group quota rejection can arm a queue-head wait: selection failed
@@ -5355,6 +5369,13 @@ export class AgentInputCoordinator {
         makerUserMessage,
         this.describeQueueBehindDispatch(sessionId, head),
       );
+      const memoryRecovery = hasNativeMemoryBinding(sessionId)
+        ? (head as typeof head & { [MEMORY_RECOVERY]?: MemoryRecoveryToken })[MEMORY_RECOVERY] : undefined;
+      if (hasNativeMemoryBinding(sessionId) && head.originalSyntheticTrigger === 'continue'
+        && head.retrySourceClientId && !memoryRecovery) throw new Error('MEMORY_RECOVERY_PROOF_REQUIRED');
+      if (memoryRecovery) bindMemoryRecoveryMessage(memoryRecovery, wireUserMessage, () => {
+        if (!this.isActiveTurnCurrent(sessionId, active)) throw new Error('MEMORY_RECOVERY_STALE_GENERATION');
+      });
       active.sendStarted = true;
       active.dispatchLifecycle = 'sending';
       // Freeze side-effect timestamps before entering vendor code. A dispatch
@@ -5363,6 +5384,7 @@ export class AgentInputCoordinator {
       const preVendorDispatchAt = Math.max(0, Date.now() - 1);
       const appMessageGuard = queuedAppMessageGuard(head);
       const result = await this.deps.sendToAgent(sessionId, wireUserMessage, head.createOpts, {
+        ...(memoryRecovery ? { [MEMORY_RECOVERY]: memoryRecovery } : {}),
         ...(appMessageGuard || taskActionGuard ? { [MCP_APP_MESSAGE_GUARD]: async () => {
           try {
             await appMessageGuard?.();

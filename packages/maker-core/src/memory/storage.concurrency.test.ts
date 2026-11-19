@@ -149,3 +149,23 @@ describe.skipIf(process.platform === 'win32')('links in the memory folder', () =
     }
   });
 });
+
+it('keeps an unquoted YAML timestamp stable across reads and conditional edits', async () => {
+  // Fixture mirrors the legacy timestamp syntax; never modifies the retained A1 markers.
+  const date = '2026-11-17T00:44:58.947Z';
+  await fs.writeFile(path.join(dir, filename), `---\ntype: user\ntitle: Fixture\ndescription: Fixture\nupdatedAt: ${date}\n---\nFixture body\n`);
+  const original = await fs.readFile(path.join(dir, filename), 'utf8');
+  vi.useFakeTimers({ toFake: ['Date'] });
+  try {
+    vi.setSystemTime(new Date('2026-11-18T00:00:00Z'));
+    const first = await storage.read(filename);
+    vi.setSystemTime(new Date('2026-11-19T00:00:00Z'));
+    const second = await new MemoryStorage(dir).read(filename);
+    expect(first.frontmatter.updatedAt).toBe(date);
+    expect(second.frontmatter.updatedAt).toBe(date);
+    expect(await fs.readFile(path.join(dir, filename), 'utf8')).toBe(original);
+    const edited = await storage.update(filename, date, {title:'Edited fixture', description:'Fixture', body:'Changed fixture'});
+    expect(edited.frontmatter.updatedAt).not.toBe(date);
+    await expect(storage.delete(filename, date)).rejects.toMatchObject({code:'version-conflict'});
+  } finally { vi.useRealTimers(); }
+});

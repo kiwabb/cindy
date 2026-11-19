@@ -207,6 +207,7 @@ export interface OwnerProviderRouteBinding {
 }
 
 export interface RemoteAgentHostDeps {
+  companionText?(input:{model:string;prompt:string;assertCurrent():void}):Promise<{providerId:string;model:string;text:string}>;
   /**
    * 这台自己的 Cindy 托管 Skill(启用中的；命令名与 SKILL.md 所在目录)。caps 据此报指纹，任务所在电脑报「用你自己那份」
    * 时据此复制；组所在电脑中转时据此替组内电脑补文件。
@@ -648,6 +649,7 @@ function describeHandle(handle: AgentSessionHandle, shadowDir: string, mirrorRoo
     writableDirs,
     virtualWorkspace,
     imessageSendContext: true,
+    supportsHostTurnContext: handle.supportsHostTurnContext === true,
     ...(previousMirrorRoots.length ? { previousMirrorRoots } : {}),
     methods,
     ...(handle.requestSessionId ? { requestSessionId: handle.requestSessionId } : {}),
@@ -1709,6 +1711,21 @@ export function createRemoteAgentHost(deps: RemoteAgentHostDeps) {
         return;
       }
       run.handle = handle;
+      // Only an already-authorized same-account run may use its exact subscription.
+      // No new remote channel, credentials, storage access or provider selection from the caller.
+      if (run.trust !== 'guest' && run.kind === 'codex' && run.providerId === 'openai' && deps.companionText) {
+        handle.requestCompanionText = async prompt => {
+          const model = run.authorizedModel;
+          const current = () => {
+            if (!model || run.closing || run.handle !== handle || !deps.isOwnerCurrent(run.owner)
+              || !deps.isControllerAuthorized(run.controller) || deps.isControllerModelUseRevoked?.(run.controller)
+              || run.providerId !== 'openai' || run.authorizedModel !== model
+              || !deps.providerAccess?.isAllowed('openai',run.controller,model,run.sessionId))
+              throw Error('COMPANION_SUBSCRIPTION_REVOKED');
+          };
+          current();const result=await deps.companionText!({model:model!,prompt,assertCurrent:current});current();return result;
+        };
+      }
       if (run.trust === 'guest' || run.forkWorkspaceIds.length) {
         await timing.measure('session-registration', () =>
           recordGuestSession(run.controller, run.relayKey, hostSessionId, [handle.id, handle.requestSessionId], undefined, run.forkWorkspaceIds),
@@ -2662,16 +2679,21 @@ export function createRemoteAgentHost(deps: RemoteAgentHostDeps) {
   }
 
   async function callOnHandle(run: Run, callId: string, method: RemoteAgentMethod, payload: RemoteAgentPayload): Promise<void> {
-    if (run.relay?.started) return relayCall(run, run.relay, callId, method, payload);
+    // Companion extraction is a direct same-account feature, never a provider-group relay method.
+    if (run.relay?.started && method !== 'requestCompanionText') return relayCall(run, run.relay, callId, method, payload);
     const handle = run.handle;
     let rollbackProvider: (() => void) | undefined;
     let standbyTurn: Run['standbyTurn'];
     try {
+      if (method === 'requestCompanionText' && (run.relay || run.trust === 'guest'))
+        fail('REMOTE_AGENT_UNSUPPORTED', 'companion analysis requires a direct same-account run');
       if (run.closing) fail('REMOTE_AGENT_EXPIRED', 'task has ended');
       if (!delegatedRunAllowed(run)) fail('REMOTE_AGENT_UNAVAILABLE', 'this shared task is no longer authorized');
       if (!handle) fail('REMOTE_AGENT_UNAVAILABLE', 'agent has not started');
       const raw = await resolvePayload(run.controller, payload);
       const args = takeGroupNewRound(run, callId, method, Array.isArray(raw) ? raw : []);
+      if (method === 'requestCompanionText' && (!Array.isArray(raw) || args.length !== 1 || typeof args[0] !== 'string' || args[0].length > 131072))
+        fail('REMOTE_AGENT_INVALID', 'companion analysis accepts only bounded prompt text; route is owned by the run');
       const target = (handle as unknown as Record<string, unknown>)[method];
       if (typeof target !== 'function') fail('REMOTE_AGENT_UNSUPPORTED', `${method} is not supported by this agent`);
       let callArgs: unknown[] = args;

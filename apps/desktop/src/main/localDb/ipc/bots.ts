@@ -1,3 +1,5 @@
+import { companionMemoryPreview, registerCompanionMemoryPreviewIpc } from '../../maker-ipc/companionMemoryPreview.js';
+import { registerBotPrivateFactIpc } from '../../maker-ipc/botPrivateFactIpc.js';
 import { registerPersonalTodoIpc, registerPersonalTodoSyncIpc } from '../../maker-ipc/personalTodoIpc.js';
 import { registerLearningIpc } from '../../learning/learningIpc.js';
 import { emitSessionCreated } from './sessionCreatedBroadcast.js';
@@ -121,9 +123,10 @@ import { getResolvedMainLocale } from '../../i18n.desktop.js';
 import { SUPPORTED_LOCALES, type SupportedLocale } from '../../../shared/locale.js';
 import { normalizeBotWelcomeContext, type BotWelcomeContext } from '../../../shared/botWelcomeContext';
 import { broadcastBotRemoteResourceChanged } from '../../maker-ipc/botRemoteResourceInvalidation.js';
-import { createBotMemoryService } from '../../maker-ipc/botMemoryService.js';
+import { assertExclusiveBotWorkspace, createBotMemoryAccess } from '../../maker-ipc/botMemoryAccess.js';
+import { hasNativeMemoryBinding } from '../../maker-ipc/nativeMemoryTurn.js';
 import { readTeammateProjectMode } from '../../maker-ipc/botWorkspaceRuntime.js';
-import { resolveMemoryScopeKey } from '@cindy/maker-core';
+
 
 const log = createLogger('bots');
 
@@ -149,13 +152,13 @@ function captureBotOperationOwner() {
   return { userDataDir, assertCurrent };
 }
 
-let botMemoryService: ReturnType<typeof createBotMemoryService> | null = null;
+let botMemoryAccess: ReturnType<typeof createBotMemoryAccess> | null = null;
 /**
  * 伙伴记忆页的唯一服务实例。本机设置页 IPC 与设备互联的远程设置共用它,
  * 同一条记忆的保存 / 删除串行与运行时刷新合并才不会分成两份。
  */
-export function getBotMemoryService(): ReturnType<typeof createBotMemoryService> {
-  botMemoryService ??= createBotMemoryService({
+export function getBotMemoryAccess(): ReturnType<typeof createBotMemoryAccess> {
+  botMemoryAccess ??= createBotMemoryAccess({
     async getStore(scopeKey) {
       const manager = getMakerIfReady()?.makerMemory;
       if (!manager) throwIpcError('MAKER_MEMORY_NOT_READY', 'Memory is not ready');
@@ -170,16 +173,28 @@ export function getBotMemoryService(): ReturnType<typeof createBotMemoryService>
         .limit(1);
       owner.assertCurrent();
       if (!row || row.status === 'deleting') return null;
-      const scopeKey = await readTeammateProjectMode(botId)
-        ? await resolveMemoryScopeKey(path.join(botProfileDir(owner.userDataDir, botId), 'workspace'))
-        : undefined;
+      const projectMode = await readTeammateProjectMode(botId);
       owner.assertCurrent();
-      return { canonicalSessionId: row.canonicalSessionId, assertCurrent: owner.assertCurrent, ...(scopeKey ? { scopeKey } : {}) };
+      const privateCompanion = !!row.canonicalSessionId && hasNativeMemoryBinding(row.canonicalSessionId);
+      const assertCompanionSelected = () => {
+        owner.assertCurrent();
+        if ((!!row.canonicalSessionId && hasNativeMemoryBinding(row.canonicalSessionId)) !== privateCompanion)
+          throw new Error('COMPANION_PRIVATE_SELECTION_CHANGED');
+      };
+      return { root: owner.userDataDir, canonicalSessionId: row.canonicalSessionId, projectMode, privateCompanion, assertCurrent: owner.assertCurrent, assertCompanionSelected,
+        assertExclusiveWorkspace: async (workspace: string) => {
+          const users = await getDbClient().drizzle.select({ id: sessions.id, workingDir: sessions.workingDir, projectDir: sessions.projectDir }).from(sessions);
+          owner.assertCurrent();
+          assertExclusiveBotWorkspace(workspace, row.canonicalSessionId!, users);
+        } };
+
     },
     requestRefresh: (sessionId) => requestBotRuntimeEpochRefresh(sessionId, 'resource'),
   });
-  return botMemoryService;
+  return botMemoryAccess;
 }
+export function invalidateBotMemoryAccess(botId?: string) { botMemoryAccess?.invalidate(botId); }
+export function getBotMemoryService() { return getBotMemoryAccess().service; }
 
 /**
  * 把这份档案摊到伙伴自己的家(`<userData>/bots/<botId>/`)。
@@ -2834,6 +2849,25 @@ export function registerBotIpc(): void {
     });
   });
 
+  const disposePreview = registerCompanionMemoryPreviewIpc({
+    ipc: ipcMain,
+    assertTrusted: event => {
+      if (isDeviceLinkInvoke()) throwIpcError('PRECONDITION_FAILED', 'Memory preview requires local owner settings');
+      assertTrustedAppRendererEvent(event);
+    },
+    captureOwner: captureBotOperationOwner,
+    getService: companionMemoryPreview,
+  });
+  const disposePrivateFacts = registerBotPrivateFactIpc({
+    ipc: ipcMain,
+    assertTrusted: event => {
+      if (isDeviceLinkInvoke()) throwIpcError('PRECONDITION_FAILED', 'Private facts require local owner settings');
+      assertTrustedAppRendererEvent(event);
+    },
+    captureOwner: captureBotOperationOwner,
+    getService: () => getBotMemoryAccess().privateService,
+  });
+  app.once('will-quit', () => { disposePreview(); disposePrivateFacts(); invalidateBotMemoryAccess(); });
   const memory = getBotMemoryService();
   /** Bind each memory operation to the account that started it. */
   const withMemoryOwner = async <T>(run: () => Promise<T>): Promise<T> => {

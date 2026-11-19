@@ -49,6 +49,7 @@ export const REMOTE_AGENT_MAX_PUSH_FRAMES = 64;
  * 不在表里的方法被控端一律拒绝。
  */
 export const REMOTE_AGENT_METHODS = [
+  'requestCompanionText',
   'send',
   'steer',
   'abort',

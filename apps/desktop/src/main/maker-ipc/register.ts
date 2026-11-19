@@ -1,3 +1,12 @@
+import { createCompanionMemoryPreview, installCompanionMemoryPreview } from './companionMemoryPreview.js';
+import { createCompanionSubscriptionPort } from '../maker-host/companion-subscription-port.js';
+import { getDeviceId as getStableCompanionDeviceId } from '../authManager.js';
+import { bindDesktopCompanionState, localCompanionBindingId, type CompanionStateAssemblyInput } from './companionStateAssembly.js';
+import { CompanionMemoryRuntime } from './companionMemoryRuntime.js';
+import { createDesktopFactResponsesPort } from '../maker-host/fact-analysis-responses.desktop.js';
+import { setNativeMemorySelectionResolver } from './nativeMemoryTurn.js';
+import { requestBotRuntimeEpochRefresh } from './botRuntimeEpochRefreshSignal.js';
+import { readTeammateProjectMode } from './botWorkspaceRuntime.js';
 import { createSchedulerQueueBridge, type SchedulerQueueBridge, type SchedulerQueuedPromptRequest, type SchedulerEnqueueResult } from './schedulerQueueBridge.js';
 import { markCindyOfficialSkills } from '../maker-host/managed-skills.js';
 import { registerRuntimeSettingsSection } from '../app-settings/runtime.js';
@@ -700,7 +709,7 @@ import { validateExistingLocalProjectDirectory } from '../mcp-integrations/creat
 import { gitExec } from '../worktree/gitExec.js';
 import { BOT_GROUP_CLIENT_ID_PREFIX } from '../../shared/botGroupChat.js';
 import { syncBotLanePermission, syncBotLinkedLanePermissions } from './botPermissionSync.js';
-import { ensureBotGroupLaneSession } from '../localDb/ipc/bots.js';
+import { ensureBotGroupLaneSession, getBotMemoryAccess, invalidateBotMemoryAccess } from '../localDb/ipc/bots.js';
 import { restartBotRuntime } from './botRuntimeRestart.js';
 import { registerBotLifecycleHandlers } from './botLifecycleService.js';
 import { isSessionPermissionMode, persistPermissionModeWithoutRuntime } from './sessionPermissionPersistence.js';
@@ -6159,8 +6168,84 @@ const sessionBindings = createSessionBindingLifecycle<WiredSession, WiredSession
   },
 });
 
+/** Product assembly: no selection exists until a trusted Main caller explicitly activates it. */
+function bindCompanionStateForMain(input: CompanionStateAssemblyInput) {
+  const profile = app.getPath('userData');
+  const guard = () => {
+    if (app.getPath('userData') !== profile) throw Error('COMPANION_PROFILE_CHANGED');
+    input.assertCurrent();
+  };
+  return bindDesktopCompanionState({ ...input, assertCurrent: guard }, {
+    deviceId: () => localCompanionBindingId(profile, getStableCompanionDeviceId()),
+    cloudDeviceId: getSelfDeviceId,
+  });
+}
+const companionMemoryRuntime = new CompanionMemoryRuntime({
+  owner: () => {
+    const active = getActiveAppSession();
+    return !isAppSessionBoundaryPending() && active.dataOwnerId
+      ? { id: active.dataOwnerId, epoch: activeOwnerScopeKey(), root: ownerScopedUserDataPath() } : null;
+  },
+  session: id => getMakerIfReady()?.getSession(id),
+  readBot: async id => {
+    const [bot] = await getDbClient().drizzle.select({ canonicalSessionId: botProfiles.canonicalSessionId, status: botProfiles.status })
+      .from(botProfiles).where(eq(botProfiles.id, id)).limit(1);
+    return bot ? { canonicalSessionId: bot.canonicalSessionId, deleting: bot.status === 'deleting',
+      projectMode: await readTeammateProjectMode(id) } : null;
+  },
+  store: async botId => (await getBotMemoryAccess().resolveCompanion(botId)).store,
+  provider: getSessionProvider,
+  analysis: (id,route,current) => {
+    if(route.protocol==='openai-responses')return createDesktopFactResponsesPort(id,route,current);
+    const session=getMakerIfReady()?.getSession(id);if(!session)throw Error('COMPANION_SESSION_REQUIRED');
+    return createCompanionSubscriptionPort(session,route,current);
+  },
+  // Local dialogue only: no fresh owner-bound executor authority is supplied.
+  // Explicit state opt-in cannot enable autonomous work; default memory sends skip this branch.
+  state: bindCompanionStateForMain,
+  refresh: sessionId => requestBotRuntimeEpochRefresh(sessionId, 'resource'),
+  reportFailure: () => log.warn('Companion memory processing requires review'),
+});
+const memoryPreview = createCompanionMemoryPreview({
+  owner: () => {
+    const owner = getActiveAppSession().dataOwnerId, epoch = activeOwnerScopeKey(), root = ownerScopedUserDataPath();
+    const assertCurrent = () => { if (!owner || isAppSessionBoundaryPending() || getActiveAppSession().dataOwnerId !== owner || activeOwnerScopeKey() !== epoch || ownerScopedUserDataPath() !== root) throw Error('MEMORY_PREVIEW_OWNER_CHANGED'); };
+    assertCurrent(); return { id:owner!, root, assertCurrent };
+  },
+  target: async botId => {
+    const ownerId = getActiveAppSession().dataOwnerId, epoch = activeOwnerScopeKey();
+    const [bot] = await getDbClient().drizzle.select().from(botProfiles).where(eq(botProfiles.id, botId)).limit(1);
+    if (!ownerId || !bot || bot.status !== 'active' || !bot.canonicalSessionId) throw Error('MEMORY_PREVIEW_BOT_REQUIRED');
+    const [row] = await getDbClient().drizzle.select().from(sessions).where(eq(sessions.id, bot.canonicalSessionId)).limit(1);
+    if (!row || row.agentKind !== 'codex' || row.remoteHostId || row.source !== 'bot' || !row.model || !row.providerId) throw Error('MEMORY_PREVIEW_LOCAL_CODEX_REQUIRED');
+    if(row.providerId!=='openai')throw Error('MEMORY_PREVIEW_OPENAI_SUBSCRIPTION_REQUIRED');
+    if(row.agentDeviceId) {
+      if(!/^[a-f0-9]{64}$/.test(row.agentDeviceId))throw Error('MEMORY_PREVIEW_OWN_DEVICE_REQUIRED');
+      await readRemoteProviderRoute({agentDeviceId:row.agentDeviceId,agentKind:'codex',model:row.model,providerId:'openai'});
+    } else {
+      const catalogProvider=getActiveCatalog().providers.find(p=>p.id==='openai');
+      const providers=await getDesktopProviderService().listProviders({allowSideEffects:false,catalog:getActiveCatalog()});
+      const provider=providers.find(p=>p.id==='openai');
+      if(catalogProvider?.access?.kind!=='subscription'||!provider?.connected||provider.suspended||!provider.models.codex?.some(model=>model.id===row.model))throw Error('MEMORY_PREVIEW_SUBSCRIPTION_UNAVAILABLE');
+    }
+    if (epoch !== activeOwnerScopeKey() || isAppSessionBoundaryPending()) throw Error('MEMORY_PREVIEW_OWNER_CHANGED');
+    return {ownerId,botId,sessionId:row.id,route:{providerId:'openai',model:row.model,protocol:'cindy-subscription',agentDeviceId:row.agentDeviceId??null}};
+  },
+  botForSession: async sessionId => {
+    const [bot] = await getDbClient().drizzle.select({id:botProfiles.id}).from(botProfiles).where(eq(botProfiles.canonicalSessionId, sessionId)).limit(1);
+    return bot?.id ?? null;
+  },
+  activate: selection => companionMemoryRuntime.activate(selection), ensure: id => companionMemoryRuntime.ensure(id),
+  deactivate: id => companionMemoryRuntime.deactivate(id),
+  reportFailure: (sessionId, error) => log.warn('Companion memory unavailable; ordinary send continues', { sessionId, error: error instanceof Error ? error.name : 'unknown' }),
+});
+installCompanionMemoryPreview(memoryPreview);
+setNativeMemorySelectionResolver(id => companionMemoryRuntime.hasSelection(id));
+onAppSessionInvalidated(() => { memoryPreview.dispose(); companionMemoryRuntime.dispose(); invalidateBotMemoryAccess(); });
 /** Called only when the outgoing Maker is actually discarded, not on any error status. */
 export function releaseSessionBindingsForOwnerBoundary(): void {
+  memoryPreview.dispose();
+  companionMemoryRuntime.dispose();
   sessionBindings.releaseForOwnerBoundary();
 }
 
@@ -13803,6 +13888,8 @@ export function registerMakerIpc(maker: Maker, options: RegisterMakerIpcOptions)
     maker,
     restartRuntime: restartBotCanonicalRuntime,
     onBeforeDelete: async (botId) => {
+      companionMemoryRuntime.deleteBot(botId);
+      invalidateBotMemoryAccess(botId);
       // 伙伴自有的 IM 机器人连接先停掉并清凭证: 伙伴没了, 它的 bot 不能继续收消息。
       await removeBotImConnectionsForBot(botId);
       await prepareCompanionImportDeletion(botId);
@@ -18367,6 +18454,7 @@ export function registerMakerIpc(maker: Maker, options: RegisterMakerIpcOptions)
     prewarmSession: prewarmSessionRuntime,
     hydrateActiveOrcaSession,
   } = createMakerSendTransaction({
+    ensureCompanionMemory: id => memoryPreview.ensure(id),
     prepareExternalInput: (sessionId) => takeOverLocalAgentVisibleSession(sessionId, true),
     restoreArchivedSessionForSend,
     prepareProductTurn: (sessionId) => {

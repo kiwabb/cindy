@@ -6675,6 +6675,24 @@ describe('CodexAgent.startSession developerInstructions', () => {
     await handle.close();
   });
 
+  it('registers frozen hidden recall for subscription WS without changing native user input', async () => {
+    const { HOST_TURN_CONTEXT } = await import('../shared/host-turn-context.js');
+    const register = vi.fn();
+    const agent = new CodexAgent(createDeps({systemPrompt:'STABLE'}, {registerCodexSystemPromptForThread:register}));
+    const host = installFakeHost(agent, undefined, {codexProxyActive:true,remoteCompactionProviderId:'cindy_openai'});
+    const handle = await agent.startSession({sessionId:'ws-recall',model:'gpt-5.4',providerId:'openai',workingDir:'/repo'});
+    expect(handle.supportsHostTurnContext).toBe(true);
+    const context = Object.freeze({requestId:'root',text:'private recall'});
+    handle.validateSendOptions?.({[HOST_TURN_CONTEXT]:context});
+    await handle.send({ type: 'user', content: 'original input' }, {[HOST_TURN_CONTEXT]:context});
+    expect(register).toHaveBeenLastCalledWith(expect.objectContaining({webSocketTurnContext:expect.stringContaining('private recall')}));
+    const params = host.request.mock.calls.filter(([method])=>method===Method.TurnStart).at(-1)?.[1] as TurnStartParams;
+    expect(JSON.stringify(params.input)).toContain('original input');
+    expect(JSON.stringify(params.input)).not.toContain('private recall');
+    expect(params.collaborationMode).toBeUndefined();
+    await handle.close();
+  });
+
   it('uses HTTP prompt injection when the host reports OpenAI WebSocket unavailable', async () => {
     const registerCodexSystemPromptForThread = vi.fn();
     const agent = new CodexAgent(createDeps(

@@ -36,6 +36,7 @@ import {
   withoutCodexSpawnModelOverrides,
 } from './device-hosted-guest.js';
 import { LIBRARY_READ_ROOT, withLibraryNativeReadContext } from '../shared/library-native-read.js';
+import { HOST_TURN_CONTEXT, appendHostTurnContext, validateHostTurnContext, type HostTurnContext } from '../shared/host-turn-context.js';
 import os from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -1148,6 +1149,7 @@ type CodexInternalSendOptions = SendOptions & {
   [CODEX_INTERACTION_CONTINUATION]?: true;
 };
 type InteractionContinuationClaim = {
+  hostTurnContext?: HostTurnContext;
   id: number;
   state: 'awaiting' | 'active' | 'cancelled';
   settled: boolean;
@@ -3872,6 +3874,7 @@ assertRouteCurrent();
         source: 'codex',
       });
     };
+    let activeHostTurnContext: HostTurnContext | undefined;
     let isTurnInFlight = false;
     const yieldedExecCellsByTurnId = new Map<string, Map<string, YieldedExecCell[]>>();
     const yieldContinuationClaims = new Map<number, YieldContinuationClaim>();
@@ -3915,6 +3918,7 @@ assertRouteCurrent();
         id: nextYieldContinuationId++, state: 'awaiting' as const, settled: false,
         pendingBoundaryEvents: 0, turnIds: new Set<string>(), requestIds: new Set<string>(),
         pendingSends: 0, sendTail: Promise.resolve(), abort: new AbortController(),
+        hostTurnContext: activeHostTurnContext,
       };
       interactionContinuation = claim;
       interactionContinuationClaims.set(claim.id, claim);
@@ -4010,6 +4014,7 @@ assertRouteCurrent();
         claim.state = 'active';
         emitYieldContinuationState(claim.id, 'active');
         await handle.send(message, { ...options, signal: claim.abort.signal,
+          ...(claim.hostTurnContext || activeHostTurnContext ? { [HOST_TURN_CONTEXT]: claim.hostTurnContext } : {}),
           throwOnStartFailure: true, [CODEX_INTERACTION_CONTINUATION]: true } as CodexInternalSendOptions);
       }).catch((error: unknown) => {
         if (claim.settled || closed) return;
@@ -6999,8 +7004,8 @@ assertRouteCurrent();
     /**
      * proxy 的 registry 注入通道本 thread 是否可用。
      *
-     * 除 host 侧条件外还要求**本 thread 不走 WebSocket**:proxy 的 WS 通道只做 socket
-     * 级透传、看不到请求体,registry 注入不会生效。这类 thread 必须改走 codex 原生的
+     * 除 host 侧条件外还要求**本 thread 不走 WebSocket**:完整产品指令的 registry 注入只适用于 HTTP。WS 保留原生产品指令；
+     * 单轮隐藏记忆由独立的 WS body transform 注入，不复写该稳定前缀。这类 thread 必须改走 codex 原生的
      * developerInstructions 字段(下面 thread/start 与 thread/resume 的
      * `!useProxyChannel` 分支)。
      *
@@ -7025,6 +7030,7 @@ assertRouteCurrent();
         sessionId: sid,
         threadId,
         text,
+        ...(threadUsesWebSocket && activeHostTurnContext ? { webSocketTurnContext: appendHostTurnContext('', activeHostTurnContext) } : {}),
         ...(subagentRoute ? { subagentRoute } : {}),
         // 共享的 app-server 目录不带档位。只有存档或当轮显式选过的档位
         // 才交给宿主：宿主会用它给本线程的智能路由盖章。目录默认 high
@@ -13390,7 +13396,9 @@ assertRouteCurrent();
       });
     };
 
+    const registerHostContext = this.deps.registerCodexSystemPromptForThread;
     const handle: AgentSessionHandle = {
+      get supportsHostTurnContext() { return hostUsesCodexProxy && typeof registerHostContext === 'function'; },
       disabledSkillPaths: disabledSkillSnapshot,
       getAutoReviewOwner: () => currentApprovalConfig().approvalsReviewer === 'auto_review' ? 'native' : 'cindy',
       reviewAutoPermissionAction: async (action) => {
@@ -13411,6 +13419,10 @@ assertRouteCurrent();
       get codexProductPromptDelivery() { return codexProductPromptDelivery; },
 
       validateSendOptions(sendOpts: SendOptions) {
+        if (sendOpts[HOST_TURN_CONTEXT]) {
+          if (!hostUsesCodexProxy || !registerHostContext) throw new Error('HOST_TURN_CONTEXT_UNSUPPORTED');
+          validateHostTurnContext(sendOpts[HOST_TURN_CONTEXT]);
+        }
         if (sendOpts.toolsDisabled && (!host.isCodexProxyActive() || !textOnlyPolicyCleanups.has(threadId))) {
           throw new Error('Host text-only turns require an active Codex request policy proxy.');
         }
@@ -13578,6 +13590,16 @@ assertRouteCurrent();
           abandonBufferedTurns('send cancelled after input preparation');
           flushDeferredTerminalTurnCompletionsIfIdle();
           return;
+        }
+        // Synchronous registry update only: no extra provider call or user-input rewrite.
+        // Internal retries/continuations retain the accepted snapshot; a new input clears it.
+        if (hostUsesCodexProxy && registerHostContext && (activeHostTurnContext || sendOpts?.[HOST_TURN_CONTEXT]) && ((!isContinuation && yieldAttempt == null)
+          || (sendOpts && HOST_TURN_CONTEXT in sendOpts))) {
+          activeHostTurnContext = sendOpts?.[HOST_TURN_CONTEXT];
+          const nextInstructions = appendHostTurnContext(developerInstructions, sendOpts?.[HOST_TURN_CONTEXT]);
+          if (nextInstructions !== registeredDeveloperInstructions || threadUsesWebSocket) {
+            registerCodexDeveloperInstructions(threadId, nextInstructions);
+          }
         }
         const autoReviewIntent = (sendOpts as CodexInternalSendOptions | undefined)?.[
           CODEX_AUTO_REVIEW_INTENT

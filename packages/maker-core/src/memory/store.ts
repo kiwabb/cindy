@@ -18,6 +18,9 @@
  */
 
 import type Database from 'better-sqlite3';
+import { FactJournal } from './fact-journal.js';
+import { FactMemoryQueue, validateFactSelection, type FactMemoryDeps, type FactMutation } from './fact-memory.js';
+import { buildBotMemoryScopeKey } from './storage.js';
 
 import { MemoryFts } from './fts.js';
 import { MemoryStorage, sanitizeWorkdir, buildFilename, parseFilename } from './storage.js';
@@ -78,6 +81,9 @@ export class MakerMemoryStore {
   private readonly fts: MemoryFts;
   private readonly logger: Logger;
   private initialized = false;
+  private factJournal?: FactJournal;
+  private factQueue?: FactMemoryQueue;
+  private readonly derivationProofs = new WeakMap<object, { revision: number; sources: Array<{ filename: string; updatedAt: string }> }>();
 
   constructor(private readonly deps: MakerMemoryStoreDeps) {
     const config = { ...DEFAULT_MEMORY_CONFIG, ...(deps.config ?? {}) };
@@ -87,6 +93,7 @@ export class MakerMemoryStore {
       // 透传 scope 守卫到 storage 写路径 — write 内部 tryReadRaw await 窗口后、
       // 真正写盘前复核 (review #2388 Codex 8th P1)
       deps.scopeCheck ? () => this.assertScopeOk() : undefined,
+      filenames => { this.assertScopeOk(); this.factJournal?.bump(); this.factJournal?.invalidateSources(filenames); this.factJournal?.cancelPending(); },
     );
     this.fts = new MemoryFts(deps.db);
     this.logger = deps.logger;
@@ -105,6 +112,14 @@ export class MakerMemoryStore {
     this.deps.scopeCheck?.();
   }
 
+  /** Host-only storage attestation; actual SQLite main path, no contents or credentials. */
+  getStorageIdentity(): Readonly<{ scopeKey: string; storageDir: string; databasePath: string }> {
+    this.assertScopeOk();
+    const databases = this.deps.db.pragma('database_list') as Array<{ name: string; file: string }>;
+    return Object.freeze({ scopeKey: this.deps.absWorkdir, storageDir: this.deps.storageDir,
+      databasePath: databases.find(database => database.name === 'main')?.file ?? '' });
+  }
+
   /** mkdir + meta.json + FTS 表创建 + sanity check (count 不一致 → rebuild). 幂等. */
   async init(): Promise<void> {
     if (this.initialized) return;
@@ -117,6 +132,8 @@ export class MakerMemoryStore {
     // 首次打开的 getStore 无 withStore 后置检查, 边界不得在此创建旧 owner 的 fts.db。
     this.assertScopeOk();
     this.fts.init();
+    this.factJournal = FactJournal.existing(this.deps.db);
+    await this.purgeInvalidatedDerived();
     await this.sanityCheck();
     // FTS 无条件重建 (review #2388 Codex 24th P2): update/append 被边界中止时
     // 文件数不变, sanityCheck 的 count 检查永不触发 — open 时全量重建保证
@@ -129,6 +146,120 @@ export class MakerMemoryStore {
     // sanityCheck/list 内部多次 await 后复核。
     this.assertScopeOk();
     this.initialized = true;
+  }
+
+  /** Explicit host binding only. No default model and no automatic activation from persisted jobs. */
+  async createFactMemory(options: Pick<FactMemoryDeps, 'scope' | 'selectedRoute' | 'port' | 'assertCurrentScope' | 'onCommitted'>): Promise<FactMemoryQueue> {
+    this.assertScopeOk();
+    validateFactSelection(options.selectedRoute, options.port.route);
+    options.assertCurrentScope(options.scope);
+    if (this.deps.absWorkdir !== buildBotMemoryScopeKey(options.scope.botId) || !options.scope.ownerId) {
+      throw new MemoryError('not-ready', 'Fact memory requires an owner-bound bot store');
+    }
+    if (this.factQueue && !this.factQueue.isDisposed) throw new MemoryError('not-ready', 'Fact memory already bound');
+    await this.init();
+    options.assertCurrentScope(options.scope);
+    this.assertScopeOk();
+    this.factJournal = FactJournal.open(this.deps.db, JSON.stringify([options.scope.ownerId, options.scope.botId]));
+    this.factQueue = new FactMemoryQueue({ ...options, journal: this.factJournal,
+      list: () => this.list(), apply: async (revision, mutations) => { await this.applyFacts(revision, mutations); if (mutations.length) await this.summarizeFacts(); } });
+    return this.factQueue;
+  }
+
+  private async applyFacts(revision: number, mutations: FactMutation[]): Promise<void> {
+    this.assertScopeOk();
+    if (!mutations.length) {
+      if (this.factJournal?.revision() !== revision) throw new MemoryError('version-conflict', 'Fact source is stale');
+      return;
+    }
+    try {
+      await this.storage.applyFactMutations(() => {
+        this.assertScopeOk();
+        if (this.factJournal?.revision() !== revision) throw new MemoryError('version-conflict', 'Fact source is stale');
+      }, mutations);
+      await this.purgeInvalidatedDerived();
+      const records = await this.storage.list();
+      this.assertScopeOk();
+      // Unlike best-effort ordinary writes, a forgetting receipt requires a fresh FTS index.
+      this.fts.rebuild(records);
+    } catch (error) {
+      // Next read must repair both derived indexes before exposing them.
+      this.initialized = false;
+      throw error;
+    }
+  }
+
+  /** Capture before asynchronous derivation; only a proof from this store may publish it. */
+  async captureDerivation(filenames: string[]): Promise<object> {
+    await this.init(); this.assertScopeOk();
+    if (!this.factJournal || !filenames.length) throw new MemoryError('not-ready', 'Derived memory requires fact scope');
+    const revision = this.factJournal.revision();
+    const sources = await Promise.all([...new Set(filenames)].map(async filename => {
+      const record = await this.read(filename); return { filename, updatedAt: record.frontmatter.updatedAt };
+    }));
+    this.assertScopeOk();
+    if (this.factJournal.revision() !== revision) throw new MemoryError('version-conflict', 'Derived source changed');
+    const proof = Object.freeze({}); this.derivationProofs.set(proof, { revision, sources }); return proof;
+  }
+
+  async writeDerivedMemory(proof: object, opts: WriteOptions): Promise<void> {
+    this.assertScopeOk();
+    const captured = this.derivationProofs.get(proof); this.derivationProofs.delete(proof);
+    if (!captured || !this.factJournal || opts.type !== 'digest' || (opts.mode && opts.mode !== 'create')) throw new MemoryError('not-ready', 'Invalid derivation proof');
+    const filename = buildFilename(opts.type, opts.name);
+    if (captured.sources.some(source => source.filename === filename)) throw new MemoryError('invalid-filename', 'Self-derived memory');
+    const existing = await this.storage.read(filename).catch(error => {
+      if (error instanceof MemoryError && error.code === 'not-found') return null; throw error;
+    });
+    if (existing) throw new MemoryError('already-exists', 'Derived target exists');
+    const contentHash = FactJournal.contentHash({ body: opts.body, frontmatter: { type: opts.type, title: opts.title, description: opts.description, updatedAt: '' } });
+    try {
+      await this.storage.applyFactMutations(() => {
+        this.assertScopeOk();
+        if (this.factJournal!.revision() !== captured.revision) throw new MemoryError('version-conflict', 'Derived source changed');
+        this.factJournal!.rememberDerived(filename, contentHash, captured.sources);
+      }, [{ write: { ...opts, mode: 'create' } }]);
+      const records = await this.storage.list(); this.assertScopeOk(); this.fts.rebuild(records);
+    } catch (error) { this.initialized = false; throw error; }
+  }
+
+  private async purgeInvalidatedDerived(): Promise<void> {
+    if (!this.factJournal) return;
+    for (const link of this.factJournal.derivations()) {
+      const current = await this.storage.read(link.filename).catch(error => {
+        if (error instanceof MemoryError && error.code === 'not-found') return null; throw error;
+      });
+      this.assertScopeOk();
+      // A manual replacement belongs to its author, even if it kept the old filename.
+      if (!current || FactJournal.contentHash(current) !== link.content_hash) continue;
+      const sources = JSON.parse(link.sources) as Array<{ filename: string; updatedAt: string }>;
+      let stale = !!link.invalidated;
+      for (const source of sources) {
+        const record = await this.storage.read(source.filename).catch(error => {
+          if (error instanceof MemoryError && error.code === 'not-found') return null; throw error;
+        });
+        if (!record || record.frontmatter.updatedAt !== source.updatedAt) stale = true;
+      }
+      this.assertScopeOk();
+      if (stale) await this.storage.delete(current.filename, current.frontmatter.updatedAt);
+    }
+  }
+
+  /** Deterministic, attributable synopsis; no extra model invocation. */
+  private async summarizeFacts(): Promise<void> {
+    const facts = (await this.list()).filter(record => /^user_fact_[a-f0-9]{24}_/.test(record.filename));
+    if (!facts.length) return;
+    const included: MemoryRecord[] = []; let body = '';
+    for (const fact of facts) {
+      const next = `- ${fact.body.split('\n\nSource:')[0]}\n`;
+      if (Buffer.byteLength(body + next) > 6000) break;
+      body += next; included.push(fact);
+    }
+    if (!included.length) return;
+    // Fixed filename collision is left untouched rather than claiming a manual summary.
+    if ((await this.list()).some(record => record.filename === 'digest_fact_summary.md')) return;
+    const proof = await this.captureDerivation(included.map(record => record.filename));
+    await this.writeDerivedMemory(proof, { type: 'digest', name: 'fact_summary', title: 'User facts', description: 'Derived user fact synopsis', body });
   }
 
   // ── 直通 storage 的方法 (read 类) ────────────────────────────────────────
@@ -194,6 +325,13 @@ export class MakerMemoryStore {
     // storage await 后、FTS 同步前复核 (review #2388 Codex 15th P1): 边界不得
     // 让 manager.write 直接路径 (Pi compaction) 改旧 owner 的 fts.db。
     this.assertScopeOk();
+    if (this.factJournal) {
+      try {
+        await this.purgeInvalidatedDerived();
+        const records = await this.storage.list(); this.assertScopeOk(); this.fts.rebuild(records);
+        return result;
+      } catch (error) { this.initialized = false; throw error; }
+    }
     // FTS 同步 — 失败只 warn, 文件已落盘
     try {
       const rec = await this.storage.read(result.filename);
@@ -215,6 +353,10 @@ export class MakerMemoryStore {
     this.assertScopeOk();
     await this.init();
     await this.storage.delete(filename, expectedUpdatedAt);
+    if (this.factJournal) {
+      await this.syncWrite({ ok: true, filename });
+      return;
+    }
     // storage await 后、FTS 同步前复核 (review #2388 Codex 15th P1)
     this.assertScopeOk();
     try {
@@ -298,6 +440,7 @@ export class MakerMemoryStore {
       }
     }
 
+    await this.purgeInvalidatedDerived();
     // FTS 同步 (整体重建一次, 比逐个 upsert/delete 简单且更不容易出错)
     // rebuild 前复核 (review #2388 Codex 15th P1): 删源循环的 await 窗口后,
     // 边界不得让 FTS 重建落在旧 owner 的 sqlite 上。

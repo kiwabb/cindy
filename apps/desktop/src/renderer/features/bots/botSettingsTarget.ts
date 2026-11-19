@@ -52,6 +52,8 @@ export interface BotSettingsTarget {
   /** Teammates on the same computer: name uniqueness and the follow-up holder's name. */
   useRoster(): ReadonlyArray<{ id: string; name: string; status?: string }>;
   memory: Bots['memory'];
+  /** Explicit local-only private view; absent on remote/older targets. Never a fallback. */
+  openPrivateMemory?: (input: { botId: string; assertCurrent(): void }) => import('./privateBotMemoryAccess').PrivateBotMemoryAccess;
   /** Core text and learned Skill actions; null when the teammate's computer is too old to offer them. */
   skills: Bots['skills'] | null;
   history: { search(body: { botId: string; query: string; limit: number }): Promise<ConversationSearchResponse> };

@@ -52,6 +52,9 @@ function ownedGuestAccess(peer: string) {
   return share && member ? { shareId: share.shareId, memberId: member.memberId, providerId: share.providerId } : null;
 }
 vi.mock('../../authManager.js', () => ({ getDeviceId: () => 'one' }));
+vi.mock('../../maker-host/companion-subscription-text.js', () => ({
+  requestCompanionSubscriptionText: vi.fn(async () => { throw new Error('Companion analysis is outside this fixture'); }),
+}));
 vi.mock('../../device-link/providerShareApi.js', () => ({
   providerShareOwnerKey: () => state.owner,
   checkProviderShareDelegation: (...args: unknown[]) => state.check(...args),

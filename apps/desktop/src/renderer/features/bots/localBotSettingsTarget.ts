@@ -1,3 +1,4 @@
+import { createPrivateBotMemoryAccess } from './privateBotMemoryAccess';
 import { useMemo, useSyncExternalStore } from 'react';
 
 import type { ConversationSearchResponse } from '../../../shared/conversationSearch';
@@ -130,6 +131,7 @@ export const localBotSettingsTarget: BotSettingsTarget = {
   useDefaultModelChain,
   useHiddenVendors,
   useRoster: () => useBotProfiles(),
+  openPrivateMemory: input => createPrivateBotMemoryAccess(input, () => api().privateFacts),
   memory: {
     list: (...args) => api().memory.list(...args),
     read: (...args) => api().memory.read(...args),

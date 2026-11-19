@@ -13,6 +13,8 @@
  */
 import { createHash } from 'node:crypto';
 import {
+  HOST_TURN_CONTEXT,
+  validateHostTurnContext,
   LOCAL_AGENT_CLIENT,
   AUTO_REVIEW_DELEGATED_CONTINUATION,
   AUTO_REVIEW_SOURCE_CONTENT,
@@ -707,6 +709,7 @@ export interface RemoteAgentWireSendOptions {
    */
   groupNewRound?: true;
   cindy?: {
+    hostTurnContext?: { requestId:string; text:string };
     /** autoReviewReferences is optional and additive; older peers drop it and review without it. */
     mainOwned?: { origin: TurnPermissionOrigin; rawChannelText?: string; autoReviewReferences?: unknown };
     autoReviewSourceContent?: RemoteAgentWireMessage;
@@ -758,6 +761,7 @@ export async function encodeSendOptions(
     });
   }
   const cindy: NonNullable<RemoteAgentWireSendOptions['cindy']> = {};
+  if (opts[HOST_TURN_CONTEXT]) { validateHostTurnContext(opts[HOST_TURN_CONTEXT]); cindy.hostTurnContext = {...opts[HOST_TURN_CONTEXT]}; }
   const mainOwned = opts[MAIN_OWNED_SEND_CONTEXT];
   if (mainOwned) cindy.mainOwned = jsonSafe(mainOwned) as NonNullable<typeof cindy.mainOwned>;
   const sourceContent = opts[AUTO_REVIEW_SOURCE_CONTENT];
@@ -835,6 +839,13 @@ export async function decodeSendOptions(value: unknown, callbacks: DecodeSendCal
   }
   if (isRecord(value.cindy)) {
     const cindy = value.cindy;
+    if (cindy.hostTurnContext !== undefined) {
+      const context = cindy.hostTurnContext;
+      if (!isRecord(context) || typeof context.requestId !== 'string' || typeof context.text !== 'string'
+        || Object.keys(context).some(key => key !== 'requestId' && key !== 'text')) throw Error('REMOTE_AGENT_INVALID: invalid recall context');
+      const snapshot = {requestId:context.requestId,text:context.text}; validateHostTurnContext(snapshot);
+      opts[HOST_TURN_CONTEXT] = Object.freeze(snapshot);
+    }
     if (cindy.mainOwned !== undefined) {
       if (!isRecord(cindy.mainOwned)) throw new Error('REMOTE_AGENT_INVALID: invalid Main-owned send context');
       const origin = decodeOrigin(cindy.mainOwned.origin);

@@ -134,6 +134,7 @@ vi.mock('../../../maker-ipc/botDefaultProvisioning.js', () => ({
 }));
 vi.mock('electron', () => ({
   app: {
+    once: vi.fn(),
     getPath: vi.fn(() => h.userDataDir),
     getAppPath: () => resolve(__dirname, '../../../../..'),
   },
