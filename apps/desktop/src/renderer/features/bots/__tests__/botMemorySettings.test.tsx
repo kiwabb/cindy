@@ -389,3 +389,26 @@ describe('explicit private memory source UI fixtures',()=>{
   await screen.findByRole('button',{name:/说结论前核实/});expect(screen.queryByRole('button',{name:'bots.memory.sourcePrivate'})).toBeNull();expect(privateApi.list).not.toHaveBeenCalled();
  });
 });
+
+it.each([
+ ['COMPANION_SHARED_WORKSPACE','privateWorkspaceConflict'],
+ ['COMPANION_PRIVATE_STORE_REQUIRED','privateIsolationFailed'],
+ ['COMPANION_PRIVATE_WORKSPACE_REQUIRED','privateIsolationFailed'],
+ ['UNKNOWN_FAILURE','loadFailed'],
+])('private list explains %s and retry recovers without enabling preview',async(code,key)=>{
+ const privateApi=installPrivateFixture();
+ privateApi.list.mockRejectedValueOnce(new Error(`Error invoking remote method 'local-db:bots:private-facts:list': Error: ${code}`));
+ renderMemory(false);
+ fireEvent.click(screen.getByRole('button',{name:'bots.memory.sourcePrivate'}));
+ expect((await screen.findByRole('alert')).textContent).toContain(`bots.memory.${key}`);
+ expect(screen.queryByText(code)).toBeNull();
+ fireEvent.click(screen.getByRole('button',{name:'commonUi.retry'}));
+ await screen.findByRole('button',{name:/Private fixture/});
+ expect(window.electronAPI.localDb.bots.memoryPreview.set).not.toHaveBeenCalled();
+});
+it('private detail reports isolation failure without exposing raw server text',async()=>{
+ const privateApi=installPrivateFixture(); renderMemory(); await showPrivate();
+ privateApi.read.mockRejectedValueOnce(new Error('COMPANION_PRIVATE_STORE_REQUIRED'));
+ fireEvent.click(screen.getByRole('button',{name:/Private fixture/}));
+ expect((await screen.findByRole('alert')).textContent).toContain('bots.memory.privateIsolationFailed');
+});

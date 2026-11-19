@@ -10713,6 +10713,8 @@
       "search": "Rechercher dans les mémoires",
       "empty": "Aucune mémoire",
       "noResults": "Aucune mémoire correspondante",
+      "privateWorkspaceConflict": "Impossible d’ouvrir la mémoire privée : un autre partenaire utilise cet espace de travail. Attribuez un espace distinct à chaque partenaire, puis réessayez.",
+      "privateIsolationFailed": "Impossible de vérifier l’emplacement de la mémoire privée. Vérifiez que le dossier mémoire de ce partenaire n’a pas été déplacé ou lié à un autre emplacement, puis réessayez.",
       "loadFailed": "Impossible de charger les mémoires",
       "types": {
         "user": "À votre sujet",

@@ -49,6 +49,13 @@ const isConflict = (error: unknown) => {
   const ipc = extractIpcError(error);
   return ipc?.code === 'PRECONDITION_FAILED' && ipc.message.includes(BOT_MEMORY_CHANGED);
 };
+// Electron prefixes rejected handler errors; never display raw paths or error text.
+function memoryLoadErrorKey(error: unknown) {
+  const message = extractIpcError(error)?.message ?? (error instanceof Error ? error.message : '');
+  if (/(?:^|[ :])COMPANION_SHARED_WORKSPACE$/.test(message)) return 'bots.memory.privateWorkspaceConflict';
+  if (/(?:^|[ :])COMPANION_PRIVATE_(?:STORE|WORKSPACE)_REQUIRED$/.test(message)) return 'bots.memory.privateIsolationFailed';
+  return 'bots.memory.loadFailed';
+}
 const normalizeTitle = (title: string) => title.replace(/\s+/g, ' ').trim();
 const bodyTooLong = (body: string) =>
   new TextEncoder().encode(body.trim()).length > BOT_MEMORY_BODY_MAX_BYTES;
@@ -243,7 +250,7 @@ function MemoryList({
   const [query, setQuery] = useState('');
   const [entries, setEntries] = useState<BotMemorySummary[] | null>(null);
   const [total, setTotal] = useState<number | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
 
   useEffect(() => {
@@ -256,10 +263,10 @@ function MemoryList({
           if (cancelled) return;
           setEntries(next);
           if (!search) setTotal(next.length);
-          setFailed(false);
+          setFailed(null);
         })
-        .catch(() => {
-          if (!cancelled) setFailed(true);
+        .catch((error: unknown) => {
+          if (!cancelled) setFailed(memoryLoadErrorKey(error));
         });
     };
     const timer = search ? setTimeout(run, SEARCH_DEBOUNCE_MS) : null;
@@ -314,7 +321,7 @@ function MemoryList({
           className="flex flex-col items-center gap-3 py-10 text-13 text-[var(--text-secondary)]"
           role="alert"
         >
-          {t('bots.memory.loadFailed')}
+          {t(failed!)}
           <Button variant="secondary" size="md" onClick={() => setReload((value) => value + 1)}>
             {t('commonUi.retry')}
           </Button>
@@ -411,7 +418,7 @@ function MemoryDetail({
   const { stamp } = useDateLabels();
   const { confirm } = useConfirmDialog();
   const [detail, setDetail] = useState<BotMemoryDetail | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
   const [changed, setChanged] = useState(false);
   const [busy, setBusy] = useState(false);
   const [reload, setReload] = useState(0);
@@ -424,12 +431,12 @@ function MemoryDetail({
         if (cancelled) return;
         setDetail(next);
         onLoaded(next);
-        setFailed(false);
+        setFailed(null);
       })
       .catch((error: unknown) => {
         if (cancelled) return;
         if (extractIpcError(error)?.code === 'NOT_FOUND') onMissing();
-        else setFailed(true);
+        else setFailed(memoryLoadErrorKey(error));
       });
     return () => {
       cancelled = true;
@@ -472,7 +479,7 @@ function MemoryDetail({
         className="flex flex-col items-center gap-3 py-10 text-13 text-[var(--text-secondary)]"
         role="alert"
       >
-        {t('bots.memory.loadFailed')}
+        {t(failed!)}
         <Button variant="secondary" size="md" onClick={() => setReload((value) => value + 1)}>
           {t('commonUi.retry')}
         </Button>

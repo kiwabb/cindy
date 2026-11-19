@@ -18,14 +18,17 @@ export interface BotMemoryAccessDeps {
   getStore(scopeKey: string): Promise<MakerMemoryStore>;
   requestRefresh(sessionId: string): Promise<unknown>;
 }
-/** Owner-local session metadata only; aliases cannot hide a shared workspace. */
-export function assertExclusiveBotWorkspace(workspace: string, canonicalSessionId: string,
-  sessions: ReadonlyArray<{ id: string; workingDir: string | null; projectDir: string | null }>): void {
+/** Working in a teammate project does not grant access to its private store.
+ * Ordinary project tasks and this bot's linked tasks may share the workspace;
+ * only a task bound to a different bot is an ownership conflict. The separate
+ * scope/realpath/database guard below remains the private-memory boundary. */
+export function assertExclusiveBotWorkspace(workspace: string, botId: string,
+  sessions: ReadonlyArray<{ id: string; botId: string | null; workingDir: string | null; projectDir: string | null }>): void {
   const comparable = (value: string) => process.platform === 'win32' ? value.toLowerCase() : value;
   let target = path.resolve(workspace);
   try { target = fs.realpathSync(target); } catch { /* Compare missing paths lexically. */ }
   for (const session of sessions) {
-    if (session.id === canonicalSessionId) continue;
+    if (!session.botId || session.botId === botId) continue;
     for (const candidate of [session.workingDir, session.projectDir]) {
       if (!candidate) continue;
       let resolved = path.resolve(candidate);

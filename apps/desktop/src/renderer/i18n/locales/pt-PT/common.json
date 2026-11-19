@@ -10713,6 +10713,8 @@
       "search": "Pesquisar memórias",
       "empty": "Ainda não há memórias",
       "noResults": "Nenhuma memória correspondente",
+      "privateWorkspaceConflict": "Não é possível abrir a memória privada porque outro parceiro usa este espaço de trabalho. Use um espaço separado para cada parceiro e tente novamente.",
+      "privateIsolationFailed": "Não foi possível verificar a localização da memória privada. Verifique se a pasta de memória deste parceiro foi movida ou ligada a outra localização e tente novamente.",
       "loadFailed": "Não foi possível carregar as memórias",
       "types": {
         "user": "Sobre si",

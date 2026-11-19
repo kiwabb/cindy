@@ -10584,6 +10584,8 @@
       "search": "搜索记忆",
       "empty": "还没有记忆",
       "noResults": "没有找到相关记忆",
+      "privateWorkspaceConflict": "此工作区也被其他伙伴使用，暂时不能打开私有记忆。请让每个伙伴使用各自的工作区后重试。",
+      "privateIsolationFailed": "无法确认私有记忆的存储位置，已停止读取。请检查该伙伴的记忆目录是否被移动或链接到其他位置后重试。",
       "loadFailed": "记忆读取失败",
       "types": {
         "user": "关于你",
