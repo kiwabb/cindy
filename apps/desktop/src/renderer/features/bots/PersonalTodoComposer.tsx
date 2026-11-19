@@ -23,7 +23,7 @@ import {
   isDataOwnerIdCurrent,
 } from '@/contexts/dataOwnerGeneration';
 import { extractIpcError } from '@/utils/ipcError';
-import type { PersonalTodo, PersonalTodoUpdate } from '../../../shared/personalTodo';
+import type { PersonalTodo, PersonalTodoWriteRequest } from '../../../shared/personalTodo';
 import { parseTodoWhen } from './parseTodoWhen';
 import { personalDueText, PERSONAL_PRIORITIES } from './personalTodoModel';
 import {
@@ -69,15 +69,18 @@ export function PersonalTodoComposer({
   supportedColors,
   createTag,
   activeTagId,
+  atTop = false,
   onCreated,
 }: {
-  update: (input: PersonalTodoUpdate) => Promise<PersonalTodo>;
+  update: (input: PersonalTodoWriteRequest) => Promise<PersonalTodo>;
   tags: readonly TaskTag[];
   supportedColors: readonly TaskTagColor[];
   /** Absent on a replica: its tags are the main computer's catalog, which cannot be edited here. */
   createTag?: (name: string, color: TaskTagColor) => Promise<TaskTag>;
   /** The tag the list is filtered to; a new draft starts with it. */
   activeTagId: string | null;
+  /** In manual order a new todo goes to the top of the list, right under this composer. */
+  atTop?: boolean;
   onCreated: (todo: PersonalTodo) => void;
 }) {
   const { t, i18n } = useTranslation();
@@ -168,7 +171,7 @@ export function PersonalTodoComposer({
       const saved = await update({
         ...(target
           ? { id: target.id, expectedRevision: target.revision }
-          : { creationRequestId: requestId.current }),
+          : { creationRequestId: requestId.current, ...(atTop ? { place: { to: 'top' as const } } : {}) }),
         title: finalTitle,
         notes,
         deadline,

@@ -3,6 +3,7 @@ import {
   getPersonalTodoSnapshot,
   ensurePersonalTodos,
   refreshPersonalTodos,
+  reorderPersonalTodos,
   updatePersonalTodo,
 } from './personalTodoCache';
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
@@ -32,6 +33,8 @@ import { StepAdder, StepList } from './PersonalTodoSteps';
 import {
   DEFAULT_PERSONAL_GROUPING,
   DEFAULT_PERSONAL_ORDER,
+  EARLIER_PERSONAL_GROUPING,
+  EARLIER_PERSONAL_ORDER,
   PERSONAL_GROUPINGS,
   PERSONAL_ORDERS,
   PERSONAL_PRIORITIES,
@@ -52,6 +55,36 @@ import {
 } from './personalTodoVisuals';
 import { quickDate } from './todoDates';
 
+const GROUPING_CHOICE = 'personal-todo-grouping';
+const ORDER_CHOICE = 'personal-todo-order';
+const VIEW_DEFAULTS_SETTLED = 'personal-todo-view-defaults';
+
+const storedKey = (name: string, dataOwnerId: string | null | undefined) =>
+  `${name}:${dataOwnerId ?? 'local'}`;
+
+/**
+ * One-time compatibility for the new defaults (manual order, no groups; 2026-11-18). Only explicit
+ * picks are stored, and before this an account could have picked one of grouping and order while
+ * seeing the other at the earlier default. Such an account gets that other one written once at the
+ * earlier default, so its view stays as it was. After the marker, an unpicked choice follows the
+ * current default.
+ */
+function settleEarlierViewDefaults(dataOwnerId: string | null | undefined) {
+  try {
+    const marker = storedKey(VIEW_DEFAULTS_SETTLED, dataOwnerId);
+    if (localStorage.getItem(marker) !== null) return;
+    const grouping = storedKey(GROUPING_CHOICE, dataOwnerId);
+    const order = storedKey(ORDER_CHOICE, dataOwnerId);
+    const pickedGrouping = localStorage.getItem(grouping) !== null;
+    const pickedOrder = localStorage.getItem(order) !== null;
+    if (pickedOrder && !pickedGrouping) localStorage.setItem(grouping, EARLIER_PERSONAL_GROUPING);
+    if (pickedGrouping && !pickedOrder) localStorage.setItem(order, EARLIER_PERSONAL_ORDER);
+    localStorage.setItem(marker, '1');
+  } catch {
+    /* Without preference storage there is nothing earlier to keep. */
+  }
+}
+
 /** A per-account preference kept in localStorage; storage that cannot be read or written only costs the memory. */
 function useStoredChoice<T extends string>(
   name: string,
@@ -59,7 +92,7 @@ function useStoredChoice<T extends string>(
   allowed: readonly T[],
   fallback: T,
 ) {
-  const key = `${name}:${dataOwnerId ?? 'local'}`;
+  const key = storedKey(name, dataOwnerId);
   const load = (): T => {
     try {
       const saved = localStorage.getItem(key);
@@ -90,14 +123,16 @@ export function usePersonalTodos() {
     getPersonalTodoSnapshot,
   );
   useEffect(ensurePersonalTodos, [dataOwnerId, ownerGeneration]);
+  // Before the stored choices are read, so an earlier account keeps the view it had.
+  settleEarlierViewDefaults(dataOwnerId);
   const [grouping, selectGrouping] = useStoredChoice<PersonalGrouping>(
-    'personal-todo-grouping',
+    GROUPING_CHOICE,
     dataOwnerId,
     PERSONAL_GROUPINGS,
     DEFAULT_PERSONAL_GROUPING,
   );
   const [order, selectOrder] = useStoredChoice<PersonalOrder>(
-    'personal-todo-order',
+    ORDER_CHOICE,
     dataOwnerId,
     PERSONAL_ORDERS,
     DEFAULT_PERSONAL_ORDER,
@@ -106,6 +141,7 @@ export function usePersonalTodos() {
     ...snapshot,
     refresh: refreshPersonalTodos,
     update: updatePersonalTodo,
+    reorder: reorderPersonalTodos,
     grouping,
     selectGrouping,
     order,

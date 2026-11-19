@@ -95,6 +95,12 @@ export interface TeammateTodo {
   subtasks?: TodoSubtask[];
   /** The conversation this todo opens; absent means none. */
   link?: TodoLink;
+  /**
+   * Manual position: lower comes first. Absent means the todo was never placed by hand and sits at
+   * its creation time (`Date.parse(createdAt)`), so ranks set by hand and creation order compare on
+   * one scale. Optional and additive: older versions keep it as an unknown field.
+   */
+  rank?: number;
 }
 export interface TodoPatch {
   id?: string;
@@ -123,6 +129,8 @@ export interface TodoPatch {
   subtasks?: TodoSubtask[];
   /** Sets the linked conversation; null removes it. */
   link?: TodoLink | null;
+  /** Sets the manual position (see TeammateTodo.rank); null returns it to creation order. */
+  rank?: number | null;
 }
 export interface TodoState {
   version: 1;
@@ -155,6 +163,10 @@ const text = (s: unknown, max: number, required: boolean, field: string): string
 };
 export function validTodoPriority(value: unknown): value is TodoPriority {
   return value === 0 || value === 1 || value === 2 || value === 3;
+}
+/** A finite manual rank within the range a millisecond timestamp scale leaves room for. */
+export function validTodoRank(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= 1e15;
 }
 export function validTodoReminder(value: unknown): value is TodoReminder {
   return (TODO_REMINDERS as readonly unknown[]).includes(value);
@@ -646,6 +658,11 @@ export function applyTodoPatch(
     const link = normalizeTodoLink(patch.link);
     if (link) t.link = link;
     else delete t.link;
+  }
+  if (patch.rank !== undefined) {
+    if (patch.rank === null) delete t.rank;
+    else if (!validTodoRank(patch.rank)) throw invalidInput('rank must be a finite number');
+    else t.rank = patch.rank;
   }
   if (patch.resolvedActionRequestId !== undefined) {
     if (!old?.action || old.action.requestId !== patch.resolvedActionRequestId)

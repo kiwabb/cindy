@@ -9,7 +9,9 @@ import {
   ALL_TAGS,
   effectiveTagFilter,
   matchesTagFilter,
+  personalCanReorder,
   personalCounts,
+  personalDropMove,
   personalSections,
   personalTagChips,
   resolvePersonalTag,
@@ -27,6 +29,9 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
+import { SortableList } from '@/components/sidebar/SortableList';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
+import { toast } from '@/lib/toast';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { SETTINGS_SECTION_TITLE_CLASS } from '@/components/ui/settings-rows';
 import { cn } from '@/lib/utils';
@@ -114,6 +119,21 @@ function TodoBoard() {
   const updateSteps = async (input: PersonalTodoUpdate) => {
     setStepsSaved(await personal.update(input));
   };
+  // A drop saves quietly too; the open panel follows the moved todo's new revision.
+  const reducedMotion = useReducedMotion();
+  const isDraft = (id: string) => id.startsWith(CONFLICT_DRAFT_PREFIX);
+  const dropped = (before: readonly string[], after: string[]) => {
+    const move = personalDropMove(before, after, isDraft);
+    if (!move) return;
+    void personal.reorder([move.id], move.place).then(
+      (todos) => {
+        const moved = todos.find((todo) => todo.id === editor?.id);
+        if (moved) setStepsSaved(moved);
+      },
+      () => toast.error(t('personalTodos.reorderFailed')),
+    );
+  };
+  const draggable = personalCanReorder(personal.order, view);
   // A todo added from the composer stays visible: a filter that would hide it is cleared.
   const created = (todo: PersonalTodo) => {
     if (!matchesTagFilter(todo, catalog, effectiveTagFilter(tagFilter, catalog)))
@@ -161,38 +181,61 @@ function TodoBoard() {
   };
 
   const anyLinked = sections.some((section) => section.items.some((todo) => todo.link));
+  const row = (section: PersonalSection, todo: PersonalTodo) => (
+    <PersonalTodoRow
+      key={todo.id}
+      todo={todo}
+      view={view}
+      tag={showTag ? resolvePersonalTag(todo, catalog) : null}
+      groupBucket={
+        personal.grouping === 'due' && section.key.kind === 'bucket'
+          ? section.key.bucket
+          : undefined
+      }
+      selected={editor?.id === todo.id}
+      now={now}
+      reserveLinkSlot={anyLinked}
+      // Opening the row that is already open closes it again.
+      onOpen={(next) =>
+        next.id.startsWith(CONFLICT_DRAFT_PREFIX)
+          ? undefined
+          : setEditor((open) => (open?.id === next.id ? undefined : next))
+      }
+      onUpdate={updateRow}
+      onSteps={updateSteps}
+      conflict={
+        sync.conflicts.has(todo.id)
+          ? { busy: sync.busy, onResolve: (choice) => void sync.resolve(todo.id, choice) }
+          : undefined
+      }
+    />
+  );
   const list: ReactNode = sections.length
     ? sections.map((section) => (
         <Section key={section.id} label={sectionLabel(section)} count={section.items.length}>
-          {section.items.map((todo) => (
-            <PersonalTodoRow
-              key={todo.id}
-              todo={todo}
-              view={view}
-              tag={showTag ? resolvePersonalTag(todo, catalog) : null}
-              groupBucket={
-                personal.grouping === 'due' && section.key.kind === 'bucket'
-                  ? section.key.bucket
-                  : undefined
+          {draggable ? (
+            // Manual order: a row moves within its section (dropping it into another section would
+            // mean changing its deadline, priority or tag). Refused drafts stay where they are.
+            <SortableList
+              items={section.items}
+              getId={(todo) => todo.id}
+              onReorder={(ids) =>
+                dropped(
+                  section.items.map((todo) => todo.id),
+                  ids,
+                )
               }
-              selected={editor?.id === todo.id}
-              now={now}
-              reserveLinkSlot={anyLinked}
-              // Opening the row that is already open closes it again.
-              onOpen={(next) =>
-                next.id.startsWith(CONFLICT_DRAFT_PREFIX)
-                  ? undefined
-                  : setEditor((open) => (open?.id === next.id ? undefined : next))
+              renderItem={(todo) =>
+                isDraft(todo.id) ? <div data-no-drag>{row(section, todo)}</div> : row(section, todo)
               }
-              onUpdate={updateRow}
-              onSteps={updateSteps}
-              conflict={
-                sync.conflicts.has(todo.id)
-                  ? { busy: sync.busy, onResolve: (choice) => void sync.resolve(todo.id, choice) }
-                  : undefined
-              }
+              reducedMotion={reducedMotion}
+              filter="input, textarea, select, a, [data-no-drag]"
+              className="flex flex-col"
+              rowClassName="personal-todo-sortable-row"
             />
-          ))}
+          ) : (
+            section.items.map((todo) => row(section, todo))
+          )}
         </Section>
       ))
     : personal.loading
@@ -304,6 +347,7 @@ function TodoBoard() {
                 supportedColors={taskTags.supportedColors}
                 createTag={replicaTags ? undefined : taskTags.create}
                 activeTagId={effectiveFilter.kind === 'tag' ? effectiveFilter.id : null}
+                atTop={personal.order === 'manual'}
                 onCreated={created}
               />
             ) : null}

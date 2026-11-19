@@ -20111,6 +20111,7 @@
     "deleteConfirm": "Supprimer cet élément ?",
     "empty": "Aucun élément dans cette vue",
     "saveFailed": "Échec de l’enregistrement. Votre saisie est conservée. Réessayez.",
+    "reorderFailed": "Impossible d’enregistrer le nouvel ordre. Réessayez.",
     "loadFailed": "Impossible de charger vos éléments personnels.",
     "conflict": "Mis à jour ailleurs",
     "reloadVersion": "Charger la version à remplacer",
@@ -20160,6 +20161,7 @@
     },
     "order": {
       "label": "Ordre dans le groupe",
+      "manual": "Mon ordre (glisser pour réorganiser)",
       "priority": "Priorité la plus haute d’abord",
       "due": "Échéance la plus proche d’abord",
       "created": "Ajoutées récemment d’abord"

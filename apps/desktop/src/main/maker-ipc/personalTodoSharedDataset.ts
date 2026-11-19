@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { TodoError, type TeammateTodo } from '@cindy/maker-shared/teammate-todo';
+import { TodoError, validTodoRank, type TeammateTodo } from '@cindy/maker-shared/teammate-todo';
 import type { TaskTag } from '@cindy/maker-shared';
 import type { PersonalTodoUpdate } from '../../shared/personalTodo.js';
 import {
@@ -48,6 +48,9 @@ const stepsOf = (todo: TeammateTodo) =>
     done,
     ...(doneAt ? { doneAt } : {}),
   }));
+
+/** The stored manual rank, or null for a todo never placed by hand. */
+const rankOf = (todo: TeammateTodo) => (validTodoRank(todo.rank) ? todo.rank : null);
 
 const deferral = (todo: TeammateTodo) => (todo.decision?.kind === 'later' ? (todo.decision.until ?? null) : null);
 
@@ -132,6 +135,8 @@ export const personalTodosDataset: SharedDatasetDefinition<StoredTodo, TaskTag[]
       ...(item.subtasks?.length ? { subtasks: stepsOf(item) } : {}),
       // Only when set: a main computer from before links refuses the unknown field.
       ...(item.link ? { link: item.link } : {}),
+      // Likewise the manual rank: only a todo placed by hand carries one.
+      ...(validTodoRank(item.rank) ? { rank: item.rank } : {}),
       ...(item.status === 'done' ? { [CARRY_DONE]: true } : {}),
       ...(item.status === 'open' && item.decision?.kind === 'later' && item.decision.until
         ? { [CARRY_LATER]: item.decision.until }
@@ -154,6 +159,8 @@ export const personalTodosDataset: SharedDatasetDefinition<StoredTodo, TaskTag[]
       ...(JSON.stringify(local.link ?? null) !== JSON.stringify(remote.link ?? null)
         ? { link: local.link ?? null }
         : {}),
+      // The same for the manual rank: a reorder made here is kept, anything else leaves it alone.
+      ...(rankOf(local) !== rankOf(remote) ? { rank: rankOf(local) } : {}),
       ...revisionOperation(local, remote),
     };
   },

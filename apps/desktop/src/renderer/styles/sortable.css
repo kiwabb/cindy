@@ -80,6 +80,14 @@
   border-radius: 8px;
 }
 
+/* 个人待办行（手动排序）的浮起 clone 脱离列表后补回浮层背景；只用主题语义 token，
+   Light / Dark 同源。 */
+.personal-todo-sortable-row.xdt-sortable-drag {
+  background-color: var(--surface-elevated);
+  border-radius: 8px;
+  box-shadow: var(--shadow-menu);
+}
+
 /* 设置页供应商行的浮起 clone 脱离卡片后补回卡片背景；阴影只使用主题语义 token，
    Light / Dark 同源，不另写模式补丁。 */
 .provider-settings-sortable-row.xdt-sortable-drag {

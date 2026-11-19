@@ -19851,6 +19851,7 @@
     "deleteConfirm": "删此待办？",
     "empty": "此处暂无待办",
     "saveFailed": "保存未成，输入仍存。请再保存。",
+    "reorderFailed": "次序未存，请再试。",
     "loadFailed": "个人待办未能读取。",
     "conflict": "已在别处更新",
     "reloadVersion": "读取最新版本以覆盖保存",
@@ -19900,6 +19901,7 @@
     },
     "order": {
       "label": "组内之序",
+      "manual": "手排之序（可拖移）",
       "priority": "急者居前",
       "due": "期近者居前",
       "created": "新添者居前"

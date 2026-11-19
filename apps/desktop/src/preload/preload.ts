@@ -6204,7 +6204,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     personalTodos: {
       list: () => ipcRenderer.invoke('local-db:personal-todos:list'),
-      update: (input: import('../shared/personalTodo').PersonalTodoUpdate) => ipcRenderer.invoke('local-db:personal-todos:update', input),
+      update: (input: import('../shared/personalTodo').PersonalTodoWriteRequest) => ipcRenderer.invoke('local-db:personal-todos:update', input),
+      reorder: (ids: string[], place?: import('../shared/personalTodo').PersonalTodoPlace) =>
+        ipcRenderer.invoke('local-db:personal-todos:reorder', ids, place),
       onChanged: (listener: (ownerStamp?: import('../shared/dataOwnerPush').DataOwnerPushStamp) => void) => {
         const wrapped = (_event: Electron.IpcRendererEvent, ownerStamp?: import('../shared/dataOwnerPush').DataOwnerPushStamp) => listener(ownerStamp);
         ipcRenderer.on('local-db:personal-todos:changed', wrapped);

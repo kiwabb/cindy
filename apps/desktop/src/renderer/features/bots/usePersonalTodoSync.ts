@@ -33,6 +33,8 @@ export function conflictDraftTodo(conflict: PersonalTodoSyncConflict): PersonalT
     reminder: draft.reminder ?? 'default',
     subtasks: (draft.subtasks ?? []).map((step, index) => ({ id: step.id ?? `draft-${index}`, title: step.title, done: step.done ?? false })),
     ...(draft.link ? { link: draft.link } : {}),
+    // Where it was placed when drafted; otherwise at the bottom, like any new todo.
+    rank: typeof draft.rank === 'number' ? draft.rank : Date.parse(at),
     ownership: 'self',
     source: 'manual',
   };

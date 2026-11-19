@@ -2,7 +2,11 @@ import { AppFrame, forbid, mountPage, subscription } from '../../ui-page/harness
 import { TeammateTodosView } from '../../../src/renderer/features/bots/TeammateTodosView';
 import { todoLocalDate } from '@cindy/maker-shared/teammate-todo';
 import { TASK_TAG_COLORS, type TaskTag } from '@cindy/maker-shared';
-import type { PersonalTodo } from '../../../src/shared/personalTodo';
+import {
+  planPersonalTodoOrder,
+  type PersonalTodo,
+  type PersonalTodoPlace,
+} from '../../../src/shared/personalTodo';
 
 // The page, the personal todo read, the task-tag cache, menus, tooltips, theme and translations are
 // the production code; only the account generation hook is replaced at build time (ui-page.mjs `stubs`).
@@ -28,9 +32,10 @@ const instant = (offset: number, hour: number, minute = 0) => {
   return { kind: 'instant' as const, date, at: at.toISOString(), timeZone: zone };
 };
 function mine(id: string, title: string, patch: Partial<PersonalTodo> = {}): PersonalTodo {
+  const createdAt = `2026-11-0${Number(id.replace(/\D/g, '')) % 9 + 1}T08:00:00Z`;
   return {
     id, revision: 1, title, notes: '', deadline: null, status: 'open', deferredUntil: null,
-    createdAt: `2026-11-0${Number(id.replace(/\D/g, '')) % 9 + 1}T08:00:00Z`, updatedAt: '2026-11-10T08:00:00Z',
+    createdAt, rank: Date.parse(createdAt), updatedAt: '2026-11-10T08:00:00Z',
     priority: 0, tagIds: [], reminder: 'default', subtasks: [], ownership: 'self', source: 'manual', ...patch,
   };
 }
@@ -78,6 +83,19 @@ function syncConflicts(caseName: string) {
   if (caseName === 'sync-conflict-row') return [{ sequence: 1, code: 'CONFLICT', todoId: 'p2' }];
   return [{ sequence: 2, code: 'NOT_FOUND', draft: { title: '订会议室并通知参会人', priority: 2, tagIds: ['work'], deadline: deadline(1) } }];
 }
+// `manual-order`: a drop is answered in memory with the same plan the main process makes (fixture
+// data only, nothing is stored), so the real drag and the list's new order can be checked.
+const reorderApi = (caseName: string) => {
+  if (caseName !== 'manual-order') return { reorder: forbid('personalTodos.reorder') };
+  let items = personal(caseName);
+  return {
+    reorder: async (ids: string[], place?: PersonalTodoPlace) => {
+      const ranks = new Map(planPersonalTodoOrder(items, ids, place).map((change) => [change.id, change.rank]));
+      items = items.map((item) => (ranks.has(item.id) ? { ...item, rank: ranks.get(item.id)!, revision: item.revision + 1 } : item));
+      return items.filter((item) => ranks.has(item.id));
+    },
+  };
+};
 const syncApi = (caseName: string) =>
   SYNC_CASES.includes(caseName)
     ? {
@@ -97,7 +115,7 @@ mountPage({
   route: '/bots/todos',
   host: (ctx) => ({
     localDb: {
-      personalTodos: { list: async () => personal(ctx.case), update: forbid('personalTodos.update'), onChanged: subscription('personalTodos'), ...syncApi(ctx.case) },
+      personalTodos: { list: async () => personal(ctx.case), update: forbid('personalTodos.update'), ...reorderApi(ctx.case), onChanged: subscription('personalTodos'), ...syncApi(ctx.case) },
       taskTags: {
         execute: async () => ({ tags: TAGS, sessions: [], supportedColors: [...TASK_TAG_COLORS] }),
         onChanged: subscription('taskTags'),

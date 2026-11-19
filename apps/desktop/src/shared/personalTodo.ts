@@ -1,10 +1,12 @@
-import type {
-  TeammateTodo,
-  TodoDeadline,
-  TodoLink,
-  TodoPriority,
-  TodoReminder,
-  TodoSubtask,
+import {
+  TodoError,
+  validTodoRank,
+  type TeammateTodo,
+  type TodoDeadline,
+  type TodoLink,
+  type TodoPriority,
+  type TodoReminder,
+  type TodoSubtask,
 } from '@cindy/maker-shared/teammate-todo';
 
 /** Personal ownership is established by the account store, never by teammate origin. */
@@ -29,6 +31,11 @@ export interface PersonalTodo {
   subtasks: TodoSubtask[];
   /** The conversation this todo opens (e.g. a tutor's study conversation); absent means none. */
   link?: TodoLink;
+  /**
+   * Manual order, lower first (see `comparePersonalTodoRank`). A todo never placed by hand reads
+   * as its creation time in milliseconds, so it sits in creation order among the placed ones.
+   */
+  rank: number;
   ownership: 'self';
   source: 'manual';
 }
@@ -50,6 +57,12 @@ export interface PersonalTodoUpdate {
   subtasks?: Array<{ id?: string; title: string; done?: boolean; doneAt?: string }>;
   /** Links the todo to a conversation; null removes the link. Send it only to change it. */
   link?: TodoLink | null;
+  /**
+   * Absolute manual rank, always resolved on this computer from a `place` before the edit is
+   * written or queued for the main computer. Send it only to move a todo: a main computer from
+   * before manual order refuses the field.
+   */
+  rank?: number | null;
   operation?: 'complete' | 'reopen' | 'delete' | 'later' | 'restore';
   until?: string;
 }
@@ -65,6 +78,7 @@ export const PERSONAL_TODO_UPDATE_KEYS = [
   'reminder',
   'subtasks',
   'link',
+  'rank',
   'operation',
   'until',
 ] as const satisfies ReadonlyArray<keyof PersonalTodoUpdate>;
@@ -86,9 +100,120 @@ export function projectPersonalTodo(todo: TeammateTodo): PersonalTodo {
     reminder: todo.reminder ?? 'default',
     subtasks: todo.subtasks ?? [],
     ...(todo.link ? { link: todo.link } : {}),
+    rank: effectiveTodoRank(todo),
     ownership: 'self',
     source: 'manual',
   };
+}
+
+/** The stored manual rank, or the creation time for a todo never placed by hand. */
+export function effectiveTodoRank(todo: Pick<TeammateTodo, 'rank' | 'createdAt'>): number {
+  return validTodoRank(todo.rank) ? todo.rank : Date.parse(todo.createdAt) || 0;
+}
+
+/** Manual order: rank, then creation time, then id, so every computer shows the same order. */
+export function comparePersonalTodoRank(
+  a: Pick<PersonalTodo, 'rank' | 'createdAt' | 'id'>,
+  b: Pick<PersonalTodo, 'rank' | 'createdAt' | 'id'>,
+): number {
+  return a.rank - b.rank || a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id);
+}
+
+/**
+ * Where todos go in the manual order: at the top or bottom of the whole list, or right before or
+ * after another todo. Resolved to absolute ranks on this computer (`planPersonalTodoOrder`).
+ */
+export type PersonalTodoPlace = { to: 'top' | 'bottom' } | { before: string } | { after: string };
+
+/** A write from a local surface: the update plus, optionally, where the todo goes. */
+export type PersonalTodoWriteRequest = PersonalTodoUpdate & { place?: PersonalTodoPlace };
+
+/** A shape check that names the problem; ids are checked against the list by the planner. */
+export function normalizePersonalTodoPlace(value: unknown): PersonalTodoPlace {
+  const fail = () => {
+    throw new TodoError(
+      'INVALID_INPUT',
+      "INVALID_INPUT: place must be {to:'top'|'bottom'}, {before:id} or {after:id}",
+    );
+  };
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return fail();
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (entries.length !== 1) return fail();
+  const [key, target] = entries[0];
+  if (key === 'to' && (target === 'top' || target === 'bottom')) return { to: target };
+  if ((key === 'before' || key === 'after') && typeof target === 'string' && target && target.length <= 512)
+    return key === 'before' ? { before: target } : { after: target };
+  return fail();
+}
+
+/** Spacing between neighbouring ranks the planner hands out: one second on the creation scale. */
+const RANK_STEP = 1000;
+/**
+ * Spacing at the bottom of the list: one millisecond, so a todo moved to the end right after it was
+ * created does not get a rank ahead of the clock and end up below todos created a moment later.
+ */
+const BOTTOM_STEP = 1;
+
+type Ranked = Pick<PersonalTodo, 'id' | 'rank' | 'createdAt'>;
+
+/**
+ * The rank changes that put `ids` (in this order, as one block) at `place`; without a place the
+ * block starts where the first of them currently is. Only the moved todos change, spread between
+ * their new neighbours; when no room is left between those (equal ranks, or a gap worn down by
+ * many moves) every todo is renumbered in the new order. An order that already holds returns [].
+ */
+export function planPersonalTodoOrder(
+  items: readonly Ranked[],
+  ids: readonly string[],
+  place?: PersonalTodoPlace,
+): Array<{ id: string; rank: number }> {
+  if (!ids.length || new Set(ids).size !== ids.length)
+    throw new TodoError('INVALID_INPUT', 'INVALID_INPUT: ids must be a non-empty list without repeats');
+  const order = [...items].sort(comparePersonalTodoRank);
+  const byId = new Map(order.map((item) => [item.id, item]));
+  const moving = ids.map((id) => {
+    const item = byId.get(id);
+    if (!item) throw new TodoError('NOT_FOUND');
+    return item;
+  });
+  const moved = new Set(ids);
+  const rest = order.filter((item) => !moved.has(item.id));
+  let index: number;
+  if (!place) index = order.findIndex((item) => moved.has(item.id));
+  else if ('to' in place) index = place.to === 'top' ? 0 : rest.length;
+  else {
+    const anchor = 'before' in place ? place.before : place.after;
+    if (moved.has(anchor))
+      throw new TodoError('INVALID_INPUT', 'INVALID_INPUT: place must name a todo that is not being moved');
+    const at = rest.findIndex((item) => item.id === anchor);
+    if (at < 0) throw new TodoError('NOT_FOUND');
+    index = 'before' in place ? at : at + 1;
+  }
+  const next = [...rest.slice(0, index), ...moving, ...rest.slice(index)];
+  if (next.every((item, i) => item.id === order[i].id)) return [];
+  const low = rest[index - 1]?.rank;
+  const high = rest[index]?.rank;
+  const k = moving.length;
+  const ranks = moving.map((item, i) =>
+    low === undefined && high === undefined
+      ? Math.min(...moving.map((todo) => todo.rank)) + i * BOTTOM_STEP
+      : low === undefined
+        ? high! - (k - i) * RANK_STEP
+        : high === undefined
+          ? low + (i + 1) * BOTTOM_STEP
+          : low + ((high - low) * (i + 1)) / (k + 1),
+  );
+  const fits = ranks.every(
+    (rank, i) =>
+      validTodoRank(rank) &&
+      (i === 0 ? low === undefined || rank > low : rank > ranks[i - 1]) &&
+      (i < k - 1 || high === undefined || rank < high),
+  );
+  if (fits) return moving.map((item, i) => ({ id: item.id, rank: ranks[i] }));
+  return next
+    .map((item, i) => ({ id: item.id, rank: i * RANK_STEP, before: item.rank }))
+    .filter((change) => change.rank !== change.before)
+    .map(({ id, rank }) => ({ id, rank }));
 }
 
 /** Multi-computer sync of personal todos as the desktop page sees it. */

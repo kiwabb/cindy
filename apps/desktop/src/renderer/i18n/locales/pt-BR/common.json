@@ -20111,6 +20111,7 @@
     "deleteConfirm": "Excluir esta pendência?",
     "empty": "Nenhuma pendência nesta visualização",
     "saveFailed": "Não foi possível salvar. Sua entrada foi mantida. Tente salvar novamente.",
+    "reorderFailed": "Não foi possível salvar a nova ordem. Tente novamente.",
     "loadFailed": "Não foi possível carregar as pendências.",
     "conflict": "Atualizado em outro lugar",
     "reloadVersion": "Carregar versão para sobrescrever",
@@ -20160,6 +20161,7 @@
     },
     "order": {
       "label": "Ordem no grupo",
+      "manual": "Minha ordem (arraste para organizar)",
       "priority": "Maior prioridade primeiro",
       "due": "Prazo mais próximo primeiro",
       "created": "Adicionadas recentemente primeiro"

@@ -117,9 +117,13 @@ import {
   personalTodoSyncActions,
   personalTodoSyncSummary,
   readPersonalTodoSyncStatus,
+  reorderPersonalTodos,
   writePersonalTodo,
 } from '../maker-ipc/personalTodoAccess.js';
-import type { PersonalTodoUpdate } from '../../shared/personalTodo.js';
+import {
+  comparePersonalTodoRank,
+  type PersonalTodoWriteRequest,
+} from '../../shared/personalTodo.js';
 import { TodoError } from '@cindy/maker-shared/teammate-todo';
 import { createTaskDigestReader } from './taskDigest.js';
 import { createDesktopTaskDigestDeps } from './taskDigestHost.js';
@@ -1246,7 +1250,8 @@ export function createDesktopMcpProviders(deps: DesktopMcpProvidersDeps): LiziMc
           const scope = captureDataOwnerBroadcastScope();
           const { store, assertCurrent } = openPersonalTodoStore();
           if (operation === 'list') {
-            const items = await store.list();
+            // Manual order, the same comparator the desktop page uses; the tool re-sorts on request.
+            const items = (await store.list()).sort(comparePersonalTodoRank);
             assertCurrent();
             // 标签目录读失败不拖垮待办列表:tags 留空并带一句说明。
             let tags: Array<{ id: string; name: string; color: string }> = [];
@@ -1260,7 +1265,15 @@ export function createDesktopMcpProviders(deps: DesktopMcpProvidersDeps): LiziMc
             const sync = await personalTodoSyncSummary();
             return { ok: true, items, tags, ...(tagsError ? { tagsError } : {}), ...(sync ? { sync } : {}) };
           }
-          const written = await writePersonalTodo((input ?? {}) as PersonalTodoUpdate, scope);
+          if (operation === 'reorder') {
+            const reordered = await reorderPersonalTodos(input?.ids, input?.place, scope);
+            return {
+              ok: true,
+              todos: reordered.todos,
+              ...(reordered.sync ? { sync: reordered.sync } : {}),
+            };
+          }
+          const written = await writePersonalTodo((input ?? {}) as PersonalTodoWriteRequest, scope);
           return { ok: true, todo: written.todo, ...(written.sync ? { sync: written.sync } : {}) };
         } catch (error) {
           if (error instanceof PersonalTodoOwnerChangedError)
