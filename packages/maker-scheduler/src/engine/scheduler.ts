@@ -1303,6 +1303,9 @@ export class Scheduler extends EventEmitter {
     if (!schedule || (schedule.source === 'bot' && !options?.internalRoutine))
       throw new Error(`Schedule not found: ${id}`);
     assertScheduleMutationGuard(options?.expectedSchedule, schedule);
+    if (schedule.companionFollowUpAt !== undefined) {
+      throw new Error('This companion follow-up only runs at its scheduled time');
+    }
     if (recovery && schedule.status !== 'active') {
       await this.storage.updateRun(runId, { status: 'interrupted', errorMsg: 'app restarted' });
       return { runId, deferred: true };
@@ -1594,12 +1597,21 @@ export class Scheduler extends EventEmitter {
     this.emitEvent({ type: 'changed', scheduleId: target.scheduleId });
   }
 
-  async create(input: CreateScheduleInput): Promise<Schedule> {
+  async create(input: CreateScheduleInput, companionFollowUpAt?: number): Promise<Schedule> {
+    if (Object.prototype.hasOwnProperty.call(input, 'companionFollowUpAt')) {
+      throw new Error('Invalid companion follow-up creation path');
+    }
     if ((input as Partial<Schedule>).source === 'bot') throw new Error('invalid schedule source');
     input = this.normalizeManagedWorkingDir(input);
     const now = this.clock.now();
     const id = this.generateId();
     const manual = input.manual ?? false;
+    if (companionFollowUpAt !== undefined && (
+      !Number.isSafeInteger(companionFollowUpAt) || companionFollowUpAt <= now || manual ||
+      input.recurring || input.intervalMs !== undefined || input.targetSessionId ||
+      input.webhookTrigger || input.preRunHook || input.preRunPlugin || input.executionMode === 'script' ||
+      input.expireAt == null || input.expireAt <= companionFollowUpAt
+    )) throw new Error('Invalid companion follow-up schedule');
     // intervalMs 只决定下一次何时触发，不会让 cronExpr / timezone 变成可跳过的
     // 元数据。否则用户能先持久化一个坏表达式，等未来清掉 intervalMs 时才在调度
     // 路径报错。此处纯校验，不影响 interval 的 now + N 首次触发语义。
@@ -1610,10 +1622,11 @@ export class Scheduler extends EventEmitter {
     //   - 其它 → 第一个壁钟 cron 槽位
     let firstFireAt: number | undefined;
     if (!manual) {
-      firstFireAt =
+      firstFireAt = companionFollowUpAt ?? (
         input.intervalMs !== undefined
           ? now + input.intervalMs
-          : nextCronOrMonthlyFire(input.cronExpr, now, input.timezone);
+          : nextCronOrMonthlyFire(input.cronExpr, now, input.timezone)
+      );
     }
     // 未显式传 workspaceKind 时按目标推断:非 heartbeat、不开 worktree、也没给
     // workingDir → 视为对话任务(runner 分配 app 管理的工作区,会话归入"对话"分组)。
@@ -1627,6 +1640,7 @@ export class Scheduler extends EventEmitter {
     const schedule: Schedule = {
       id,
       ...input,
+      ...(companionFollowUpAt === undefined ? {} : { companionFollowUpAt }),
       webhookTrigger: normalizeWebhookTrigger(input.webhookTrigger, undefined, this.generateId),
       workspaceKind: inferredWorkspaceKind,
       // null(JSON 边界的"清空"表达)归一成 undefined,Schedule 内存形态只有两态
@@ -1722,6 +1736,10 @@ export class Scheduler extends EventEmitter {
         : next;
     }
     assertScheduleMutationGuard(expected, existing);
+    if (existing.companionFollowUpAt !== undefined ||
+        Object.prototype.hasOwnProperty.call(patch, 'companionFollowUpAt')) {
+      throw new Error('Invalid update: cancel the companion follow-up and create a new one');
+    }
     // Old clients can rename an automation without losing its route. A model edit,
     // however, must carry the location once one has been explicitly selected.
     if (existing.modelAgentDeviceId !== undefined && patch.modelAgentDeviceId === undefined &&
@@ -1913,6 +1931,9 @@ export class Scheduler extends EventEmitter {
     if (!existing) throw new Error(`Schedule not found: ${id}`);
     assertScheduleMutationGuard(expected, existing);
     const now = this.clock.now();
+    if (existing.companionFollowUpAt !== undefined) {
+      throw new Error('A cancelled companion follow-up must be scheduled again');
+    }
     // 与 create/update 对齐：恢复 interval 任务前也验证它保留的 cron 元数据，不能
     // 重新激活一条未来清 interval 后必坏的记录。
     nextCronOrMonthlyFire(existing.cronExpr, now, existing.timezone);
@@ -3333,6 +3354,11 @@ function computeNextFireAt(schedule: Schedule, fromMs: number): number | undefin
   // manual schedule 永远不参与自动触发，跳过 cron 计算（runNow 是单独路径）
   if (schedule.manual) return undefined;
   if (!schedule.recurring && schedule.lastFiredAt !== undefined) return undefined;
+  if (schedule.companionFollowUpAt !== undefined) {
+    // A non-empty slot is the durable authority. Startup must not rearm a
+    // claim whose process stopped before a receipt or run row was saved.
+    return schedule.nextFireAt === schedule.companionFollowUpAt ? schedule.nextFireAt : undefined;
+  }
   // interval schedules still persist cron metadata. Validate it before taking
   // the interval fast path so legacy rows accepted by older parsers cannot
   // evade startup/DB-sync quarantine and fire from a stale nextFireAt.

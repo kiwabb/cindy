@@ -49,7 +49,7 @@ export interface SchedulerHostRuntime<Deps extends SchedulerHostStartDeps> {
   dialogueWorkspaceRoots(): string[];
   onStarted(scheduler: Scheduler, deps: Deps, passive: boolean): void;
   /** Wraps the runner, e.g. to skip a teammate project's automations on a computer it was handed away from. */
-  wrapRunner?(runner: ScheduleRunner): ScheduleRunner;
+  wrapRunner?(runner: ScheduleRunner, storage: DrizzleScheduleStorage): ScheduleRunner;
   /** A real teammate project of this account: its automation files sync without the import prompt. */
   isOwnTeammateProject?(workingDir: string): Promise<boolean>;
   beforeReset(): Promise<void>;
@@ -106,7 +106,7 @@ export function createSchedulerHost<Deps extends SchedulerHostStartDeps>(runtime
             : promptRunner.fire(schedule, ctx);
         }),
     };
-    const runner = runtime.wrapRunner ? runtime.wrapRunner(baseRunner) : baseRunner;
+    const runner = runtime.wrapRunner ? runtime.wrapRunner(baseRunner, storage) : baseRunner;
 
     // 双开让位开关:同一台机器同时跑 dev + release(共用同一 userData/DB)时,
     // 给其中一个实例(通常 dev)设 XDT_SCHEDULER_PASSIVE=1 → 本实例不参与自动触发
