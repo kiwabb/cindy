@@ -17,7 +17,7 @@
  *   同一被测模块的用例都在这一个文件里，没有拆分。
  */
 import { act, cleanup, render, screen } from '@testing-library/react';
-import { useRef } from 'react';
+import { StrictMode, useRef } from 'react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import type { ConversationMark, ConversationMarkScope, ConversationMarkSyncStatus } from '../../../../shared/conversationMarks';
@@ -146,6 +146,47 @@ describe('useConversationMarks', () => {
     await idle();
     expect(listCallsFor(sessionId)).toBe(1);
     for (const name of names) expect(renders[name]).toBe(settled[name] + 1);
+  });
+
+  it('reads again when a change arrives while the conversation is closed and a read is still out', async () => {
+    const sessionId = 'reentered-in-flight';
+    store.marks.set(sessionId, [mark(sessionId)]);
+    const first = render(<Subscriber sessionId={sessionId} name="i" renders={{}} />);
+    await idle();
+    const outstanding = deferred<ConversationMark[]>();
+    api.list.mockImplementationOnce(() => outstanding.promise);
+    push();
+    first.unmount();
+    store.marks.set(sessionId, [mark(sessionId, { revision: 2, state: 'discussed' })]);
+    push();
+    render(<Subscriber sessionId={sessionId} name="i" renders={{}} />);
+    await act(async () => outstanding.resolve([mark(sessionId)]));
+    await idle();
+    expect(screen.getByTestId('i').textContent).toBe('m1:discussed');
+    const settled = listCallsFor(sessionId);
+    await idle();
+    expect(listCallsFor(sessionId)).toBe(settled);
+  });
+
+  it('settles under StrictMode double subscription', async () => {
+    const sessionId = 'strict';
+    store.marks.set(sessionId, [mark(sessionId)]);
+    const view = render(
+      <StrictMode>
+        <Subscriber sessionId={sessionId} name="s" renders={{}} />
+      </StrictMode>,
+    );
+    await idle();
+    expect(screen.getByTestId('s').textContent).toBe('m1:open');
+    const settled = listCallsFor(sessionId);
+    expect(settled).toBeLessThanOrEqual(2);
+    view.rerender(
+      <StrictMode>
+        <Subscriber sessionId={sessionId} name="s" renders={{}} />
+      </StrictMode>,
+    );
+    await idle();
+    expect(listCallsFor(sessionId)).toBe(settled);
   });
 
   it('keeps the newer list when an older read answers late', async () => {
@@ -280,6 +321,26 @@ describe('useConversationMarkSyncStatus', () => {
     await idle();
     expect(api.syncStatus).toHaveBeenCalledTimes(1);
     expect(renders).toBe(settled + 1);
+  });
+
+  it('reads the status again when it changed while closed and a read was still out', async () => {
+    store.status = { phase: 'synced', pending: 0, pendingIds: [] } satisfies ConversationMarkSyncStatus;
+    function Status() {
+      const status = useConversationMarkSyncStatus();
+      return <div data-testid="status">{status ? `${status.phase}:${status.pending}` : 'off'}</div>;
+    }
+    const first = render(<Status />);
+    await idle();
+    const outstanding = deferred<ConversationMarkSyncStatus | null>();
+    api.syncStatus.mockImplementationOnce(() => outstanding.promise);
+    push();
+    first.unmount();
+    store.status = { phase: 'offline', pending: 2, pendingIds: ['a', 'b'] } satisfies ConversationMarkSyncStatus;
+    push();
+    render(<Status />);
+    await act(async () => outstanding.resolve({ phase: 'synced', pending: 0, pendingIds: [] }));
+    await idle();
+    expect(screen.getByTestId('status').textContent).toBe('offline:2');
   });
 
   it('keeps the newer status when an older read answers late', async () => {

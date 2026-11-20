@@ -59,9 +59,13 @@ async function refresh(entry: Entry): Promise<void> {
   }
   if (generation !== entry.generation) return;
   entry.inFlight = false;
-  if (entry.snapshot.loaded && sameContent(entry.snapshot.marks, marks)) return;
-  entry.snapshot = { loaded: true, marks };
-  for (const listener of entry.listeners) listener();
+  if (!entry.snapshot.loaded || !sameContent(entry.snapshot.marks, marks)) {
+    entry.snapshot = { loaded: true, marks };
+    for (const listener of entry.listeners) listener();
+  }
+  // Went stale while this read was out (left and came back, with a change in between): this
+  // answer may predate the change, so read once more. Bounded: a read clears the flag.
+  if (entry.stale && entry.listeners.size > 0) void refresh(entry);
 }
 
 async function refreshStatus(): Promise<void> {
@@ -77,9 +81,12 @@ async function refreshStatus(): Promise<void> {
   // A late answer to an older read must not overwrite a newer one.
   if (generation !== statusGeneration) return;
   statusInFlight = false;
-  if (sameContent(status, next)) return;
-  status = next;
-  for (const listener of statusListeners) listener();
+  if (!sameContent(status, next)) {
+    status = next;
+    for (const listener of statusListeners) listener();
+  }
+  // Same as the list: stale again while out means this answer may be older than the change.
+  if (statusStale && statusListeners.size > 0) void refreshStatus();
 }
 
 function subscribeStatus(listener: () => void): () => void {
