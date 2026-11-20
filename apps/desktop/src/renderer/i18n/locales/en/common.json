@@ -9549,7 +9549,7 @@
       "ready": "New version ready — click the sidebar to apply",
       "manifestFailed": "Update check failed, please check your network",
       "downloadFailed": "New version download failed, try again later",
-      "prepareDeferred": "New version downloaded but can't be prepared right now. It will retry automatically"
+      "prepareDeferred": "New version downloaded but can’t be prepared right now. It will retry automatically"
     },
     "closeConfirm": {
       "title": "Confirm exit?",
@@ -10264,8 +10264,8 @@
       "manualTitle": "New version needs manual install",
       "manualButton": "Download installer",
       "manualAria": "Download the installer for {{version}}",
-      "manualReasonSigning": "This installation isn't signed by your development team, so it can't update automatically. You can download the installer and install it manually.",
-      "manualReasonFailed": "Automatic installation couldn't be prepared, so this version was skipped. You can download the installer and install it manually."
+      "manualReasonSigning": "This installation isn’t signed by your development team, so it can’t update automatically. You can download the installer and install it manually.",
+      "manualReasonFailed": "Automatic installation couldn’t be prepared, so this version was skipped. You can download the installer and install it manually."
     },
     "notice": {
       "title": "What's New",

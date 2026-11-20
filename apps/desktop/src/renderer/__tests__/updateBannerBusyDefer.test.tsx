@@ -44,6 +44,7 @@ const updateStatus = vi.hoisted(() => ({
     displayVersion?: string;
     errorCode: string | null;
     downloadUrl?: string;
+    manualReason?: 'storage' | 'signing' | 'failed';
   },
 }));
 
