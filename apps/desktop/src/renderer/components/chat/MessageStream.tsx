@@ -7174,7 +7174,8 @@ const MessageItem = memo(function MessageItem({
       return withAssistantAvatar(
         assistantAvatar,
         <>
-          <MessageSourceLabels sourceGroup={message.sourceGroup} align="start" />
+          <MessageSourceLabels sourceGroup={message.sourceGroup}
+            automationOrigin={message.automationOrigin} hostSessionId={sessionId} align="start" />
           <AssistantMessage
             workingDir={workingDir}
             localFileRefs={localFileRefs}

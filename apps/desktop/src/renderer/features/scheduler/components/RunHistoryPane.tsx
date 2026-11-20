@@ -279,19 +279,19 @@ export function RunHistoryPane({
             // 不修改 schedule 的 status/lastFiredAt/nextFireAt，跟 Once 语义不冲突。
             // runNowBusy：派发窗口内(点击→'fired')由页面级传入禁用,防止双发;run 真正
             // 开跑后即释放。busy 仍覆盖本 pane 的 pause/delete 等在途操作。
-            disabled={busy || runNowBusy}
+            disabled={busy || runNowBusy || s.companionFollowUpAt !== undefined}
             icon={<Play size={12} strokeWidth={2.25} />}
             label={t('scheduler.button.runNow')}
           />
           <PillButton
             onClick={() => onEdit(s)}
-            disabled={busy}
+            disabled={busy || s.companionFollowUpAt !== undefined}
             icon={<Pencil size={12} strokeWidth={2} />}
             label={t('scheduler.button.edit')}
           />
           <PillButton
             onClick={() => void wrap(s.id, () => onTogglePause(s))}
-            disabled={busy || isExpired}
+            disabled={busy || isExpired || (isPaused && s.companionFollowUpAt !== undefined)}
             icon={
               isPaused ? <Play size={12} strokeWidth={2} /> : <Pause size={12} strokeWidth={2} />
             }

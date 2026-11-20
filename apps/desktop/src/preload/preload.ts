@@ -8638,6 +8638,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       get: (id: string): Promise<unknown | null> => ipcRenderer.invoke('maker:schedule:get', id),
       create: (input: unknown): Promise<unknown> =>
         ipcRenderer.invoke('maker:schedule:create', input),
+      createCompanionFollowUp: (input: { botId: string; topic: string; dueAt: number }): Promise<unknown> =>
+        ipcRenderer.invoke('maker:schedule:create-companion-follow-up', input),
       update: (id: string, patch: unknown): Promise<unknown> =>
         ipcRenderer.invoke('maker:schedule:update', id, patch),
       delete: (id: string): Promise<void> => ipcRenderer.invoke('maker:schedule:delete', id),

@@ -4825,6 +4825,21 @@ describe('repeatable environment notes are sent only when they change', () => {
     expect(sentAt(session, 1)).toContain(uiLanguageNote());
   });
 
+  it('passes a proactive assistant row to the next engine turn and restores the note after a reset', async () => {
+    const note = '[Companion chat context] Scheduled fixture reply';
+    const { session, transaction, memory } = setup({
+      readCompanionOutreachNote: vi.fn(async () => note),
+    });
+    await transaction.sendToAgentAccepted('session-1', 'my answer');
+    await transaction.sendToAgentAccepted('session-1', 'another message');
+    expect(sentAt(session, 0)).toContain(note);
+    expect(sentAt(session, 0)).toContain('my answer');
+    expect(sentAt(session, 1)).not.toContain(note);
+    memory.reset('session-1');
+    await transaction.sendToAgentAccepted('session-1', 'after restart');
+    expect(sentAt(session, 2)).toContain(note);
+  });
+
   it('leaves slash-command turns alone without marking the notes as seen', async () => {
     const session = createSession({ agentKind: 'claude-code' });
     const { transaction } = setup({ getSession: vi.fn(() => session) });

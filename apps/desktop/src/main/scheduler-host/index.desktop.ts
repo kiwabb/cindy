@@ -45,6 +45,7 @@ import { SchedulerScriptCapabilityBroker } from './script-capability-broker.desk
 import { DesktopNotifier } from './notifier.desktop';
 import { sendFeishuSessionNotification } from '../im/feishu/notificationOrigin';
 import { wecomGroupNotificationService } from '../wecomGroupNotification';
+import { withCompanionFollowUps } from './companionOutreachHost.js';
 import { withTeammateHomeGuard } from './teammateHomeGuard.js';
 import { ownTeammateProjectState } from './ownTeammateProject.js';
 import { companionHomes } from '../companion-cloud/homes.js';
@@ -139,7 +140,10 @@ const desktop = createSchedulerHost<StartSchedulerDeps>({
     return { notifier, promptRunner, scriptRunner };
   },
   // A teammate's project automations run only on its main computer (handed away: skipped here).
-  wrapRunner: runner => withTeammateHomeGuard(runner, () => companionHomes.snapshot().demotedBotIds, ownTeammateProjectState),
+  wrapRunner: (runner, storage) => withTeammateHomeGuard(
+    withCompanionFollowUps(runner, id => storage.get(id)),
+    () => companionHomes.snapshot().demotedBotIds, ownTeammateProjectState,
+  ),
   isOwnTeammateProject: async workingDir => (await ownTeammateProjectState(workingDir)) !== null,
   isPassive: () => !app.isPackaged && process.env.XDT_SCHEDULER_PASSIVE === '1',
   dialogueWorkspaceRoots: () => dialogueWorkspaceRoots(),

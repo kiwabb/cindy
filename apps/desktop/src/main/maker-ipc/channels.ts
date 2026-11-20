@@ -644,6 +644,7 @@ export const MAKER_INVOKE = {
   SCHEDULE_LIST: 'maker:schedule:list',
   SCHEDULE_GET: 'maker:schedule:get',
   SCHEDULE_CREATE: 'maker:schedule:create',
+  SCHEDULE_CREATE_COMPANION_FOLLOW_UP: 'maker:schedule:create-companion-follow-up',
   SCHEDULE_UPDATE: 'maker:schedule:update',
   SCHEDULE_DELETE: 'maker:schedule:delete',
   SCHEDULE_PAUSE: 'maker:schedule:pause',

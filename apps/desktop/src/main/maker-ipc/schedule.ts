@@ -418,6 +418,21 @@ export function registerScheduleHandlers(getMaker?: () => Maker | null): void {
     return withScheduler(({ scheduler }) => scheduler.get(scheduleId));
   });
 
+  ipcMain.handle(MAKER_INVOKE.SCHEDULE_CREATE_COMPANION_FOLLOW_UP, async (event, raw) => {
+    if (isDeviceLinkInvoke() || !isTrustedAppRendererEvent(event)) {
+      throwIpcError('INVALID_PARAMS', 'Schedule a follow-up from this companion’s settings on its main computer');
+    }
+    const { botId, topic, dueAt } = requireObject(raw, 'follow-up');
+    if (typeof dueAt !== 'number') throwIpcError('INVALID_PARAMS', 'Invalid follow-up time');
+    return withScheduler(async ({ scheduler }) => {
+      const { createCompanionFollowUp } = await import('../scheduler-host/companionOutreachHost.js');
+      return createCompanionFollowUp(
+        (input, at) => scheduler.create(input, at),
+        requireString(botId, 'botId'), requireString(topic, 'topic'), dueAt,
+      );
+    });
+  });
+
   ipcMain.handle(MAKER_INVOKE.SCHEDULE_CREATE, async (_e, input: unknown) => {
     requireObject(input, 'input');
     if (isDeviceLinkInvoke()) {

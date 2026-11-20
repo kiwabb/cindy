@@ -483,6 +483,7 @@ export interface MakerSendTransactionDeps {
    * 与 `[客户端说明]` 同层,只进 wire 消息。
    */
   readBotThreadNote?(sessionId: string): Promise<string | null>;
+  readCompanionOutreachNote?(sessionId: string): Promise<string | null>;
   /** The owner's message closed a waiting 代输入 card: the agent hears it here, with no turn of its own. */
   readInputHandoffOwnerNote?(sessionId: string): string | null;
   inputHandoffOwnerNoteDelivered?(sessionId: string): void;
@@ -1529,6 +1530,9 @@ export function createMakerSendTransaction(deps: MakerSendTransactionDeps): Make
         'side-chat': allowsEnvironmentNotes && taskSource === 'side-chat'
           ? SIDE_CHAT_CONTEXT : null,
         'bot-thread': botThreadNote,
+        'companion-follow-up': allowsEnvironmentNotes
+          ? ((await deps.readCompanionOutreachNote?.(sessionId).catch(() => null)) ?? null)
+          : null,
         'client-environment': mobileClientNote,
         'cindy-make': cindyMakeNote,
         'ui-language': uiLanguageNote,
@@ -1551,6 +1555,9 @@ export function createMakerSendTransaction(deps: MakerSendTransactionDeps): Make
       }
       if (plannedNotes['bot-thread']) {
         outgoing = prependNoteToWireUserMessage(outgoing as HandoffWireMessage, plannedNotes['bot-thread']);
+      }
+      if (plannedNotes['companion-follow-up']) {
+        outgoing = prependNoteToWireUserMessage(outgoing as HandoffWireMessage, plannedNotes['companion-follow-up']);
       }
       // The note belongs to the message that closed the card. A native command (a slash input) keeps its
       // first characters, so it carries no note and the note is dropped rather than left for the next message.

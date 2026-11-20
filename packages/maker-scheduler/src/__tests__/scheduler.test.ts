@@ -641,6 +641,42 @@ function makeHarness(opts?: {
   return { scheduler, storage, clock, runner, fireCalls };
 }
 
+describe('owner-authorized companion follow-up', () => {
+  it('keeps the pending slot across reboot and never rearms a claimed slot', async () => {
+    const first = makeHarness();
+    const dueAt = first.clock.now() + 60_000;
+    const input = { ...baseInput, recurring: false, expireAt: dueAt + 3_600_000 };
+    const pending = await first.scheduler.create(input, dueAt);
+    const claimed = await first.scheduler.create(input, dueAt);
+    await first.storage.claimDueFire(claimed.id, dueAt);
+    first.clock.setTo(dueAt + 3_000);
+    const restarted = makeHarness({ storage: first.storage, clock: first.clock, generateId: () => 'run-after-restart' });
+    await restarted.scheduler.start();
+    try {
+      await restarted.scheduler.tick();
+      expect(restarted.fireCalls.map(call => call.schedule.id)).toEqual([pending.id]);
+      await restarted.scheduler.tick();
+      expect(restarted.fireCalls).toHaveLength(1);
+      expect(await restarted.scheduler.get(claimed.id)).toMatchObject({ nextFireAt: undefined });
+    } finally {
+      await restarted.scheduler.stop();
+    }
+  });
+
+  it('rejects generic creation, manual runs and reactivation after cancellation', async () => {
+    const { scheduler, clock } = makeHarness();
+    const dueAt = clock.now() + 60_000;
+    const input = { ...baseInput, recurring: false, expireAt: dueAt + 3_600_000 };
+    const forged = { ...input, companionFollowUpAt: dueAt };
+    await expect(scheduler.create(forged)).rejects.toThrow(/creation path/);
+    const saved = await scheduler.create(input, dueAt);
+    await expect(scheduler.runNow(saved.id)).rejects.toThrow(/scheduled time/);
+    await expect(scheduler.update(saved.id, { prompt: 'new topic' })).rejects.toThrow(/create a new one/);
+    await scheduler.pause(saved.id);
+    await expect(scheduler.resume(saved.id)).rejects.toThrow(/scheduled again/);
+  });
+});
+
 describe('Scheduler', () => {
   let h: Harness;
   beforeEach(() => {
