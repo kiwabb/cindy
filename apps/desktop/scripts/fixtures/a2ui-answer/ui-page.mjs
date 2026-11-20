@@ -16,11 +16,13 @@ export default {
     invalid: { about: 'An unsupported wire version falls back without hiding adjacent Markdown or cindy-ui' },
     nested: { about: 'A list-nested A2UI example stays code, without an active form' },
   },
-  async ready(page, ui) {
+  // The runner passes only the page here: wait for whichever settled state the case renders.
+  async ready(page) {
     await page.getByText('普通 Markdown 继续显示。', { exact: true }).waitFor();
-    if (ui.case === 'invalid') await page.locator('.cindy-a2ui-fallback').waitFor();
-    else if (ui.case === 'nested') await page.locator('pre').filter({ hasText: 'createSurface' }).waitFor();
-    else await page.getByRole('button', { name: '提交主旨', exact: true }).waitFor();
+    await page.locator('.cindy-a2ui-fallback')
+      .or(page.locator('pre').filter({ hasText: 'createSurface' }))
+      .or(page.getByRole('button', { name: '提交主旨', exact: true }))
+      .first().waitFor();
   },
   async check(page, ui) {
     const submit = page.getByRole('button', { name: '提交主旨', exact: true });
