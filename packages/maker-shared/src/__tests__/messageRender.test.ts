@@ -80,21 +80,19 @@ describe('message render shared model', () => {
     const invalid = body.replace('"version":"1.0"', '"version":"9.9"');
     expect(a2uiReadableText(invalid)).toBe(invalid);
     expect(a2uiMediaSources(invalid).size).toBe(0);
+    const deleted = a2ui([{ id: 'root', component: 'Image', url: 'https://example.invalid/gone.png' }], [{ version: '1.0', deleteSurface: { surfaceId: 'a' } }]);
+    expect(a2uiMediaSources(deleted).size).toBe(0);
   });
 
-  it('deduplicates A2UI images only inside their completed turn and retains tool history', () => {
+  // Mobile and IM consume this model but render A2UI as source, not as a card;
+  // dropping the tool image here would leave them with no image at all.
+  it('keeps tool images that an A2UI card repeats, because non-desktop surfaces do not render the card', () => {
     const url = 'cindy-media://blobs/figure.png';
     const body = a2ui([{ id: 'root', component: 'Image', url }]);
-    const tool = message({ kind: 'tool', source: source('image', {}, 1), media: [{ kind: 'image', url }, { kind: 'image', url: 'other.png' }] });
+    const tool = message({ kind: 'tool', source: source('image', {}, 1), media: [{ kind: 'image', url }] });
     const answer = message({ kind: 'assistant', source: source('answer', body, 2), body, turnCompleted: true });
-    const artifacts = (rows: FixtureMessage[]) => buildMessageRenderItems(rows).flatMap(item => item.type === 'tool_media' ? item.tools.flatMap(t => t.media ?? []) : []);
-    expect(artifacts([tool, answer]).map(m => m.url)).toEqual(['other.png']);
-    expect(tool.media).toHaveLength(2);
-    expect(artifacts([tool, { ...answer, isStreaming: true }])).toHaveLength(2);
-    expect(artifacts([tool, message({ kind: 'user', source: { ...source('next', 'again', 2), role: 'user' } }), answer])).toHaveLength(2);
-    expect(artifacts([tool, { ...answer, body: '````markdown\n' + body + '\n````' }])).toHaveLength(2);
-    const deleted = a2ui([{ id: 'root', component: 'Image', url }], [{ version: '1.0', deleteSurface: { surfaceId: 'a' } }]);
-    expect(artifacts([tool, { ...answer, body: deleted }])).toHaveLength(2);
+    const artifacts = buildMessageRenderItems([tool, answer]).flatMap(item => item.type === 'tool_media' ? item.tools.flatMap(t => t.media ?? []) : []);
+    expect(artifacts.map(m => m.url)).toEqual([url]);
   });
 
   // Unit regression: a generated video appeared both as a tool artifact and a

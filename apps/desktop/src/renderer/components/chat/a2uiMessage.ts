@@ -1,5 +1,6 @@
 import type { ProcessableMessage } from '@cindy/a2ui-renderer/core';
 export { splitA2uiMessage, A2UI_SDK_VERSION, A2UI_PROTOCOL_VERSION, A2UI_BASIC_CATALOG } from '@cindy/maker-shared/a2ui-message';
+export type { A2uiMessagePart } from '@cindy/maker-shared/a2ui-message';
 import { readA2uiEnvelopes } from '@cindy/maker-shared/a2ui-message';
 
 export function readA2uiMessages(source: string): ProcessableMessage[] {

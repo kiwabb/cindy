@@ -1,4 +1,4 @@
-import { hasA2uiAnswer, a2uiMediaSources } from './a2uiMessage';
+import { hasA2uiAnswer } from './a2uiMessage';
 import { hasRichAnswer, richAnswerMediaSources } from './richAnswer';
 import { groupWorkRuns } from './workRunGrouping.js';
 import { isContinuationMessage } from './syntheticTrigger.js';
@@ -317,7 +317,7 @@ function buildLinearItems<
     inlineMediaByMessage.set(message, inlineMedia);
     if (message.kind === 'assistant' && !message.isStreaming && !message.failedSamplingAttempt) {
       for (const url of richAnswerMediaSources(message.body)) inlineMedia.add(url);
-      for (const url of a2uiMediaSources(message.body)) inlineMedia.add(url);
+      // A2UI is deduplicated only by the desktop renderer: mobile and IM still show its source.
     }
   }
   const todoInsertAt = findMessageTodoInsertions(sourceMessages);
