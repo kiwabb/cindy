@@ -760,7 +760,16 @@ describe.skipIf(!piAvailable)('PiAgent integration (real pi binary + fake gatewa
       const deps = buildDeps();
       deps.resolvePiGatewayModelApi = () => api;
       const agent = new PiAgent(deps);
+      let slotReads = 0;
+      let available = true;
       const opts = {
+        readPiCompanionLifeSlot: async () => {
+          slotReads += 1;
+          return available ? {
+            date: '2026-11-20', timezone: 'Asia/Shanghai', start: '09:00', end: '10:00',
+            activity: 'Illustration slot marker <plan>',
+          } : undefined;
+        },
         sessionId: 'companion-identity', workingDir, model: 'pi-test-model', providerId: 'xd',
         botProfilePrompt: 'You are the fictional companion Mira.',
         botRuntimeProfile: {
@@ -790,6 +799,8 @@ describe.skipIf(!piAvailable)('PiAgent integration (real pi binary + fake gatewa
         handle = await agent.startSession(opts);
         const legacy = await send('first turn in existing history');
         expect(system(legacy)).toMatch(/^You are (an expert|a) coding assistant/);
+        expect(slotReads).toBe(0);
+        expect(system(legacy)).not.toContain('<companion_life_plan>');
         const resumeSessionId = handle.id;
         await handle.close();
         handle = await agent.startSession({
@@ -797,7 +808,20 @@ describe.skipIf(!piAvailable)('PiAgent integration (real pi binary + fake gatewa
           botProfilePrompt: 'You are the fictional companion Mira, updated profile.',
           botRuntimeProfile: { ...opts.botRuntimeProfile, profileVersion: 2, piOwnerPrivateChat: true },
         });
+        const before = seenRequests.length;
+        if (api === 'anthropic-messages') {
+          scriptedResponses.push(anthropicToolUseBody('read', { path: path.join(workingDir, 'AGENTS.md') }));
+        }
         const resumed = await send('inspect a file for me');
+        const turnRequests = seenRequests.slice(before).map(request => JSON.parse(request.body));
+        expect(turnRequests).toHaveLength(api === 'anthropic-messages' ? 2 : 1);
+        expect(slotReads).toBe(1);
+        for (const body of turnRequests) {
+          expect(system(body)).toContain('<companion_life_plan>');
+          expect(system(body)).toContain('not a completed action');
+          expect(system(body)).toContain('Illustration slot marker');
+          expect(system(body)).not.toContain('<plan>');
+        }
         expect(handle.id).toBe(resumeSessionId);
         expect(system(resumed)).toMatch(/^You are the companion described/);
         expect(system(resumed)).not.toMatch(/You are (an expert|a) coding assistant/);
@@ -815,7 +839,13 @@ describe.skipIf(!piAvailable)('PiAgent integration (real pi binary + fake gatewa
         const automation = await send('scheduled work in the same task', 'scheduler');
         expect(system(automation)).toMatch(/^You are (an expert|a) coding assistant/);
         expect(system(automation)).not.toContain('You are the companion described');
-        expect(system(await send('back to owner chat'))).toMatch(/^You are the companion described/);
+        expect(system(automation)).not.toContain('<companion_life_plan>');
+        expect(slotReads).toBe(1);
+        available = false;
+        const next = await send('back to owner chat');
+        expect(slotReads).toBe(2);
+        expect(system(next)).toMatch(/^You are the companion described/);
+        expect(JSON.stringify(next)).not.toContain('Illustration slot marker');
       } finally {
         await handle?.close();
         rmSync(workingDir, { recursive: true, force: true });

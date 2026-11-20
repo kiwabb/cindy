@@ -1,3 +1,4 @@
+import type { CompanionLifeScheduleSlot } from './companionLifeSchedule.js';
 import { isChatOnlyGroupLane } from '../../shared/botGroupChat.js';
 import { buildTeammateGuide as buildBotCapabilityContextPrompt } from './teammateGuide.js';
 import { and, desc, eq, inArray } from 'drizzle-orm';
@@ -168,6 +169,7 @@ export interface BotProfileRuntimeDeps {
     homeDir: string;
     contentWritableDirs?: string[];
     systemPromptOverride: string;
+    readLifeSchedule?: (soul: string) => Promise<CompanionLifeScheduleSlot | undefined>;
   }>;
   /** Project mode: this computer's linked project directories (other computers' links are only references). */
   listLinkedProjectDirs?: (input: { botId: string }) => Promise<string[]>;
@@ -593,6 +595,7 @@ export async function hydrateBotProfileRuntime(
     homeDir: string;
     contentWritableDirs?: string[];
     systemPromptOverride: string;
+    readLifeSchedule?: (soul: string) => Promise<CompanionLifeScheduleSlot | undefined>;
   } | null = null;
   // Local userData paths are meaningless on a remote harness. Do not promise or
   // mount a Home there until the host provisions an actual remote-owned path.
@@ -1052,11 +1055,15 @@ export async function hydrateBotProfileRuntime(
     buildBotContextTier(promptInput),
     buildBotVolatileTier(promptInput),
   ].filter(Boolean).join('\n\n');
+  const piOwnerPrivateChat = opts.agentKind === 'pi' && (row.role === 'canonical' || row.role === 'thread');
+  const readLifeSchedule = folderPrompt?.readLifeSchedule;
+  if (piOwnerPrivateChat && readLifeSchedule) {
+    opts.readPiCompanionLifeSlot = () => readLifeSchedule(identity);
+  }
   opts.botRuntimeProfile = {
     botId: row.botId,
     profileVersion: row.profileVersion,
-    ...(opts.agentKind === 'pi' && (row.role === 'canonical' || row.role === 'thread')
-      ? { piOwnerPrivateChat: true as const } : {}),
+    ...(piOwnerPrivateChat ? { piOwnerPrivateChat: true as const } : {}),
     skillPolicy: {
       mode: runtimeSkillMode,
       configured: runtimeConfiguredSkills,

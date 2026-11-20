@@ -23,6 +23,16 @@ Cindy 以 `pi --mode rpc` spawn pi 二进制(JSONL/stdio),`translator.ts` 把 pi
   原生身份开头，保留工具、规则、文档、项目上下文和完整 SOUL。显式自定义或未知 Pi 开头沿用
   原样。同会话的定时、目标续跑和 IM 来源保留原开头。选项随已串行化的新轮提交，配置更新继续走
   原有伙伴空闲刷新。维护 Pi 版本时需用真实 Pi 加本机假网关复核恢复和同会话来源切换。
+- **主人私聊日程**：本机 Pi 可从该伙伴受管 workspace 的
+  `.cindy/companion-life-schedule.json`（`{ "version": 1, "timezone": "<IANA 时区>" }`）
+  显式启用。宿主按所有者和伙伴绑定读取 `life-schedule/YYYY-MM-DD.json`。计划必须是
+  `kind: "plan"`，日期/时区吻合，2–24 个连续时段覆盖全天，且带
+  `provenance: { rule: "current-soul-v1", soulSha256: "<当前 SOUL trim 后的 UTF-8 SHA-256>" }`。
+  只有当前时段进入系统提示末尾，按轮读取和冻结，工具续轮沿用；下一次发送（含恢复）重新取时。
+  无匹配计划、旧版无标记、角色摘要过期或路径不属于受管目录时省略快照。旧计划仍可明确查询。
+  自动化先读取当前 SOUL 摘要，再随保存命令提交该摘要；角色在生成期间变化时放弃写入。
+  存在当天旧计划时保留，等下一天按新规则生成。角色说明改成当轮有快照便不重复查 current，
+  完整日程或历史日期仍按需查询。远端执行和非 Pi 不读取这份日程。
 - **权限执行**:pi 原生无工具审批(security.md 明确:非沙箱、不限制工具)。Cindy 用注入的
   `cindy-bridge.ts` 扩展在 pi 进程内 `pi.on('tool_call')` 拦截,经 `extension_ui_request`
   子协议冒泡到 `index.ts handleExtensionUiRequest`,映射成 `InteractionRequest` 交 Cindy

@@ -2067,6 +2067,10 @@ export interface StartSessionOptions {
    * it must never be converted into natural-language capability claims.
    */
   botRuntimeProfile?: BotRuntimeProfile;
+  /** Host-only current-slot reader for local Pi owner chat. Never accepts a renderer path. */
+  readPiCompanionLifeSlot?: () => Promise<{
+    date: string; timezone: string; start: string; end: string; activity: string;
+  } | undefined>;
   /**
    * 是否启用 Maker Memory (本次 session 内). 跟 userPrompt 同模式 — renderer 启 session
    * 时透传当前 memoryMode='maker' → true, 'native' / 'off' → false。main 不持久化。

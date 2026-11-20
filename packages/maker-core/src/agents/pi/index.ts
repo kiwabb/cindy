@@ -3421,7 +3421,7 @@ export class PiAgent extends BaseAgent {
       : undefined;
     if (companionIdentityExtensionPath && companionIdentityModePath) {
       await writeFile(companionIdentityExtensionPath, CINDY_PI_COMPANION_IDENTITY_SOURCE);
-      await writeFile(companionIdentityModePath, 'task');
+      await writeFile(companionIdentityModePath, JSON.stringify({ companion: false }));
     }
     // cindy-subagent extension:与 bridge 并列的独立扩展(职责分离 —— bridge 管权限门与
     // MCP 桥,这个只管子代理)。子进程继承 PI_CODING_AGENT_DIR,因此同样加载 bridge,
@@ -8055,7 +8055,11 @@ export class PiAgent extends BaseAgent {
                 }
                 const origin = sendOpts?.origin;
                 const companion = (!origin || origin.kind === 'user') && origin?.surface !== 'im';
-                await writeFile(companionIdentityModePath, companion ? 'companion' : 'task');
+                const schedule = companion && !remote && !hosted
+                  ? await opts.readPiCompanionLifeSlot?.().catch(() => undefined)
+                  : undefined;
+                if (!managedPackageRoute.accepted) rejectIfCancelled(sendOpts, 'send');
+                await writeFile(companionIdentityModePath, JSON.stringify({ companion, schedule }));
                 if (!managedPackageRoute.accepted) rejectIfCancelled(sendOpts, 'send');
               }
               const pendingTurnStartToken = markPiHostTurnStartPending(ctx);

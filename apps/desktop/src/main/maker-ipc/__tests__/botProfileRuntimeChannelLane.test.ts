@@ -47,8 +47,17 @@ describe('Pi companion identity is selected by the persisted Bot lane', () => {
     if (role) seed(role, null);
     else state.rows = [[]];
     const opts = { id: 'same-title-and-workspace', agentKind, workingDir: '/bots/bot/workspace', model: 'm' } as MakerSessionCreateOpts;
-    await hydrateBotProfileRuntime(opts, {}, { persistSnapshot: false });
+    const readLifeSchedule = vi.fn(async (_soul: string) => undefined);
+    await hydrateBotProfileRuntime(opts, {
+      readProfileFolder: async () => ({ homeDir: '/bots/bot', systemPromptOverride: '', readLifeSchedule }),
+    }, { persistSnapshot: false });
     expect(opts.botRuntimeProfile?.piOwnerPrivateChat === true).toBe(enabled);
+    expect(typeof opts.readPiCompanionLifeSlot === 'function').toBe(enabled);
+    expect(readLifeSchedule).not.toHaveBeenCalled();
+    if (enabled) {
+      await opts.readPiCompanionLifeSlot?.();
+      expect(readLifeSchedule).toHaveBeenCalledWith(SOUL.trim());
+    }
   });
 });
 
