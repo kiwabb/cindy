@@ -55,7 +55,7 @@ export function Badge({ children, strong }: { children: ReactNode; strong?: bool
   return (
     <span
       className={cn(
-        'inline-flex h-[22px] shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-[var(--surface-chip)] px-2 text-12 leading-4',
+        'inline-flex h-[22px] shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-[var(--surface-chip)] px-2 text-12 leading-[1.333]',
         strong ? 'font-medium text-[var(--text-primary)]' : 'text-[var(--text-secondary)]',
       )}
     >
@@ -101,7 +101,7 @@ export function DailyPlanBar({ plan, now }: { plan: LearningDailyPlan; now: 'exp
     .join(t('learning.plan.joiner'));
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="flex justify-between text-12 leading-4 text-[var(--text-secondary)]">
+      <div className="flex justify-between text-12 leading-[1.333] text-[var(--text-secondary)]">
         <span>{t('learning.plan.title')}</span>
         <span className="tabular-nums">{t('learning.minutes', { count: plan.minutes })}</span>
       </div>
@@ -123,7 +123,7 @@ export function DailyPlanBar({ plan, now }: { plan: LearningDailyPlan; now: 'exp
             <span
               aria-hidden
               className={cn(
-                'whitespace-nowrap text-12 leading-4 tabular-nums text-[var(--text-tertiary)]',
+                'whitespace-nowrap text-12 leading-[1.333] tabular-nums text-[var(--text-tertiary)]',
                 segment.kind === now && 'font-medium text-[var(--text-primary)]',
               )}
             >
@@ -161,8 +161,8 @@ function ModuleHeading({
       className={cn(
         'flex w-full items-center gap-2 rounded-lg text-left outline-none transition-colors hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]',
         compact
-          ? 'min-h-7 gap-1.5 px-1.5 text-12 leading-4 text-[var(--text-secondary)]'
-          : 'min-h-8 px-2 py-1 text-13 leading-5',
+          ? 'min-h-7 gap-1.5 px-1.5 text-12 leading-[1.333] text-[var(--text-secondary)]'
+          : 'min-h-8 px-2 py-1 text-13 leading-[1.54]',
       )}
     >
       <ChevronRight
@@ -229,7 +229,7 @@ export function GoalOutline({ goal }: { goal: LearningGoal }) {
                       <span className="flex min-w-0 flex-[1_1_16rem] flex-col gap-1">
                         <span
                           className={cn(
-                            'text-13 leading-5',
+                            'text-13 leading-[1.54]',
                             point.state === 'not-started'
                               ? 'text-[var(--text-secondary-mid)]'
                               : 'text-[var(--text-primary)]',
@@ -245,7 +245,7 @@ export function GoalOutline({ goal }: { goal: LearningGoal }) {
                           </span>
                         ) : null}
                       </span>
-                      <span className="flex h-5 shrink-0 items-center gap-2.5 whitespace-nowrap text-12 leading-4 text-[var(--text-tertiary)]">
+                      <span className="flex h-5 shrink-0 items-center gap-2.5 whitespace-nowrap text-12 leading-[1.333] text-[var(--text-tertiary)]">
                         {type ? <span>{type}</span> : null}
                         <span
                           className={cn(
@@ -307,7 +307,7 @@ export function MiniOutline({ goal }: { goal: LearningGoal }) {
                       key={point.id}
                       aria-current={current ? 'step' : undefined}
                       className={cn(
-                        'ml-3 flex h-7 items-center gap-2 rounded-lg px-1.5 text-12 leading-4',
+                        'ml-3 flex h-7 items-center gap-2 rounded-lg px-1.5 text-12 leading-[1.333]',
                         current
                           ? 'bg-[var(--surface-chip)] font-medium text-[var(--text-primary)]'
                           : done
