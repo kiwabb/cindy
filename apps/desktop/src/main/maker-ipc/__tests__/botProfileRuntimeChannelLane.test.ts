@@ -32,6 +32,35 @@ function prompt(opts: MakerSessionCreateOpts): string {
   return [opts.botProfilePrompt, opts.botProfileContextPrompt].join('\n');
 }
 
+describe('Pi companion identity is selected by the persisted Bot lane', () => {
+  it.each([
+    ['pi', 'canonical', true],
+    ['pi', 'thread', true],
+    ['pi', 'delegation', false],
+    ['pi', 'routine', false],
+    ['pi', 'channel', false],
+    ['pi', 'group', false],
+    ['pi', null, false],
+    ['codex', 'canonical', false],
+    ['claude-code', 'canonical', false],
+  ] as const)('selects %s %s only for a Pi owner chat', async (agentKind, role, enabled) => {
+    if (role) seed(role, null);
+    else state.rows = [[]];
+    const opts = { id: 'same-title-and-workspace', agentKind, workingDir: '/bots/bot/workspace', model: 'm' } as MakerSessionCreateOpts;
+    const readLifeSchedule = vi.fn(async (_soul: string) => undefined);
+    await hydrateBotProfileRuntime(opts, {
+      readProfileFolder: async () => ({ homeDir: '/bots/bot', systemPromptOverride: '', readLifeSchedule }),
+    }, { persistSnapshot: false });
+    expect(opts.botRuntimeProfile?.piOwnerPrivateChat === true).toBe(enabled);
+    expect(typeof opts.readPiCompanionLifeSlot === 'function').toBe(enabled);
+    expect(readLifeSchedule).not.toHaveBeenCalled();
+    if (enabled) {
+      await opts.readPiCompanionLifeSlot?.();
+      expect(readLifeSchedule).toHaveBeenCalledWith(SOUL.trim());
+    }
+  });
+});
+
 describe('IM channel lanes hydrate the full Bot profile', () => {
   it.each(['claude-code', 'codex', 'pi'] as const)('inherits only enabled official skills on %s', async agentKind => {
     seed('channel', 'im:telegram:777:dm:555', { skillMode: 'allowlist', skills: ['personal'] });

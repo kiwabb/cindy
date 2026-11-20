@@ -51,14 +51,14 @@ export async function withNativeFactMemoryTurn(
 
 /** Called by the existing product-terminal classifier, never directly by a vendor done event. */
 export function finishNativeFactMemoryTurn(session: NativeFactSession, generation: number,
-  outcome: 'completed' | 'failed'): void {
+  outcome: 'completed' | 'failed', assistantReply?: string): void {
   const binding = bindings.get(session);
   const token = binding?.turns.get(generation);
   if (!binding || !token) return;
   binding.turns.delete(generation);
   try {
     binding.assertCurrent();
-    binding.queue.finish(token, outcome, generation);
+    binding.queue.finish(token, outcome, generation, assistantReply);
     if (outcome === 'completed') void binding.queue.drain().then(() => binding.afterDrain?.()).catch(() => binding.reportFailure());
   } catch {
     // Facts must never turn an already-completed visible reply into a send failure.

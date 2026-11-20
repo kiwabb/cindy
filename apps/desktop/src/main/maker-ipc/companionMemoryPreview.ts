@@ -1,3 +1,4 @@
+import { validateFactSelection } from '@cindy/maker-core';
 import type { IpcMainInvokeEvent } from 'electron';
 import { throwIpcError } from '../utils/ipcValidate.js';
 import fs from 'node:fs';
@@ -15,7 +16,7 @@ interface Config {
 }
 export function createCompanionMemoryPreview(deps: {
   owner(): { root: string; id: string; assertCurrent(): void };
-  target(botId: string): Promise<CompanionMemorySelection>;
+  target(botId: string, route?: CompanionMemorySelection['route']): Promise<CompanionMemorySelection>;
   botForSession(sessionId: string): Promise<string | null>;
   activate(selection: CompanionMemorySelection): Promise<void>;
   ensure(sessionId: string): Promise<void>;
@@ -23,7 +24,7 @@ export function createCompanionMemoryPreview(deps: {
   reportFailure?(sessionId: string, error: unknown): void;
 }) {
   const serial = new Map<string, Promise<unknown>>();
-  const active = new Map<string, string>();
+  const active = new Map<string, { botId: string; key: string }>();
   const pending = new Map<string, Promise<void>>();
   let epoch = 0;
   function context(botId: string) {
@@ -70,17 +71,26 @@ export function createCompanionMemoryPreview(deps: {
     active.delete(sessionId);
     deps.deactivate(sessionId);
   }
+  function matchesSelection(saved: CompanionMemorySelection | undefined, target: CompanionMemorySelection | undefined) {
+    if (!saved || !target || saved.ownerId !== target.ownerId || saved.botId !== target.botId || saved.companionState) return false;
+    try {
+      validateFactSelection(saved.route, target.route);
+      return true;
+    } catch {
+      return false;
+    }
+  }
   async function status(botId: string): Promise<MemoryPreviewStatus> {
     const { owner, file } = context(botId),
       config = read(file);
     let target: CompanionMemorySelection | undefined;
     try {
-      target = await deps.target(botId);
+      target = await deps.target(botId, config.selection?.route);
     } catch {
       /* Unsupported route does not prevent disabling or viewing saved memories. */
     }
     owner.assertCurrent();
-    const matches = !config.enabled || JSON.stringify(config.selection) === JSON.stringify(target);
+    const matches = !config.enabled || matchesSelection(config.selection, target);
     return {
       botId,
       enabled: config.enabled,
@@ -105,7 +115,9 @@ export function createCompanionMemoryPreview(deps: {
         captured.owner.assertCurrent();
         const old = read(captured.file);
         if (old.revision !== expectedRevision) throw Error('MEMORY_PREVIEW_CHANGED');
-        const selection = enabled ? await deps.target(botId) : undefined;
+        const saved = old.selection?.ownerId === captured.owner.id && old.selection.botId === botId
+          && !old.selection.companionState ? old.selection : undefined;
+        const selection = enabled ? await deps.target(botId, saved?.route) : saved;
         captured.owner.assertCurrent();
         if (
           selection &&
@@ -125,7 +137,8 @@ export function createCompanionMemoryPreview(deps: {
           }),
         );
         if (old.selection) stop(old.selection.sessionId);
-        if (selection) stop(selection.sessionId);
+        if (selection && selection.sessionId !== old.selection?.sessionId) stop(selection.sessionId);
+        for (const [id, binding] of active) if (binding.botId === botId) stop(id);
         return status(botId);
       });
     serial.set(captured.file, work);
@@ -166,7 +179,7 @@ export function createCompanionMemoryPreview(deps: {
         }
       };
       let target: CompanionMemorySelection;
-      try { target = await deps.target(botId); }
+      try { target = await deps.target(botId, config.selection?.route); }
       catch {
         assertConfig();
         // Preserve the explicit selection, but detach recall/extraction while its source is unavailable.
@@ -177,13 +190,14 @@ export function createCompanionMemoryPreview(deps: {
       if (
         target.sessionId !== sessionId ||
         target.ownerId !== owner.id ||
-        JSON.stringify(target) !== JSON.stringify(config.selection)
+        !matchesSelection(config.selection, target)
       ) {
         stop(sessionId);
         return;
       }
       const key = `${owner.root}:${config.revision}`;
-      if (active.get(sessionId) !== key) {
+      for (const [id, binding] of active) if (id !== sessionId && binding.botId === botId) stop(id);
+      if (active.get(sessionId)?.key !== key) {
         stop(sessionId);
         await deps.activate(target);
         try {
@@ -192,7 +206,7 @@ export function createCompanionMemoryPreview(deps: {
           stop(sessionId);
           throw error;
         }
-        active.set(sessionId, key);
+        active.set(sessionId, { botId, key });
       }
       await deps.ensure(sessionId);
       assertConfig();

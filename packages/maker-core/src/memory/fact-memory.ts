@@ -29,7 +29,7 @@ export type FactMutation = { write: WriteOptions } | { delete: string };
 export interface FactAnalysisPort {
   /** Resolved user-selected route. The port must dispatch this route without fallback. */
   readonly route: FactRoute;
-  analyze(input: { route: FactRoute; userText: string; facts: MemoryRecord[]; signal: AbortSignal }): Promise<{ route: FactRoute; changes: unknown }>;
+  analyze(input: { route: FactRoute; userText: string; assistantReply?: string; facts: MemoryRecord[]; signal: AbortSignal }): Promise<{ route: FactRoute; changes: unknown }>;
 }
 export interface FactMemoryDeps {
   scope: FactScope;
@@ -41,7 +41,7 @@ export interface FactMemoryDeps {
   list(): Promise<MemoryRecord[]>;
   apply(revision: number, mutations: FactMutation[]): Promise<void>;
 }
-interface Payload { source: FactSource; revision: number; route: FactRoute }
+interface Payload { source: FactSource; revision: number; route: FactRoute; assistantReply?: string }
 const sourceId = (scope: FactScope, s: FactSource) => hash([scope.ownerId, scope.botId, s.sessionId, s.logicalTurnId, s.userMessageId]);
 const sourceHash = (s: FactSource) => hash([s.sessionId, s.logicalTurnId, s.userMessageId, s.userText]);
 export interface FactTurnToken { readonly generation: number }
@@ -117,7 +117,7 @@ export class FactMemoryQueue {
     return token;
   }
   /** Host must call only at the final product-turn outcome, not each SDK done. */
-  finish(token: FactTurnToken, outcome: 'completed' | 'failed' | 'cancelled', generation: number): void {
+  finish(token: FactTurnToken, outcome: 'completed' | 'failed' | 'cancelled', generation: number, assistantReply?: string): void {
     this.assertReady();
     const payload = this.tokens.get(token);
     if (!payload || token.generation !== generation) throw new Error('Unknown or stale fact turn');
@@ -126,7 +126,7 @@ export class FactMemoryQueue {
     const s = payload.source;
     const id = sourceId(this.scope, s);
     // Generation is an attempt identifier, not the completed logical source identity.
-    this.deps.journal.enqueue(id, sourceHash(s), payload);
+    this.deps.journal.enqueue(id, sourceHash(s), { ...payload, assistantReply: assistantReply?.slice(0, 4096) });
   }
   /** Asynchronous single drain; a persisted pending job can be resumed without scanning history. */
   drain(): Promise<void> {
@@ -147,7 +147,7 @@ export class FactMemoryQueue {
         if (payload.revision !== this.deps.journal.revision()) throw new MemoryError('version-conflict', 'Memory changed');
         this.deps.journal.transition(job.id, 'preparing', 'analyzing');
         const result = await this.deps.port.analyze({ route: this.route, userText: payload.source.userText,
-          facts: records.filter(r => r.frontmatter.type === 'user'), signal: this.abort.signal });
+          assistantReply: payload.assistantReply, facts: records.filter(r => r.frontmatter.type === 'user'), signal: this.abort.signal });
         this.assertReady();
         if (routeKey(result.route) !== routeKey(this.route)) throw new Error('Unexpected fact analysis route');
         const changes = changesOf(result.changes, payload.source, records);

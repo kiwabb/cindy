@@ -10729,7 +10729,7 @@
       "sourcePrivate": "Souvenirs privés du compagnon",
       "previewLabel": "Aperçu des souvenirs privés",
       "previewHint": "Après une réponse complète, organise les faits vous concernant avec le modèle de l’abonnement OpenAI choisi pour ce compagnon ({{model}}). Cela ajoute une requête au modèle. L’ordinateur choisi doit être en ligne et autoriser l’accès. Les souvenirs existants restent modifiables lorsque la fonction est désactivée.",
-      "previewUnavailable": "Choisissez un abonnement OpenAI explicite et un modèle Codex sur cet ordinateur ou un autre de votre compte. Si la source est indisponible, l’analyse s’arrête sans modèle d’entreprise ni solution de repli. Désactivez puis réactivez après un changement.",
+      "previewUnavailable": "La mémoire privée nécessite un ami en mode projet et une conversation compatible avec Codex ou Pi. Son organisation requiert un modèle OpenAI disponible avec abonnement.",
       "previewError": "Les réglages n’ont pas pu être enregistrés ou ont changé. Rouvrez cette page pour charger la sélection actuelle.",
       "privateHint": "Ces souvenirs appartiennent à ce compagnon. Les autres tâches du projet ne les utilisent pas. Les consulter ou les modifier n’active pas l’analyse automatique.",
       "privateDeleteBoundary": "Les résumés attribuables et les entrées de recherche sont aussi supprimés. L’historique de discussion est conservé.",
