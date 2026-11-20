@@ -20103,7 +20103,7 @@
         "explainFirst": "先講講",
         "anotherQuestion": "換一道題"
       },
-      "unbound": "這場對話沒有綁定進行中的學習目標",
+      "unbound": "這場對話沒有連結進行中的學習目標",
       "localOnly": "學習目標只在這台電腦上的對話裡顯示",
       "passed": "過關",
       "passedNames": "過關：{{names}}",
