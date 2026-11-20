@@ -90,7 +90,7 @@ export function UpdateBanner({
   onOpenVersionNotice,
   autoOpenPrerequisiteDialogs = true,
 }: UpdateBannerProps) {
-  const { status, version, displayVersion, errorCode, downloadUrl } = useUpdateStatus();
+  const { status, version, displayVersion, errorCode, downloadUrl, manualReason } = useUpdateStatus();
   // What the user reads; `version` stays the key for comparisons, dismiss snapshots and release notes.
   const shownVersion = displayVersion ?? version;
   const { effectiveLocale } = useLocale();
@@ -440,6 +440,10 @@ export function UpdateBanner({
 
   if (isManual) {
     if (manualDismissed) return null;
+    // Why this version cannot install automatically; the data-format case keeps the title alone.
+    const manualReasonKey = manualReason === 'signing'
+      ? 'update.banner.manualReasonSigning'
+      : manualReason === 'failed' ? 'update.banner.manualReasonFailed' : null;
     const openInstaller = () => { void window.electronAPI.openExternal(downloadUrl!); };
     if (isCollapsed) {
       return (
@@ -476,6 +480,7 @@ export function UpdateBanner({
           <Download className="h-9 w-9 text-sidebar-muted" strokeWidth={1.5} />
           <p className="text-center text-sm font-semibold text-foreground">{t('update.banner.manualTitle')}</p>
           {shownVersion && <p className="text-center text-xs text-sidebar-muted">{shownVersion}</p>}
+          {manualReasonKey && <p className="text-center text-xs text-sidebar-muted">{t(manualReasonKey)}</p>}
           <Button
             variant="cta"
             size="md"

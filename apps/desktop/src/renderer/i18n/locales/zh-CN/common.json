@@ -9505,7 +9505,8 @@
       "downloading": "正在下载新版本，请稍后…",
       "ready": "新版本已就绪，点击侧边栏完成更新",
       "manifestFailed": "检查更新失败，请检查网络",
-      "downloadFailed": "新版本下载失败，稍后再试"
+      "downloadFailed": "新版本下载失败，稍后再试",
+      "prepareDeferred": "新版本已下载，但暂时无法准备安装，稍后会自动重试"
     },
     "closeConfirm": {
       "title": "确认要离开吗？",
@@ -10219,7 +10220,9 @@
       "dismissAria": "关闭更新提示，稍后再决定",
       "manualTitle": "新版本需手动安装",
       "manualButton": "下载安装包",
-      "manualAria": "下载 {{version}} 安装包"
+      "manualAria": "下载 {{version}} 安装包",
+      "manualReasonSigning": "当前安装不是开发团队签名，不能自动更新。可以下载安装包手动安装。",
+      "manualReasonFailed": "自动安装准备失败，已跳过这个版本。可以下载安装包手动安装。"
     },
     "notice": {
       "title": "更新公告",

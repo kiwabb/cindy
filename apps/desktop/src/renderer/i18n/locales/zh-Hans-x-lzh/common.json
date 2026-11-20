@@ -9505,7 +9505,8 @@
       "downloading": "方取新版，请稍候…",
       "ready": "新版已就，点侧边栏以竟更新，乘风而上。",
       "manifestFailed": "查更新未成，请检查网络",
-      "downloadFailed": "新版下载未成，稍后再试"
+      "downloadFailed": "新版下载未成，稍后再试",
+      "prepareDeferred": "新版已下，然暂不能备装，稍后自当再试"
     },
     "closeConfirm": {
       "title": "果欲离去乎？",
@@ -10219,7 +10220,9 @@
       "dismissAria": "阖更新之告，容后再定",
       "manualTitle": "新版须手装",
       "manualButton": "取安装包",
-      "manualAria": "取 {{version}} 安装包"
+      "manualAria": "取 {{version}} 安装包",
+      "manualReasonSigning": "今所装者非开发团队所签，不能自更。可下载安装包手装之。",
+      "manualReasonFailed": "自装之备未成，此版已略。可下载安装包手装之。"
     },
     "notice": {
       "title": "新版之告",

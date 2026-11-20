@@ -9622,7 +9622,8 @@
       "downloading": "Baixando nova versão, aguarde…",
       "ready": "Nova versão pronta — clique na barra lateral para aplicar",
       "manifestFailed": "Falha ao verificar atualizações. Verifique sua conexão",
-      "downloadFailed": "Falha ao baixar a nova versão. Tente novamente mais tarde"
+      "downloadFailed": "Falha ao baixar a nova versão. Tente novamente mais tarde",
+      "prepareDeferred": "Nova versão baixada, mas não é possível prepará-la agora. Uma nova tentativa será feita automaticamente"
     },
     "closeConfirm": {
       "title": "Confirmar saída?",
@@ -10345,7 +10346,9 @@
       "dismissAria": "Dispensar aviso de atualização por enquanto",
       "manualTitle": "A nova versão requer instalação manual",
       "manualButton": "Baixar instalador",
-      "manualAria": "Baixar o instalador da versão {{version}}"
+      "manualAria": "Baixar o instalador da versão {{version}}",
+      "manualReasonSigning": "Esta instalação não foi assinada pela sua equipe de desenvolvimento, então não pode ser atualizada automaticamente. Você pode baixar o instalador e instalar manualmente.",
+      "manualReasonFailed": "Não foi possível preparar a instalação automática, então esta versão foi ignorada. Você pode baixar o instalador e instalar manualmente."
     },
     "notice": {
       "title": "Novidades",

@@ -26,7 +26,10 @@ import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 import { isCindyPersonalRuntime } from './cindy-make/versionRuntimeIdentity.js';
 import { personalUpdateContext, checkPersonalManifest, prepareInUtilityProcess,
-  readPreparedPersonalUpdate, applyPreparedPersonalUpdate } from './personal-update/runtime.js';
+  readPreparedPersonalUpdate, applyPreparedPersonalUpdate, preflightPersonalPreparation,
+  type PersonalUpdateContext } from './personal-update/runtime.js';
+import { personalFailureKind, readPersonalFailureMarker, type PersonalFailureCode } from './personal-update/failure.js';
+import type { PersonalManifest } from './personal-update/contract.mjs';
 import { writeAtomicJson } from './personal-update/transaction.js';
 import { formatPersonalBuildVersion } from '../shared/personalBuildVersion.js';
 import os from 'node:os';
@@ -126,7 +129,15 @@ interface UpdateStatusPayload {
   errorCode?: string;
   /** `manual` only: release page of the installer the user must download and run by hand. */
   downloadUrl?: string;
+  /**
+   * Personal `manual` only: why it cannot install automatically. `storage`: incompatible data format;
+   * `signing`: this Mac's install lacks the development-team signature; `failed`: preparation failed
+   * and the revision is skipped.
+   */
+  manualReason?: PersonalManualReason;
 }
+
+type PersonalManualReason = 'storage' | 'signing' | 'failed';
 
 interface PatchInfo {
   version: string;
@@ -226,7 +237,7 @@ let readyFilePath: string | undefined;
 /** 当前 staged 补丁对应的渠道代际。延迟清理用它区分「同路径上的新旧包」。 */
 let readyChannelEpoch: number | undefined;
 /** Personal channel: newer release that cannot be applied in place (status `manual`). Never an installable patch. */
-let manualUpdate: { version: string; downloadUrl: string; displayVersion: string } | undefined;
+let manualUpdate: { version: string; downloadUrl: string; displayVersion: string; manualReason: PersonalManualReason } | undefined;
 /** Personal channel: internal `personal-r<revision>` → human-readable label (see formatPersonalBuildVersion). */
 const personalDisplayVersions = new Map<string, string>();
 function rememberPersonalDisplayVersion(version: string, manifest: { sourceCommit: string; builtAt?: string }): string {
@@ -1165,6 +1176,8 @@ export type CheckForUpdateResult =
   | 'manifest_failed'
   | 'download_failed'
   | 'manual_download'
+  /** Personal channel: the new version is downloaded but cannot be prepared right now (retried later). */
+  | 'prepare_failed'
   | 'idle';
 
 // Module-level in-flight guard so the startup IPC handler and the background
@@ -1199,6 +1212,33 @@ export function isVersionlessAppVersion(version: string): boolean {
   return version === '0.0.0' || version.startsWith('0.0.0-');
 }
 
+/** Preparation did not reach a verdict (no failure marker), so the revision is not skipped. */
+class PersonalPreparationDeferred extends Error {}
+
+function personalManualReason(code: PersonalFailureCode | 'PERSONAL_UPDATE_STORAGE_INCOMPATIBLE'): PersonalManualReason {
+  if (code === 'PERSONAL_UPDATE_STORAGE_INCOMPATIBLE') return 'storage';
+  return personalFailureKind(code);
+}
+
+/** A newer personal revision that cannot be installed automatically: show it with the reason and a download link. */
+function showPersonalManualInstall(
+  context: PersonalUpdateContext, manifest: PersonalManifest, code: PersonalFailureCode,
+): CheckForUpdateResult {
+  readyFilePath = undefined;
+  readyVersion = undefined;
+  readyChannelEpoch = undefined;
+  const manualVersion = `personal-r${manifest.revision}`;
+  manualUpdate = {
+    version: manualVersion,
+    displayVersion: rememberPersonalDisplayVersion(manualVersion, manifest),
+    downloadUrl: `https://github.com/${context.policy.repository}/releases/tag/${context.policy.channel}-r${manifest.revision}`,
+    manualReason: personalManualReason(code),
+  };
+  log.warn('Personal update needs a manual install', { code, version: manualUpdate.version });
+  setStatus('manual', manualUpdate);
+  return 'manual_download';
+}
+
 async function doCheckPersonalUpdate(): Promise<CheckForUpdateResult> {
   const context = personalUpdateContext();
   if (!context) return 'idle';
@@ -1218,22 +1258,13 @@ async function doCheckPersonalUpdate(): Promise<CheckForUpdateResult> {
       return 'idle';
     }
     const manifest = check.manifest;
-    if (check.kind === 'manual') {
-      readyFilePath = undefined;
-      readyVersion = undefined;
-      readyChannelEpoch = undefined;
-      const manualVersion = `personal-r${manifest.revision}`;
-      manualUpdate = {
-        version: manualVersion,
-        displayVersion: rememberPersonalDisplayVersion(manualVersion, manifest),
-        downloadUrl: `https://github.com/${context.policy.repository}/releases/tag/${context.policy.channel}-r${manifest.revision}`,
-      };
-      log.warn('Personal update needs a manual install', { code: 'PERSONAL_UPDATE_STORAGE_INCOMPATIBLE', version: manualUpdate.version });
-      setStatus('manual', manualUpdate);
-      return 'manual_download';
-    }
+    if (check.kind === 'manual') return showPersonalManualInstall(context, manifest, 'PERSONAL_UPDATE_STORAGE_INCOMPATIBLE');
+    if (check.kind === 'skipped') return showPersonalManualInstall(context, manifest, check.reason);
     let prepared = readPreparedPersonalUpdate();
     if (!prepared || manifest.revision > prepared.identity.revision) {
+      // Do not download what this install can never prepare (macOS signing prerequisites).
+      const blocked = await preflightPersonalPreparation(manifest);
+      if (blocked) return showPersonalManualInstall(context, manifest, blocked);
       const incoming = path.join(context.root, `incoming-${manifest.revision}.zip`);
       fs.mkdirSync(context.root, { recursive: true, mode: 0o700 });
       setStatus('downloading', { version: `personal-r${manifest.revision}`, progress: 0 });
@@ -1242,7 +1273,14 @@ async function doCheckPersonalUpdate(): Promise<CheckForUpdateResult> {
         onProgress: event => broadcastUpdateProgress({ progress: event.total ? Math.min(99, event.loaded / event.total * 100) : 0,
           received: event.loaded, total: event.total ?? manifest.asset.size }),
       });
-      prepared = await prepareInUtilityProcess(incoming, manifest);
+      try {
+        prepared = await prepareInUtilityProcess(incoming, manifest);
+      } catch (error) {
+        // A failed preparation leaves a marker and the revision is skipped from now on; say so.
+        const failure = readPersonalFailureMarker(context.root, manifest.revision);
+        if (failure) return showPersonalManualInstall(context, manifest, failure.reason);
+        throw new PersonalPreparationDeferred(error instanceof Error ? error.message : 'PERSONAL_UPDATE_PREPARATION_FAILED');
+      }
       fs.rmSync(incoming, { force: true });
     }
     if (!personalUpdateContext() || syncObservedUpdateChannel() || channelEpochAtStart !== updateChannelEpoch
@@ -1271,7 +1309,9 @@ async function doCheckPersonalUpdate(): Promise<CheckForUpdateResult> {
     readyVersion = undefined;
     readyChannelEpoch = undefined;
     setStatus('idle');
-    return 'manifest_failed';
+    // Downloaded but not preparable right now (for example a preparation still holding its lock): the
+    // next check retries, and a manual check reports this instead of a failed manifest read.
+    return error instanceof PersonalPreparationDeferred ? 'prepare_failed' : 'manifest_failed';
   }
 }
 
@@ -2413,7 +2453,7 @@ async function checkPersonalAppUpdateForAgent(currentVersion: string): Promise<{
     };
   }
   const targetVersion = `personal-r${check.manifest.revision}`;
-  if (check.kind === 'manual') {
+  if (check.kind === 'manual' || check.kind === 'skipped') {
     return { status: 'manual_download', currentVersion, targetVersion, reason: AGENT_UPDATE_FAILURE_REASONS.manual_download };
   }
   return { status: 'in_app_only', currentVersion, targetVersion, reason: PERSONAL_IN_APP_ONLY_REASON };
@@ -2478,6 +2518,7 @@ const AGENT_UPDATE_FAILURE_REASONS: Record<Exclude<CheckForUpdateResult, 'ready'
   manifest_failed: '无法读取当前渠道的更新信息。',
   download_failed: '下载更新失败，请稍后重试。',
   manual_download: '当前安装需要手动下载新版本。',
+  prepare_failed: '新版本已下载，但暂时无法准备安装，稍后会自动重试。',
   idle: '当前渠道没有适用于这台设备的可安装更新。',
 };
 
@@ -2658,7 +2699,8 @@ export function initUpdateService(): void {
 
   ipcMain.handle('update-get-status', () => {
     if (currentStatus === 'manual' && manualUpdate) {
-      return { status: currentStatus, version: manualUpdate.version, displayVersion: manualUpdate.displayVersion, downloadUrl: manualUpdate.downloadUrl };
+      return { status: currentStatus, version: manualUpdate.version, displayVersion: manualUpdate.displayVersion,
+        downloadUrl: manualUpdate.downloadUrl, manualReason: manualUpdate.manualReason };
     }
     return { status: currentStatus, version: readyVersion, ...(currentStatus === 'ready' ? displayVersionFor(readyVersion) : {}), errorCode: lastErrorCode };
   });

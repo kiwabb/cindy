@@ -17,6 +17,7 @@ export function useUpdateStatus() {
   // 快照不含 progress，错过的进度由下一条推送补上即可。
   const [progress, setProgress] = useState<number | undefined>();
   const [downloadUrl, setDownloadUrl] = useState<string | undefined>();
+  const [manualReason, setManualReason] = useState<UpdateStatusPayload['manualReason']>();
 
   useEffect(() => {
     const api = window.electronAPI;
@@ -29,6 +30,7 @@ export function useUpdateStatus() {
         setDisplayVersion(initial.displayVersion);
         setErrorCode(initial.errorCode);
         setDownloadUrl(initial.downloadUrl);
+        setManualReason(initial.manualReason);
       }
     }).catch(() => {});
 
@@ -43,6 +45,7 @@ export function useUpdateStatus() {
         setDisplayVersion(payload.displayVersion);
         setErrorCode(payload.errorCode);
         setDownloadUrl(payload.downloadUrl);
+        setManualReason(payload.manualReason);
         setProgress(typeof payload.progress === 'number' ? payload.progress : undefined);
       }
     });
@@ -50,5 +53,5 @@ export function useUpdateStatus() {
     return unsubscribe;
   }, []);
 
-  return { status, version, displayVersion, errorCode, progress, downloadUrl };
+  return { status, version, displayVersion, errorCode, progress, downloadUrl, manualReason };
 }

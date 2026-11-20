@@ -33,9 +33,12 @@ const personalContext = vi.fn<() => unknown>(() => null);
 const personalPrepared = vi.fn<() => unknown>(() => null);
 const personalManifest = vi.fn<() => Promise<unknown>>(async () => null);
 const personalApply = vi.fn<() => Promise<void>>(async () => undefined);
+const personalPrepare = vi.fn<(archive: string, manifest: unknown) => Promise<unknown>>();
+const personalPreflight = vi.fn<() => Promise<string | null>>(async () => null);
 vi.mock('../personal-update/runtime.js', () => ({
   personalUpdateContext: personalContext, readPreparedPersonalUpdate: personalPrepared,
-  checkPersonalManifest: personalManifest, prepareInUtilityProcess: vi.fn(),
+  checkPersonalManifest: personalManifest, prepareInUtilityProcess: personalPrepare,
+  preflightPersonalPreparation: personalPreflight,
   applyPreparedPersonalUpdate: personalApply,
 }));
 const fetchManifest = vi.fn();
@@ -258,6 +261,8 @@ beforeEach(() => {
   personalPrepared.mockReturnValue(null);
   personalManifest.mockResolvedValue(null);
   personalApply.mockClear();
+  personalPrepare.mockReset();
+  personalPreflight.mockReset().mockResolvedValue(null);
   // Own every startup/background timer so afterEach can cancel it before the
   // app.getPath mock starts pointing at the next test's isolated fixture.
   vi.useFakeTimers();
@@ -1681,6 +1686,79 @@ describe('app update forward-only policy', () => {
     expect(fs.existsSync(path.join(TEST_USER_DATA, 'updates', 'patch-info.json'))).toBe(false);
   });
 
+  // Regression: a revision skipped after a failure, an install that cannot be re-signed (macOS) and a failed
+  // preparation all ended in a silent idle state. Each is now a manual install with its reason; none is
+  // retried, and the signing case is detected before the download.
+  describe('personal update that cannot install automatically', () => {
+    function observe() {
+      const sends: Array<{ channel: string; payload: unknown }> = [];
+      browserWindowGetAllWindows.mockReturnValue([{
+        isDestroyed: () => false,
+        webContents: { send: (channel: string, payload: unknown) => { sends.push({ channel, payload }); } },
+      } as never]);
+      return () => sends.filter(s => s.channel === 'update-status').at(-1)?.payload;
+    }
+    const withAsset = (identity: object) => ({ kind: 'install', manifest: { ...identity,
+      asset: { url: 'https://github.com/kiwabb/cindy/releases/download/r42/app.zip', sha256: 'c'.repeat(64), size: 100 } } });
+    const markFailed = (root: string, reason: string) =>
+      fs.writeFileSync(path.join(root, 'failed-42.json'), JSON.stringify({ revision: 42, phase: 'preparation-failed', reason }));
+
+    it.each([
+      ['a revision already skipped', 'skipped', 'failed', false],
+      ['an install that fails the signing check', 'preflight', 'signing', false],
+      ['a preparation that fails and marks the revision', 'prepare', 'failed', true],
+    ] as const)('shows %s as a manual install with its reason', async (_label, setup, manualReason, downloads) => {
+      readAutoUpdateSettings.mockReturnValue({ autoRelaunchOnIdle: false });
+      appGetVersion.mockReturnValue('0.0.0');
+      const { context, identity } = personalUpdateFixture();
+      personalPrepared.mockReturnValue(null);
+      if (setup === 'skipped') personalManifest.mockResolvedValue({ kind: 'skipped', manifest: identity, reason: 'PERSONAL_UPDATE_PREPARATION_FAILED' });
+      if (setup === 'preflight') personalPreflight.mockResolvedValue('PERSONAL_UPDATE_INSTALLED_APP_SIGNATURE');
+      download.mockResolvedValue({ path: 'incoming', size: 100 });
+      if (setup !== 'skipped') personalManifest.mockResolvedValue(withAsset(identity));
+      if (setup === 'prepare') personalPrepare.mockImplementation(async () => {
+        markFailed(context.root, 'PERSONAL_UPDATE_RESIGN_FAILED');
+        throw new Error('PERSONAL_UPDATE_RESIGN_FAILED');
+      });
+      const lastStatus = observe();
+      const service = await freshUpdateService('darwin');
+      try {
+        await expect(service.checkForUpdate()).resolves.toBe('manual_download');
+        expect(lastStatus()).toMatchObject({
+          status: 'manual', version: 'personal-r42', manualReason,
+          downloadUrl: 'https://github.com/kiwabb/cindy/releases/tag/personal-windows-x64-r42',
+        });
+        expect(download).toHaveBeenCalledTimes(downloads ? 1 : 0);
+        if (setup !== 'prepare') expect(personalPrepare).not.toHaveBeenCalled();
+      } finally { service.stopUpdateService(); }
+    });
+
+    it('reports a preparation that could not run yet without skipping the revision', async () => {
+      appGetVersion.mockReturnValue('0.0.0');
+      const { context, identity } = personalUpdateFixture();
+      personalPrepared.mockReturnValue(null);
+      personalManifest.mockResolvedValue(withAsset(identity));
+      download.mockResolvedValue({ path: 'incoming', size: 100 });
+      personalPrepare.mockRejectedValue(new Error('PERSONAL_UPDATE_PREPARE_BUSY'));
+      const service = await freshUpdateService('win32');
+      try {
+        await expect(service.checkForUpdate()).resolves.toBe('prepare_failed');
+        expect(service.getUpdateStatus()).toBe('idle');
+        expect(fs.existsSync(path.join(context.root, 'failed-42.json'))).toBe(false);
+      } finally { service.stopUpdateService(); }
+    });
+
+    it('tells the Agent a skipped revision needs a manual install', async () => {
+      appGetVersion.mockReturnValue('0.0.0');
+      const { identity } = personalUpdateFixture();
+      personalManifest.mockResolvedValue({ kind: 'skipped', manifest: identity, reason: 'PERSONAL_UPDATE_HELPER_SIGNATURE' });
+      const service = await freshUpdateService('win32');
+      try {
+        await expect(service.checkAppUpdateForAgent()).resolves.toMatchObject({ status: 'manual_download', targetVersion: 'personal-r42' });
+      } finally { service.stopUpdateService(); }
+    });
+  });
+
   // Regression: the Agent check fell through to the official manifest on a personal 0.0.0 build and
   // reported official 0.1.x as "available" for it. A personal build only ever follows its own channel.
   it('never reports the official manifest to the Agent on a personal build', async () => {
@@ -1752,7 +1830,7 @@ describe('app update forward-only policy', () => {
       await expect(service.checkForUpdate()).resolves.toBe('manual_download');
       const expected = {
         status: 'manual', version: 'personal-r43', displayVersion: '2026-11-11 08:53 · aaaaaaa',
-        downloadUrl: 'https://github.com/kiwabb/cindy/releases/tag/personal-windows-x64-r43',
+        downloadUrl: 'https://github.com/kiwabb/cindy/releases/tag/personal-windows-x64-r43', manualReason: 'storage',
       };
       expect(service.getUpdateStatus()).toBe('manual');
       expect(sends.filter(s => s.channel === 'update-status').at(-1)?.payload).toEqual(expected);

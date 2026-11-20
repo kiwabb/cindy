@@ -9622,7 +9622,8 @@
       "downloading": "Téléchargement de la nouvelle version, veuillez patienter…",
       "ready": "Nouvelle version prête : cliquez dans la barre latérale pour l'appliquer",
       "manifestFailed": "Échec de la recherche de mises à jour, vérifiez votre réseau",
-      "downloadFailed": "Échec du téléchargement de la nouvelle version, réessayez plus tard"
+      "downloadFailed": "Échec du téléchargement de la nouvelle version, réessayez plus tard",
+      "prepareDeferred": "Nouvelle version téléchargée, mais impossible de la préparer pour le moment. Nouvel essai automatique plus tard"
     },
     "closeConfirm": {
       "title": "Confirmer la fermeture ?",
@@ -10345,7 +10346,9 @@
       "dismissAria": "Fermer la bannière de mise à jour pour l'instant",
       "manualTitle": "La nouvelle version nécessite une installation manuelle",
       "manualButton": "Télécharger l'installateur",
-      "manualAria": "Télécharger l'installateur de {{version}}"
+      "manualAria": "Télécharger l'installateur de {{version}}",
+      "manualReasonSigning": "Cette installation n'est pas signée par votre équipe de développement et ne peut donc pas se mettre à jour automatiquement. Vous pouvez télécharger le programme d'installation et l'installer manuellement.",
+      "manualReasonFailed": "L'installation automatique n'a pas pu être préparée : cette version a été ignorée. Vous pouvez télécharger le programme d'installation et l'installer manuellement."
     },
     "notice": {
       "title": "Nouveautés",

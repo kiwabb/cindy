@@ -9548,7 +9548,8 @@
       "downloading": "Neue Version wird heruntergeladen, bitte warten…",
       "ready": "Neue Version bereit — zum Anwenden auf die Seitenleiste klicken",
       "manifestFailed": "Update-Prüfung fehlgeschlagen. Prüfe deine Netzwerkverbindung",
-      "downloadFailed": "Download der neuen Version fehlgeschlagen. Versuch es später erneut"
+      "downloadFailed": "Download der neuen Version fehlgeschlagen. Versuch es später erneut",
+      "prepareDeferred": "Neue Version heruntergeladen, kann aber gerade nicht vorbereitet werden. Es wird automatisch erneut versucht"
     },
     "closeConfirm": {
       "title": "Wirklich beenden?",
@@ -10262,7 +10263,9 @@
       "dismissAria": "Update-Banner vorerst ausblenden",
       "manualTitle": "Neue Version erfordert manuelle Installation",
       "manualButton": "Installer herunterladen",
-      "manualAria": "Installer für {{version}} herunterladen"
+      "manualAria": "Installer für {{version}} herunterladen",
+      "manualReasonSigning": "Diese Installation ist nicht mit deinem Entwicklungsteam signiert und kann sich daher nicht automatisch aktualisieren. Du kannst das Installationsprogramm herunterladen und manuell installieren.",
+      "manualReasonFailed": "Die automatische Installation konnte nicht vorbereitet werden, daher wurde diese Version übersprungen. Du kannst das Installationsprogramm herunterladen und manuell installieren."
     },
     "notice": {
       "title": "Neuigkeiten",
