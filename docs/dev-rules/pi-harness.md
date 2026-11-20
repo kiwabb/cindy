@@ -18,6 +18,11 @@ Cindy 以 `pi --mode rpc` spawn pi 二进制(JSONL/stdio),`translator.ts` 把 pi
   prompt**(不用 `--system-prompt` 整体替换 —— 那会丢掉 pi 自己调好的工具用法/工程约定)。
   追加段的文本写在会话 `configHome/append-system-prompt.md`,命令行只传该文件路径(pi 接受
   `<text|path>`):伙伴提示词轻易两三万字符,内联会顶穿 Windows 的 spawn 命令行预算。
+  主人私聊（主会话及私聊话题）由 Desktop 从当前账号库的伙伴会话关联判定。Pi 仍先组装原生
+  提示词。Cindy 的 `cindy-companion-identity` 扩展在 `before_agent_start` 中仅替换已知
+  原生身份开头，保留工具、规则、文档、项目上下文和完整 SOUL。显式自定义或未知 Pi 开头沿用
+  原样。同会话的定时、目标续跑和 IM 来源保留原开头。选项随已串行化的新轮提交，配置更新继续走
+  原有伙伴空闲刷新。维护 Pi 版本时需用真实 Pi 加本机假网关复核恢复和同会话来源切换。
 - **权限执行**:pi 原生无工具审批(security.md 明确:非沙箱、不限制工具)。Cindy 用注入的
   `cindy-bridge.ts` 扩展在 pi 进程内 `pi.on('tool_call')` 拦截,经 `extension_ui_request`
   子协议冒泡到 `index.ts handleExtensionUiRequest`,映射成 `InteractionRequest` 交 Cindy

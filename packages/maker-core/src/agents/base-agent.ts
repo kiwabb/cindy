@@ -1785,6 +1785,8 @@ export interface BotRuntimeProfile {
    * are added. Without it the classic, isolated teammate runtime applies.
    */
   projectContext?: boolean;
+  /** Set by host hydration from an owner-private Bot Session link. */
+  piOwnerPrivateChat?: true;
 }
 
 /** The profile when the classic isolated teammate runtime applies; undefined for V2 and ordinary tasks. */

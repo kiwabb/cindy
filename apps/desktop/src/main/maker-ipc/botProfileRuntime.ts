@@ -1055,6 +1055,8 @@ export async function hydrateBotProfileRuntime(
   opts.botRuntimeProfile = {
     botId: row.botId,
     profileVersion: row.profileVersion,
+    ...(opts.agentKind === 'pi' && (row.role === 'canonical' || row.role === 'thread')
+      ? { piOwnerPrivateChat: true as const } : {}),
     skillPolicy: {
       mode: runtimeSkillMode,
       configured: runtimeConfiguredSkills,

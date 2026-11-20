@@ -1,4 +1,9 @@
 import { estimatePiContext, type PiPromptSource } from './context-estimate.js';
+import {
+  CINDY_PI_COMPANION_IDENTITY_EXTENSION,
+  CINDY_PI_COMPANION_IDENTITY_MODE,
+  CINDY_PI_COMPANION_IDENTITY_SOURCE,
+} from './companion-identity-source.js';
 import { NATIVE_SUBSCRIPTION_ACCOUNT } from '../../interfaces/auth-adapter.js';
 import { getPiExtensionUiCapability } from './extension-ui-capabilities.js';
 import { createPiCacheInputTracker } from './cache-input.js';
@@ -3406,6 +3411,18 @@ export class PiAgent extends BaseAgent {
     // 会导致 bridge/subagent 静默失效)。
     const bridgeExtensionPath = joinRemotePosixPath(extensionsDir, CINDY_BRIDGE_EXTENSION_FILENAME);
     await writeFile(bridgeExtensionPath, CINDY_BRIDGE_EXTENSION_SOURCE);
+    const companionIdentityExtensionPath =
+      !reviewMode && !hostedGuest && !opts[LOCAL_AGENT_CLIENT]?.hostToolsOnly
+      && opts.botRuntimeProfile?.piOwnerPrivateChat === true && opts.botProfilePrompt?.trim()
+        ? joinRemotePosixPath(extensionsDir, CINDY_PI_COMPANION_IDENTITY_EXTENSION)
+        : undefined;
+    const companionIdentityModePath = companionIdentityExtensionPath
+      ? joinRemotePosixPath(extensionsDir, CINDY_PI_COMPANION_IDENTITY_MODE)
+      : undefined;
+    if (companionIdentityExtensionPath && companionIdentityModePath) {
+      await writeFile(companionIdentityExtensionPath, CINDY_PI_COMPANION_IDENTITY_SOURCE);
+      await writeFile(companionIdentityModePath, 'task');
+    }
     // cindy-subagent extension:与 bridge 并列的独立扩展(职责分离 —— bridge 管权限门与
     // MCP 桥,这个只管子代理)。子进程继承 PI_CODING_AGENT_DIR,因此同样加载 bridge,
     // 权限门对子代理照样生效;递归由扩展内的 depth env 自己截断。
@@ -4170,6 +4187,7 @@ export class PiAgent extends BaseAgent {
         ...(guestContextExtensionPath ? ['--extension', guestContextExtensionPath] : []),
         '--extension',
         bridgeExtensionPath,
+        ...(companionIdentityExtensionPath ? ['--extension', companionIdentityExtensionPath] : []),
         ...(localSubagentSupported ? ['--extension', subagentExtensionPath] : []),
         ...(!reviewMode && !opts[LOCAL_AGENT_CLIENT]?.hostToolsOnly && planModeExtAvailable ? ['--extension', planModeExtPath] : []),
         ...(loadProjectResourcesInPlace
@@ -5779,6 +5797,7 @@ export class PiAgent extends BaseAgent {
           .update(CINDY_BRIDGE_EXTENSION_SOURCE)
           .update('\n')
           .update(CINDY_SUBAGENT_EXTENSION_SOURCE)
+          .update(companionIdentityExtensionPath ? CINDY_PI_COMPANION_IDENTITY_SOURCE : '')
           .digest('hex')
           .slice(0, 16);
         // 追加提示词本体在文件里，命令行不再带它；指纹进 env 才让提示词变化
@@ -8027,6 +8046,17 @@ export class PiAgent extends BaseAgent {
               if (!managedPackageRoute.accepted) {
                 await applyRequestedPlanMode();
                 rejectIfCancelled(sendOpts, 'send');
+              }
+              if (companionIdentityModePath) {
+                // A scheduler may target the canonical chat. Keep the choice on
+                // the serialized dispatch boundary, scoped to the accepted run.
+                if (ctx.isStreaming || ctx.pendingHostTurnStartToken) {
+                  throw new TurnDispatchRejectedError('Pi turn is active before identity selection.');
+                }
+                const origin = sendOpts?.origin;
+                const companion = (!origin || origin.kind === 'user') && origin?.surface !== 'im';
+                await writeFile(companionIdentityModePath, companion ? 'companion' : 'task');
+                if (!managedPackageRoute.accepted) rejectIfCancelled(sendOpts, 'send');
               }
               const pendingTurnStartToken = markPiHostTurnStartPending(ctx);
               promptRequestStarted = true;
