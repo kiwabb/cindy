@@ -70,6 +70,7 @@ export async function createCompanionFollowUp(
     const target = await readTarget(botId);
     const agentKind = target?.agentKind;
     if (!target?.model || !target.providerId || target.remoteHostId || target.agentDeviceId ||
+        target.scheduledModelBaseline ||
         (agentKind !== 'pi' && agentKind !== 'codex' && agentKind !== 'cc')) {
       throw new Error('The companion needs a local main chat with an explicit model route');
     }
@@ -103,6 +104,7 @@ async function readTarget(botId: string) {
     id: sessions.id, clearedAt: sessions.clearedAt, userSendAt: sessions.userSendAt,
     agentKind: sessions.agentKind, model: sessions.model, providerId: sessions.providerId,
     agentDeviceId: sessions.agentDeviceId, remoteHostId: sessions.remoteHostId,
+    scheduledModelBaseline: sessions.scheduledModelBaseline,
     version: botProfiles.currentVersion,
   }).from(botSessionLinks)
     .innerJoin(sessions, eq(sessions.id, botSessionLinks.sessionId))
@@ -156,6 +158,7 @@ export function withCompanionFollowUps(
     if (!botId || !isDataOwnerBroadcastScopeCurrent(scope) || !isHome(botId)) return skip('Companion is not hosted here');
     const target = await readTarget(botId);
     if (!target || target.remoteHostId || target.agentDeviceId) return skip('No local main chat');
+    if (target.scheduledModelBaseline) return skip('The main chat has a temporary automation route');
     const { agentKind, providerId, model } = target;
     if ((agentKind !== 'pi' && agentKind !== 'codex' && agentKind !== 'cc') || !providerId || !model) {
       return skip('The main chat needs an explicit, connected model route');
@@ -180,7 +183,7 @@ export function withCompanionFollowUps(
         const sameChat = !!live && live.id === target.id && live.version === target.version &&
           live.clearedAt === target.clearedAt && live.userSendAt === target.userSendAt &&
           live.agentKind === target.agentKind && live.providerId === providerId &&
-          live.model === model && !live.remoteHostId && !live.agentDeviceId;
+          live.model === model && !live.remoteHostId && !live.agentDeviceId && !live.scheduledModelBaseline;
         const lastAction = getSessionLastUserActionAt(target.id);
         return {
           enabled: !!current && current.status === 'active' && current.updatedAt === schedule.updatedAt &&
