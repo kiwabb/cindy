@@ -1466,6 +1466,9 @@ export async function main(args = process.argv.slice(2)) {
 // macOS temp directories and linked CLI entrypoints may spell the same file
 // differently from import.meta.url, which Node resolves to its real path.
 if (process.argv[1] && existsSync(process.argv[1]) && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  console.log('[follow-up verification] starting full Desktop tsc');
+  execFileSync('pnpm', ['--filter', 'desktop', 'typecheck'], { cwd: ROOT, stdio: 'inherit' });
+  console.log('[follow-up verification] full Desktop tsc passed');
   main().then((code) => { process.exitCode = code; }, (error) => {
     console.error(`[test-hygiene] ${error.message}`);
     process.exitCode = 2;
