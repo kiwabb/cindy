@@ -10104,7 +10104,8 @@
       "downloading": "A transferir a nova versão, aguarde…",
       "ready": "Nova versão pronta — clique na barra lateral para aplicar",
       "manifestFailed": "Falha ao procurar atualizações. Verifique a sua ligação à rede",
-      "downloadFailed": "Falha ao transferir a nova versão. Tente novamente mais tarde"
+      "downloadFailed": "Falha ao transferir a nova versão. Tente novamente mais tarde",
+      "prepareDeferred": "Nova versão transferida, mas não é possível prepará-la agora. Será feita uma nova tentativa automaticamente"
     },
     "closeConfirm": {
       "title": "Confirmar saída?",
@@ -10827,7 +10828,9 @@
       "dismissAria": "Fechar a faixa de atualização por agora",
       "manualTitle": "A nova versão requer instalação manual",
       "manualButton": "Transferir instalador",
-      "manualAria": "Transferir o instalador da versão {{version}}"
+      "manualAria": "Transferir o instalador da versão {{version}}",
+      "manualReasonSigning": "Esta instalação não foi assinada pela sua equipa de desenvolvimento, por isso não pode ser atualizada automaticamente. Pode transferir o instalador e instalar manualmente.",
+      "manualReasonFailed": "Não foi possível preparar a instalação automática, por isso esta versão foi ignorada. Pode transferir o instalador e instalar manualmente."
     },
     "notice": {
       "title": "Novidades",

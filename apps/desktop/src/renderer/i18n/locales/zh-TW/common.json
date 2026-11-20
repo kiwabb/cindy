@@ -9988,7 +9988,8 @@
       "downloading": "正在下載新版本，請稍候…",
       "ready": "新版本已就緒，點選側邊欄完成更新",
       "manifestFailed": "檢查更新失敗，請檢查網路",
-      "downloadFailed": "新版本下載失敗，稍後再試"
+      "downloadFailed": "新版本下載失敗，稍後再試",
+      "prepareDeferred": "新版本已下載，但暫時無法準備安裝，稍後會自動重試"
     },
     "closeConfirm": {
       "title": "確認要離開嗎？",
@@ -10702,7 +10703,9 @@
       "dismissAria": "關閉更新提示，稍後再決定",
       "manualTitle": "新版本需手動安裝",
       "manualButton": "下載安裝包",
-      "manualAria": "下載 {{version}} 安裝包"
+      "manualAria": "下載 {{version}} 安裝包",
+      "manualReasonSigning": "目前安裝的版本不是開發團隊簽署，無法自動更新。可以下載安裝檔手動安裝。",
+      "manualReasonFailed": "自動安裝準備失敗，已略過這個版本。可以下載安裝檔手動安裝。"
     },
     "notice": {
       "title": "更新公告",

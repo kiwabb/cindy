@@ -1,12 +1,28 @@
 {
-  "runtimePlugins": {
-    "save": "Speichern",
-    "promptUnsupported": "Dieser Pi-Ausführungsort unterstützt keine Systemanweisungsfragmente.",
-    "nativeHooksUnsupported": "Werkzeug-Hooks unterstützen nur lokales Claude Code und Pi.",
-    "title": "Aufgaben-Plugins",
-    "description": "Plugins für diese Aufgabe auswählen. Änderungen gelten ab der nächsten Nachricht.",
-    "unsupported": "Die Verarbeitung jeder Anfrage wird nur mit lokalem Pi unterstützt. Die Engine dieser Aufgabe unterstützt sie nicht.",
-    "failed": "Die Einstellungen konnten nicht geladen oder gespeichert werden. Dieses Fenster erneut öffnen und noch einmal versuchen."
+  "conversationMarks": {
+    "mark": "Markieren",
+    "title": "Markierungen",
+    "entryAria": "Markierungen, {{count}} nicht besprochen",
+    "groupOpen": "Nicht besprochen",
+    "groupDiscussed": "Besprochen",
+    "me": "Ich",
+    "yesterday": "Gestern {{time}}",
+    "talkAboutThis": "Darüber sprechen",
+    "markDiscussed": "Als besprochen markieren",
+    "markOpen": "Als nicht besprochen markieren",
+    "jumpToSource": "Zur ursprünglichen Nachricht",
+    "delete": "Markierung löschen",
+    "deleted": "Markierung gelöscht",
+    "undo": "Rückgängig",
+    "empty": "Noch keine Markierungen",
+    "saveFailed": "Die Markierung wurde nicht gespeichert. Versuche es erneut.",
+    "syncSynced": "Synchronisiert",
+    "syncSyncing": "Wird synchronisiert",
+    "syncOffline": "Offline",
+    "syncOfflinePending_one": "Offline · {{count}} wartet auf Synchronisierung",
+    "syncOfflinePending_other": "Offline · {{count}} warten auf Synchronisierung",
+    "pending": "Wartet auf Synchronisierung",
+    "backToConversation": "Zurück zur Unterhaltung"
   },
   "sharedTaskRecovery": {
     "title": "Fortsetzen auf dem ursprünglichen Computer nicht möglich",
@@ -1128,18 +1144,6 @@
     "detail": "Damit endet die Fernsteuerung und der Sichtschutz wird entfernt. Ist „Computer beim Beenden schützen“ aktiv, wird der Computer auch gesperrt.",
     "cancel": "Verbunden bleiben",
     "disconnect": "Trennen"
-  },
-  "awayGuard": {
-    "status": "Cindy arbeitet",
-    "hint": "Drücke eine beliebige Taste, um den Entsperrbildschirm zu öffnen",
-    "lockFailed": {
-      "status": "Cindy konnte diesen Mac nicht sperren",
-      "hint": "Berühre den Computer, um das Sperren erneut zu versuchen. Klappt es weiterhin nicht, bestätige dich mit Touch ID oder deinem Passwort, um den Sichtschutz zu entfernen. Du kannst auch den Deckel schließen oder die Ein/Aus-Taste drücken.",
-      "hintWindows": "Berühre den Computer, um das Sperren erneut zu versuchen. Klappt es weiterhin nicht, bestätige dich mit Windows Hello oder deiner PIN, um den Sichtschutz zu entfernen. Du kannst auch Windows-Logo-Taste + L drücken."
-    },
-    "hintWindows": "Drücke eine beliebige Taste, um den Entsperrbildschirm zu öffnen",
-    "hintLinux": "Drücke eine beliebige Taste, um den Entsperrbildschirm zu öffnen",
-    "verifyReason": "den Sichtschutz entfernen"
   },
   "appBadge": {
     "attentionCount": "Aufgaben, die Aufmerksamkeit benötigen: {{count}}"
@@ -10031,7 +10035,8 @@
       "downloading": "Neue Version wird heruntergeladen, bitte warten…",
       "ready": "Neue Version bereit — zum Anwenden auf die Seitenleiste klicken",
       "manifestFailed": "Update-Prüfung fehlgeschlagen. Prüfe deine Netzwerkverbindung",
-      "downloadFailed": "Download der neuen Version fehlgeschlagen. Versuche es später erneut"
+      "downloadFailed": "Download der neuen Version fehlgeschlagen. Versuche es später erneut",
+      "prepareDeferred": "Neue Version heruntergeladen, kann aber gerade nicht vorbereitet werden. Es wird automatisch erneut versucht"
     },
     "closeConfirm": {
       "title": "Wirklich beenden?",
@@ -10745,7 +10750,9 @@
       "dismissAria": "Update-Banner vorerst schließen",
       "manualTitle": "Neue Version erfordert manuelle Installation",
       "manualButton": "Installer herunterladen",
-      "manualAria": "Installer für {{version}} herunterladen"
+      "manualAria": "Installer für {{version}} herunterladen",
+      "manualReasonSigning": "Diese Installation ist nicht mit deinem Entwicklungsteam signiert und kann sich daher nicht automatisch aktualisieren. Du kannst das Installationsprogramm herunterladen und manuell installieren.",
+      "manualReasonFailed": "Die automatische Installation konnte nicht vorbereitet werden, daher wurde diese Version übersprungen. Du kannst das Installationsprogramm herunterladen und manuell installieren."
     },
     "notice": {
       "title": "Neuigkeiten",
@@ -22164,6 +22171,18 @@
     },
     "openLinked": "Verknüpftes Gespräch öffnen"
   },
+  "awayGuard": {
+    "status": "Cindy arbeitet",
+    "hint": "Drücke eine beliebige Taste, um den Entsperrbildschirm zu öffnen",
+    "lockFailed": {
+      "status": "Cindy konnte diesen Mac nicht sperren",
+      "hint": "Berühre den Computer, um das Sperren erneut zu versuchen. Klappt es weiterhin nicht, bestätige dich mit Touch ID oder deinem Passwort, um den Sichtschutz zu entfernen. Du kannst auch den Deckel schließen oder die Ein/Aus-Taste drücken.",
+      "hintWindows": "Berühre den Computer, um das Sperren erneut zu versuchen. Klappt es weiterhin nicht, bestätige dich mit Windows Hello oder deiner PIN, um den Sichtschutz zu entfernen. Du kannst auch Windows-Logo-Taste + L drücken."
+    },
+    "hintWindows": "Drücke eine beliebige Taste, um den Entsperrbildschirm zu öffnen",
+    "hintLinux": "Drücke eine beliebige Taste, um den Entsperrbildschirm zu öffnen",
+    "verifyReason": "den Sichtschutz entfernen"
+  },
   "subscriptionAccounts": {
     "placement": {
       "needsUpdate": "Auf dem ausführenden Computer muss Cindy aktualisiert werden, bevor Konten so verschoben werden können.",
@@ -22660,29 +22679,13 @@
       "bypassPermissions": "Vollzugriff"
     }
   },
-  "conversationMarks": {
-    "mark": "Markieren",
-    "title": "Markierungen",
-    "entryAria": "Markierungen, {{count}} nicht besprochen",
-    "groupOpen": "Nicht besprochen",
-    "groupDiscussed": "Besprochen",
-    "me": "Ich",
-    "yesterday": "Gestern {{time}}",
-    "talkAboutThis": "Darüber sprechen",
-    "markDiscussed": "Als besprochen markieren",
-    "markOpen": "Als nicht besprochen markieren",
-    "jumpToSource": "Zur ursprünglichen Nachricht",
-    "delete": "Markierung löschen",
-    "deleted": "Markierung gelöscht",
-    "undo": "Rückgängig",
-    "empty": "Noch keine Markierungen",
-    "saveFailed": "Die Markierung wurde nicht gespeichert. Versuche es erneut.",
-    "syncSynced": "Synchronisiert",
-    "syncSyncing": "Wird synchronisiert",
-    "syncOffline": "Offline",
-    "syncOfflinePending_one": "Offline · {{count}} wartet auf Synchronisierung",
-    "syncOfflinePending_other": "Offline · {{count}} warten auf Synchronisierung",
-    "pending": "Wartet auf Synchronisierung",
-    "backToConversation": "Zurück zur Unterhaltung"
+  "runtimePlugins": {
+    "save": "Speichern",
+    "promptUnsupported": "Dieser Pi-Ausführungsort unterstützt keine Systemanweisungsfragmente.",
+    "nativeHooksUnsupported": "Werkzeug-Hooks unterstützen nur lokales Claude Code und Pi.",
+    "title": "Aufgaben-Plugins",
+    "description": "Plugins für diese Aufgabe auswählen. Änderungen gelten ab der nächsten Nachricht.",
+    "unsupported": "Die Verarbeitung jeder Anfrage wird nur mit lokalem Pi unterstützt. Die Engine dieser Aufgabe unterstützt sie nicht.",
+    "failed": "Die Einstellungen konnten nicht geladen oder gespeichert werden. Dieses Fenster erneut öffnen und noch einmal versuchen."
   }
 }

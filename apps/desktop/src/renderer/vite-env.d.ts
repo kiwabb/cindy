@@ -1010,6 +1010,8 @@ interface UpdateStatusPayload {
   /** Personal channel only: human-readable build label shown instead of the internal `version`. */
   displayVersion?: string;
   progress?: number;
+  /** Personal `manual` only: why it cannot install automatically (see updateService). */
+  manualReason?: 'storage' | 'signing' | 'failed';
   /** `manual` only: release page to download the installer from. */
   downloadUrl?: string;
   /** Machine-readable error subtype. `windows_vc_runtime_missing` keeps a
@@ -4240,7 +4242,7 @@ interface ElectronAPI {
   /** Register an update-status subscriber. Returns an unsubscribe function. */
   onUpdateStatus: (callback: (payload: UpdateStatusPayload) => void) => () => void;
   /** Query current update status (no network, returns in-memory state). */
-  getUpdateStatus: () => Promise<{ status: string; version?: string; displayVersion?: string; errorCode?: string; downloadUrl?: string }>;
+  getUpdateStatus: () => Promise<{ status: string; version?: string; displayVersion?: string; errorCode?: string; downloadUrl?: string; manualReason?: UpdateStatusPayload['manualReason'] }>;
   /** Query and update auto-apply settings for downloaded app updates. */
   getAutoUpdateSettings: () => Promise<AutoUpdateSettingsPayload>;
   setAutoUpdateSettings: (settings: {
@@ -4292,11 +4294,12 @@ interface ElectronAPI {
    *   - 'ready'            → 新版本已就绪,等待重启
    *   - 'manifest_failed'  → 拉清单失败(网络问题)
    *   - 'download_failed'  → 找到了新版本但下载失败
-   *   - 'manual_download'  → 个人更新通道：更新版本的数据格式不兼容，需下载安装包手动安装
+   *   - 'manual_download'  → 个人更新通道：新版本无法自动安装（数据格式不兼容、签名前提不满足或准备失败已跳过），需下载安装包手动安装
+   *   - 'prepare_failed'   → 个人更新通道：新版本已下载，但暂时无法准备安装，之后会自动重试
    */
   checkForUpdate: () => Promise<{
     result:
-      'ready' | 'idle' | 'downloading' | 'manifest_failed' | 'download_failed' | 'manual_download';
+      'ready' | 'idle' | 'downloading' | 'manifest_failed' | 'download_failed' | 'manual_download' | 'prepare_failed';
   }>;
   /**
    * 现在重启会不会打断正在跑的活(逻辑 turn / Claude 后台活动 / Ghost card-action 后台活动

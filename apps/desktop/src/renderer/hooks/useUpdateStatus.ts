@@ -21,6 +21,7 @@ export function useUpdateStatus() {
   // Standard progress (retrying and why, verifying, speed, time left) from the
   // `app-update-progress` channel; cleared once the update stops downloading.
   const [download, setDownload] = useState<DownloadProgress | undefined>();
+  const [manualReason, setManualReason] = useState<UpdateStatusPayload['manualReason']>();
 
   useEffect(() => {
     const api = window.electronAPI;
@@ -33,6 +34,7 @@ export function useUpdateStatus() {
         setDisplayVersion(initial.displayVersion);
         setErrorCode(initial.errorCode);
         setDownloadUrl(initial.downloadUrl);
+        setManualReason(initial.manualReason);
       }
     }).catch(() => {});
 
@@ -47,6 +49,7 @@ export function useUpdateStatus() {
         setDisplayVersion(payload.displayVersion);
         setErrorCode(payload.errorCode);
         setDownloadUrl(payload.downloadUrl);
+        setManualReason(payload.manualReason);
         setProgress(typeof payload.progress === 'number' ? payload.progress : undefined);
         if (payload.status !== 'downloading' && payload.status !== 'superseding')
           setDownload(undefined);
@@ -62,5 +65,5 @@ export function useUpdateStatus() {
     };
   }, []);
 
-  return { status, version, displayVersion, errorCode, progress, downloadUrl, download };
+  return { status, version, displayVersion, errorCode, progress, downloadUrl, download, manualReason };
 }

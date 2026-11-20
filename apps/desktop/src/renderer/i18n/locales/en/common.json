@@ -1,12 +1,28 @@
 {
-  "runtimePlugins": {
-    "save": "Save",
-    "promptUnsupported": "This Pi execution location does not support system prompt fragments.",
-    "nativeHooksUnsupported": "Tool hooks support local Claude Code and Pi only.",
-    "title": "Task plugins",
-    "description": "Select plugins for this task. Changes apply from your next message.",
-    "unsupported": "Per-request processing is supported only for local Pi. This task’s engine does not support it.",
-    "failed": "Could not load or save these settings. Reopen this panel to try again."
+  "conversationMarks": {
+    "mark": "Mark",
+    "title": "Marks",
+    "entryAria": "Marks, {{count}} not discussed",
+    "groupOpen": "Not discussed",
+    "groupDiscussed": "Discussed",
+    "me": "Me",
+    "yesterday": "Yesterday {{time}}",
+    "talkAboutThis": "Talk about this",
+    "markDiscussed": "Mark as discussed",
+    "markOpen": "Mark as not discussed",
+    "jumpToSource": "Go to the original message",
+    "delete": "Delete mark",
+    "deleted": "Mark deleted",
+    "undo": "Undo",
+    "empty": "No marks yet",
+    "saveFailed": "The mark wasn't saved. Try again.",
+    "syncSynced": "Synced",
+    "syncSyncing": "Syncing",
+    "syncOffline": "Offline",
+    "syncOfflinePending_one": "Offline · {{count}} waiting to sync",
+    "syncOfflinePending_other": "Offline · {{count}} waiting to sync",
+    "pending": "Waiting to sync",
+    "backToConversation": "Back to conversation"
   },
   "sharedTaskRecovery": {
     "title": "Cannot resume on the original computer",
@@ -1128,18 +1144,6 @@
     "detail": "This ends remote control and removes the privacy screen. If Protect Computer on Exit is on, the computer also locks.",
     "cancel": "Keep connected",
     "disconnect": "Disconnect"
-  },
-  "awayGuard": {
-    "status": "Cindy is working",
-    "hint": "Press any key to show the unlock screen",
-    "lockFailed": {
-      "status": "Cindy couldn't lock this Mac",
-      "hint": "Touch the computer to try locking again. If it still can’t lock, verify with Touch ID or your password to remove the cover. You can also close the lid or press the power button to lock.",
-      "hintWindows": "Touch the computer to try locking again. If it still can’t lock, verify with Windows Hello or your PIN to remove the cover. You can also press the Windows logo key + L to lock."
-    },
-    "hintWindows": "Press any key to show the unlock screen",
-    "hintLinux": "Press any key to show the unlock screen",
-    "verifyReason": "remove the privacy screen"
   },
   "appBadge": {
     "attentionCount": "Tasks needing attention: {{count}}"
@@ -10031,7 +10035,8 @@
       "downloading": "Downloading new version…",
       "ready": "New version ready — click the sidebar to apply",
       "manifestFailed": "Update check failed. Check your network.",
-      "downloadFailed": "New version download failed. Try again later."
+      "downloadFailed": "New version download failed. Try again later.",
+      "prepareDeferred": "New version downloaded but can’t be prepared right now. It will retry automatically"
     },
     "closeConfirm": {
       "title": "Confirm exit?",
@@ -10745,7 +10750,9 @@
       "dismissAria": "Dismiss update banner for now",
       "manualTitle": "New version needs manual install",
       "manualButton": "Download installer",
-      "manualAria": "Download the installer for {{version}}"
+      "manualAria": "Download the installer for {{version}}",
+      "manualReasonSigning": "This installation isn’t signed by your development team, so it can’t update automatically. You can download the installer and install it manually.",
+      "manualReasonFailed": "Automatic installation couldn’t be prepared, so this version was skipped. You can download the installer and install it manually."
     },
     "notice": {
       "title": "What's New",
@@ -22164,6 +22171,18 @@
     },
     "openLinked": "Open linked conversation"
   },
+  "awayGuard": {
+    "status": "Cindy is working",
+    "hint": "Press any key to show the unlock screen",
+    "lockFailed": {
+      "status": "Cindy couldn't lock this Mac",
+      "hint": "Touch the computer to try locking again. If it still can’t lock, verify with Touch ID or your password to remove the cover. You can also close the lid or press the power button to lock.",
+      "hintWindows": "Touch the computer to try locking again. If it still can’t lock, verify with Windows Hello or your PIN to remove the cover. You can also press the Windows logo key + L to lock."
+    },
+    "hintWindows": "Press any key to show the unlock screen",
+    "hintLinux": "Press any key to show the unlock screen",
+    "verifyReason": "remove the privacy screen"
+  },
   "subscriptionAccounts": {
     "placement": {
       "needsUpdate": "The computer running this needs a Cindy update before accounts can be moved this way.",
@@ -22660,29 +22679,13 @@
       "bypassPermissions": "Full access"
     }
   },
-  "conversationMarks": {
-    "mark": "Mark",
-    "title": "Marks",
-    "entryAria": "Marks, {{count}} not discussed",
-    "groupOpen": "Not discussed",
-    "groupDiscussed": "Discussed",
-    "me": "Me",
-    "yesterday": "Yesterday {{time}}",
-    "talkAboutThis": "Talk about this",
-    "markDiscussed": "Mark as discussed",
-    "markOpen": "Mark as not discussed",
-    "jumpToSource": "Go to the original message",
-    "delete": "Delete mark",
-    "deleted": "Mark deleted",
-    "undo": "Undo",
-    "empty": "No marks yet",
-    "saveFailed": "The mark wasn't saved. Try again.",
-    "syncSynced": "Synced",
-    "syncSyncing": "Syncing",
-    "syncOffline": "Offline",
-    "syncOfflinePending_one": "Offline · {{count}} waiting to sync",
-    "syncOfflinePending_other": "Offline · {{count}} waiting to sync",
-    "pending": "Waiting to sync",
-    "backToConversation": "Back to conversation"
+  "runtimePlugins": {
+    "save": "Save",
+    "promptUnsupported": "This Pi execution location does not support system prompt fragments.",
+    "nativeHooksUnsupported": "Tool hooks support local Claude Code and Pi only.",
+    "title": "Task plugins",
+    "description": "Select plugins for this task. Changes apply from your next message.",
+    "unsupported": "Per-request processing is supported only for local Pi. This task’s engine does not support it.",
+    "failed": "Could not load or save these settings. Reopen this panel to try again."
   }
 }

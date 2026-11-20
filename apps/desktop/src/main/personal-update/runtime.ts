@@ -14,6 +14,8 @@ import type { PreparationRequest } from './prepareProcess.js';
 import { cleanupCommittedPersonalUpdates } from './cleanup.js';
 import { readLocalSigningIdentity } from './signing-core.mjs';
 import { createPreparationJob, recordPreparationWorker, finishPreparationJob, cleanupAbandonedPreparation } from './jobs.js';
+import { personalFailureCode, readPersonalFailureMarker, type PersonalFailureCode } from './failure.js';
+import { checkMacPreparationPrerequisites } from './macPreflight.js';
 
 export interface PersonalUpdateContext {
   policy: PersonalPolicy;
@@ -75,7 +77,9 @@ export function readPersonalBuildInfo(): { identity: PersonalIdentity; builtAt?:
  */
 export type PersonalManifestCheck =
   | { kind: 'install'; manifest: PersonalManifest }
-  | { kind: 'manual'; manifest: PersonalManifest };
+  | { kind: 'manual'; manifest: PersonalManifest }
+  /** A newer revision this install already failed to prepare or apply; it is never retried automatically. */
+  | { kind: 'skipped'; manifest: PersonalManifest; reason: PersonalFailureCode };
 
 export async function checkPersonalManifest(): Promise<PersonalManifestCheck | null> {
   const context = personalUpdateContext();
@@ -86,9 +90,26 @@ export async function checkPersonalManifest(): Promise<PersonalManifestCheck | n
   const text = await response.text();
   if (text.length > 32 * 1024) throw new Error('PERSONAL_UPDATE_FEED_TOO_LARGE');
   const manifest = validatePersonalManifest(JSON.parse(text), context.policy);
-  if (manifest.revision <= context.identity.revision || fs.existsSync(path.join(context.root, `failed-${manifest.revision}.json`))) return null;
+  if (manifest.revision <= context.identity.revision) return null;
+  const failure = readPersonalFailureMarker(context.root, manifest.revision);
+  if (failure) return { kind: 'skipped', manifest, reason: failure.reason };
   if (manifest.storageIdentity !== context.identity.storageIdentity) return { kind: 'manual', manifest };
   return { kind: 'install', manifest };
+}
+
+/**
+ * macOS: an install whose signing can never pass preparation skips the revision before downloading it.
+ * The marker keeps the existing rule that a failed revision is not retried automatically.
+ */
+export async function preflightPersonalPreparation(manifest: PersonalManifest): Promise<PersonalFailureCode | null> {
+  if (process.platform !== 'darwin') return null;
+  const context = personalUpdateContext();
+  if (!context) return null;
+  const reason = await checkMacPreparationPrerequisites();
+  if (!reason) return null;
+  fs.mkdirSync(context.root, { recursive: true, mode: 0o700 });
+  writeAtomicJson(path.join(context.root, `failed-${manifest.revision}.json`), { revision: manifest.revision, phase: 'preflight-failed', reason });
+  return reason;
 }
 
 /** `teamId` is the macOS Apple Development team; Windows preparation does no signing and carries none. */
@@ -113,7 +134,8 @@ export async function prepareInUtilityProcess(archive: string, manifest: Persona
         if (workerExited) {
           // Native supervisors observe parent death at 100ms intervals and reap only their own children.
           try { await finishPreparationJob(context.root, jobDirectory); }
-          catch { error = new Error('PERSONAL_UPDATE_JOB_CLEANUP_BLOCKED'); }
+          // An earlier failure stays the reported cause; cleanup only blocks an otherwise successful result.
+          catch { error ??= new Error('PERSONAL_UPDATE_JOB_CLEANUP_BLOCKED'); }
         }
         if (error) reject(error); else resolve(value!);
       };
@@ -121,8 +143,8 @@ export async function prepareInUtilityProcess(archive: string, manifest: Persona
       child.once('exit', () => { workerExited = true; void finish(new Error('PERSONAL_UPDATE_PREPARE_EXIT')); });
       child.once('message', message => {
         try {
-          const value = message as { ok?: boolean; result?: Prepared };
-          if (value.ok !== true || !value.result) return finish(new Error('PERSONAL_UPDATE_PREPARATION_FAILED'));
+          const value = message as { ok?: boolean; result?: Prepared; error?: unknown };
+          if (value.ok !== true || !value.result) return finish(new Error(personalFailureCode(value.error)));
           const candidate = value.result;
           const expectedPath = path.join(context.root, `personal-${manifest.revision}.zip`);
           const candidateIdentity = validatePersonalIdentity(candidate.identity, context.policy);
@@ -149,8 +171,9 @@ export async function prepareInUtilityProcess(archive: string, manifest: Persona
     });
     return result;
   } catch (error) {
-    writeAtomicJson(path.join(context.root, `failed-${manifest.revision}.json`), { revision: manifest.revision, phase: 'preparation-failed' });
-    throw error;
+    const reason = personalFailureCode(error instanceof Error ? error.message : undefined);
+    writeAtomicJson(path.join(context.root, `failed-${manifest.revision}.json`), { revision: manifest.revision, phase: 'preparation-failed', reason });
+    throw new Error(reason);
   } finally {
     // A still-live worker retains its exact job ledger for later safe cleanup.
     if (workerExited && fs.existsSync(jobDirectory)) {
