@@ -17818,6 +17818,8 @@
   },
   "routines": {
     "deliveryLabel": "最终送达",
+    "deliveryOutreach": "主动发一条伙伴私聊",
+    "deliveryOutreachHint": "只支持一次性跟进。显式启用后，上海时间 22:00–08:00 保持静默，每天最多两条，至少间隔三小时。",
     "deliveryDirect": "直接显示在伙伴对话里",
     "deliveryProcess": "交给伙伴处理后回复",
     "deliveryIm": "发送到消息机器人",

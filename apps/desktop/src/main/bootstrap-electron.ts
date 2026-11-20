@@ -1,5 +1,7 @@
+import { getDesktopProviderService } from './maker-host/createDesktopProviderService.js';
 import { registerRuntimeSettingsSection } from './app-settings/runtime.js';
 import { z as settingsSchema } from 'zod';
+import { publishCompanionOutreach } from './routines/companionOutreachHost.js';
 import { deliverRoutineResult, listRoutineDeliveryTargets } from './routines/delivery.js';
 import { flushPluginUsageLifecycle } from './plugin-usage/current.js';
 import { flushSessionPiTurnUsage, retryPendingPiUsageReceipts } from './maker-ipc/piUsageReceipts.js';
@@ -1223,7 +1225,7 @@ import { configureRoutineHost } from './routines/service.js';
 import { configureBotAutonomyHost, initBotAutonomy } from './bot-autonomy/service.js';
 import { voiceCallCoordinator } from './voice-conversation/callCoordinator.js';
 import { hasVoiceConversationLease } from './voice-conversation/lease.js';
-import { getBotRemoteResourceSource, ensureBotRoutineLaneSession } from './localDb/ipc/bots.js';
+import { getBotRemoteResourceSource, getBotRemoteSettingsSource, ensureBotRoutineLaneSession } from './localDb/ipc/bots.js';
 import {
   registerScheduleHandlers,
   attachSchedulerEventListeners,
@@ -1280,6 +1282,25 @@ async function waitForCurrentAccountProviderModelsReady(): Promise<void> {
 // Live getters preserve account/scheduler replacement without loading Main modules at dispatch time.
 configureRoutineHost({
   deliverResult: deliverRoutineResult, deliveryTargets: listRoutineDeliveryTargets,
+  publishOutreach: publishCompanionOutreach,
+  outreachBusy: id => isSessionInTurn(id) || isSessionTurnPendingCompletion(id) ||
+    !!getMakerIfReady()?.getSession(id)?.isTurnRunning(),
+  outreachRoute: async (botId) => {
+    const { modelChain } = await getBotRemoteSettingsSource(botId);
+    const primary = modelChain[0];
+    // This first version is limited to its reviewed personal Pi subscription.
+    if (primary?.harness !== 'pi' || primary.providerId !== 'openai' ||
+        primary.model !== 'chatgpt/gpt-6.2-sol' || primary.agentDeviceId) return null;
+    const providers = await getDesktopProviderService({ allowSideEffects: false }).listProviders();
+    const openai = providers.find(provider => provider.id === 'openai');
+    if (!openai?.connected || !openai.openAiAccount?.identity || openai.openAiAccount.reconnectRequired) return null;
+    const effort = primary.effort;
+    return {
+      agentKind: 'pi', model: primary.model, providerId: 'openai',
+      fastMode: false,
+      ...(effort === 'low' || effort === 'medium' || effort === 'high' ? { effort } : {}),
+    };
+  },
   assertImportedAutomationReady: ensureImportedAutomationReady, prepareImportedAutomation, finishImportedAutomation, recoverImports: recoverCompanionImports,
   getBot: getBotRemoteResourceSource,
   ensureRoutineSession: ensureBotRoutineLaneSession,

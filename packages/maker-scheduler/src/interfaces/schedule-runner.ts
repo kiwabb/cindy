@@ -15,6 +15,7 @@ export interface FireContext {
   /** Host caller owns deferred retries; never schedule a cron replay for this attempt. */
   deferToCaller?: boolean;
   /** Internal caller validity, checked at the accepted -> vendor-dispatch boundary. Never persisted. */
+  toolsDisabled?: true;
   canDispatch?: () => boolean;
   /** Bound pre-run hooks must execute in the directory shown in the approval card. */
   expectedPreRunWorkingDir?: string;

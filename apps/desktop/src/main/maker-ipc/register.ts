@@ -16,6 +16,14 @@ import { pluginAppResult } from '../mcp-apps/pluginCards.js';
 import { restorePluginPageSession } from '../mcp-apps/pluginPageCall.js';
 import { resumeInterruptedScheduleRun } from '../scheduler-host/index.js';
 import { readTaskDeliveryNote } from '../bot-autonomy/hub.js';
+import { readCompanionOutreachNote } from '../routines/companionOutreachHost.js';
+
+async function readDeliveryAndOutreachNote(sessionId: string): Promise<string | null> {
+  const current = await readTaskDeliveryNote(sessionId);
+  const outreach = await readCompanionOutreachNote(sessionId).catch(() => null);
+  return [current, outreach].filter(Boolean).join('\n\n') || null;
+}
+
 import { setVoiceTaskDispatch, setVoiceCallMemoryReader } from '../voice-conversation/taskBridge.js';
 import { buildBotMemoryScopeKey, SessionCreationCleanupPendingError } from '@cindy/maker-core';
 import { createOrcaWorkerProjectHandlers } from './orcaWorkerProjectHandlers';
@@ -12439,7 +12447,7 @@ export function registerMakerIpc(maker: Maker, options: RegisterMakerIpcOptions)
         ? (prependNoteToWireUserMessage(withHandoff as HandoffWireMessage, sourceNote) as UserMessage)
         : withHandoff;
       const deliveryNote = shouldPrependMobileClientPromptNote(message, session.agentKind)
-        ? await readTaskDeliveryNote(session.id) : null;
+        ? await readDeliveryAndOutreachNote(session.id) : null;
       const deliveryPlan = wireNoteMemory.plan(session.id, { 'task-delivery': deliveryNote }, { force: !!pendingHandoff, partial: true });
       const outgoingMessage = deliveryPlan.notes['task-delivery']
         ? prependNoteToWireUserMessage(sourcedMessage as HandoffWireMessage, deliveryPlan.notes['task-delivery']) as UserMessage
@@ -18976,7 +18984,7 @@ export function registerMakerIpc(maker: Maker, options: RegisterMakerIpcOptions)
     readReplyQuoteNote,
     // 私聊话题的 [话题说明]:按持久化的话题链接现读,不是话题时为 null。
     readBotThreadNote: readBotDmThreadContextNote,
-    readTaskDeliveryNote,
+    readTaskDeliveryNote: readDeliveryAndOutreachNote,
     readInputHandoffOwnerNote: (sessionId) =>
       getDeviceLinkInvokeContext()?.sharedTask ? null : (getInputHandoffService()?.ownerMessageNote(sessionId) ?? null),
     inputHandoffOwnerNoteDelivered: (sessionId) => getInputHandoffService()?.ownerMessageNoteDelivered(sessionId),
