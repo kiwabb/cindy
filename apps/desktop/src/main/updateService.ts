@@ -2377,6 +2377,48 @@ function agentUpdateUnsupportedReason(): string | null {
   return agentUpdateApplyBlockReason();
 }
 
+const PERSONAL_IN_APP_ONLY_REASON =
+  '个人渠道的新版本只能通过应用内更新提示安装（准备好后点重启）；Agent 工具不安装个人渠道更新。';
+
+/**
+ * Agent view of a personal build: read-only (never stages a patch) and never the official feed. The Agent
+ * install flow judges success by app version, which stays 0.0.0 on personal builds, so personal updates are
+ * reported but not offered to it.
+ */
+async function checkPersonalAppUpdateForAgent(currentVersion: string): Promise<{
+  status: string;
+  currentVersion: string;
+  targetVersion?: string;
+  reason?: string;
+}> {
+  if (currentStatus === 'manual' && manualUpdate) {
+    return {
+      status: 'manual_download', currentVersion, targetVersion: manualUpdate.version,
+      reason: AGENT_UPDATE_FAILURE_REASONS.manual_download,
+    };
+  }
+  if (currentStatus === 'ready' && readyVersion) {
+    return { status: 'in_app_only', currentVersion, targetVersion: readyVersion, reason: PERSONAL_IN_APP_ONLY_REASON };
+  }
+  let check: Awaited<ReturnType<typeof checkPersonalManifest>>;
+  try {
+    check = await checkPersonalManifest();
+  } catch {
+    return { status: 'manifest_failed', currentVersion, reason: '无法读取个人渠道的更新信息。' };
+  }
+  if (!check) {
+    return {
+      status: 'no_installable_update', currentVersion,
+      reason: '个人渠道没有适用于这台设备的可安装更新；也可能已是最新版本。',
+    };
+  }
+  const targetVersion = `personal-r${check.manifest.revision}`;
+  if (check.kind === 'manual') {
+    return { status: 'manual_download', currentVersion, targetVersion, reason: AGENT_UPDATE_FAILURE_REASONS.manual_download };
+  }
+  return { status: 'in_app_only', currentVersion, targetVersion, reason: PERSONAL_IN_APP_ONLY_REASON };
+}
+
 export async function checkAppUpdateForAgent(): Promise<{
   status: string;
   currentVersion: string;
@@ -2386,6 +2428,9 @@ export async function checkAppUpdateForAgent(): Promise<{
   const currentVersion = app.getVersion();
   const unsupported = agentUpdateUnsupportedReason();
   if (unsupported) return { status: 'unsupported', currentVersion, reason: unsupported };
+  // A personal build follows only its own channel. The official manifest compares as newer than the
+  // personal 0.0.0 and must never be reported as this build's update.
+  if (personalUpdateContext()) return checkPersonalAppUpdateForAgent(currentVersion);
   // Agent 的安装结果按「重启后版本前进」判定：同版本换装 Apple 芯片包（下载中或已就绪）
   // 不交给 Agent，落到下面按清单严格比较，只走侧栏更新提示。
   const advancesVersion = (version: string | undefined) =>

@@ -1681,6 +1681,27 @@ describe('app update forward-only policy', () => {
     expect(fs.existsSync(path.join(TEST_USER_DATA, 'updates', 'patch-info.json'))).toBe(false);
   });
 
+  // Regression: the Agent check fell through to the official manifest on a personal 0.0.0 build and
+  // reported official 0.1.x as "available" for it. A personal build only ever follows its own channel.
+  it('never reports the official manifest to the Agent on a personal build', async () => {
+    appGetVersion.mockReturnValue('0.0.0');
+    fetchManifest.mockResolvedValue(updateManifest('0.1.141'));
+    const { identity } = personalUpdateFixture();
+    const service = await freshUpdateService('win32');
+    try {
+      personalManifest.mockResolvedValueOnce(null);
+      await expect(service.checkAppUpdateForAgent()).resolves.toMatchObject({ status: 'no_installable_update' });
+      personalManifest.mockResolvedValueOnce({ kind: 'install', manifest: identity });
+      await expect(service.checkAppUpdateForAgent()).resolves.toMatchObject({
+        status: 'in_app_only', targetVersion: 'personal-r42',
+      });
+      personalManifest.mockRejectedValueOnce(new Error('PERSONAL_UPDATE_FEED_UNAVAILABLE'));
+      await expect(service.checkAppUpdateForAgent()).resolves.toMatchObject({ status: 'manifest_failed' });
+      expect(fetchManifest).not.toHaveBeenCalled();
+      expect(download).not.toHaveBeenCalled();
+    } finally { service.stopUpdateService(); }
+  });
+
   it('applies a qualified personal revision through the normal relaunch IPC despite public 0.0.0', async () => {
     readAutoUpdateSettings.mockReturnValue({ autoRelaunchOnIdle: false });
     appGetVersion.mockReturnValue('0.0.0');
