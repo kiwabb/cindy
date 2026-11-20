@@ -138,6 +138,7 @@ export function createRemoteModelAccessStore(options: { filePath(): string; scop
 }
 
 export const remoteModelAccess = createRemoteModelAccessStore({
+  // Same import cycle as the Device Link settings store: forward at call time.
   withMutation: (providerId, work) => withAvailabilityPolicyMutation(providerId, work),
   filePath: () => ownerScopedUserDataPath('remote-model-access.json'),
   scopeKey: () => { captureProviderManagementScope(); return activeOwnerScopeKey(); },
