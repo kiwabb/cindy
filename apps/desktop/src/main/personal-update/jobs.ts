@@ -18,7 +18,10 @@ function birthtime(pid: number): string | null {
   if (process.platform === 'win32') {
     // Windows reuses PIDs quickly, so the exact process start time (100ns ticks) is the identity.
     const powershell = path.join(process.env.SystemRoot ?? 'C:/Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
-    const script = `$p = Get-Process -Id ${pid} -ErrorAction SilentlyContinue; if ($p) { $p.StartTime.ToUniversalTime().Ticks }`;
+    // A missing process must exit 0 with no output: the failed Get-Process would otherwise make
+    // PowerShell exit 1, turning every dead recorded owner into "unknown" and keeping its lock forever.
+    // An unreadable start time still fails (exit 1) and stays unknown.
+    const script = `$p = Get-Process -Id ${pid} -ErrorAction SilentlyContinue; if (-not $p) { exit 0 }; $p.StartTime.ToUniversalTime().Ticks`;
     const windows = spawnSync(powershell, ['-NoProfile', '-NonInteractive', '-Command', script],
       { encoding: 'utf8', timeout: 15_000, maxBuffer: 4096, windowsHide: true });
     if (windows.error || windows.status !== 0) throw new Error('PERSONAL_UPDATE_JOB_PROCESS_UNKNOWN');
