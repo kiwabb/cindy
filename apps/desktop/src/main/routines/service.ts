@@ -26,13 +26,17 @@ import { assertTrustedAppRendererEvent } from '../security/trustedAppRenderer.js
 import { throwIpcError } from '../utils/ipcValidate.js';
 import { createLogger } from '../logger.js';
 import { runTaskActionRequest } from '../maker-ipc/taskActionAuthorization.js';
+import { CompanionOutreachLedger } from './companionOutreachLedger.js';
+import { runCompanionOutreach } from './companionOutreachRun.js';
+import { readOutreachConversation } from './companionOutreachHost.js';
+import { withSendToSessionLock, hasSendToSessionLock } from '../maker-ipc/sendToSessionLock.js';
 import { RoutineFileStore } from './store.js';
 import { assertPreRunHookCommandSyntax } from '../scheduler-host/pre-run-hook.js';
 import { untrustedJsonBlock } from '../../shared/untrustedPrompt.js';
 import type { GhostControlPointResult, GhostRoutineRunPointData } from '../../shared/ghost.js';
 import { getCurrentDbClientSnapshot } from '../localDb/client/current.js';
 import { botProfiles } from '../localDb/schema.js';
-import { isCompanionShadowed } from '../companion-cloud/homes.js';
+import { companionHomes, isCompanionShadowed } from '../companion-cloud/homes.js';
 import { botSystemSkillsOff, currentFollowUpEvents } from '../bot-autonomy/hub.js';
 import {
   BUILTIN_FOLLOW_UP_ROUTINE_PREFIX,
@@ -50,6 +54,9 @@ import { readNightlyLearningState, updateNightlyLearningState } from '../maker-i
 
 /** Bootstrap supplies live getters without a service -> scheduler -> IPC dependency cycle. */
 export interface RoutineHostDeps {
+  outreachRoute?(botId: string): Promise<RoutineModel | null>;
+  outreachBusy?(sessionId: string): boolean;
+  publishOutreach?(input: { routine: Routine; runId: string; targetSessionId: string; clientId: string; text: string; assertCurrent(): void }): Promise<{ messageId: string }>;
   deliveryTargets?(botId: string): Promise<RoutineDeliveryTarget[]>;
   deliverResult?(input: { routine: Routine; runId: string; sessionId: string; targetSessionId: string; text: string; assertCurrent(): void }): Promise<void>;
   assertImportedAutomationReady?: typeof import('../bot-import/host.js').ensureImportedAutomationReady;
@@ -165,6 +172,75 @@ function controlPointStopMessage(gate: Extract<GhostControlPointResult, { action
 
 /** Each standing instruction owns one persistent companion lane. */
 async function execute(scope: string, routine: Routine, run: RoutineRun, signal: AbortSignal, canDispatch: () => boolean) {
+  if (routine.delivery?.kind !== 'companion' || routine.delivery.mode !== 'outreach') {
+    return executeRoutine(scope, routine, run, signal, canDispatch);
+  }
+  assertScope(scope);
+  const host = getRoutineHost();
+  const bot = await host.getBot(routine.botId);
+  const sessionId = bot.canonicalSessionId;
+  const trigger = routine.triggers[0];
+  if (!host.outreachRoute || !host.outreachBusy || !host.publishOutreach || !sessionId ||
+      routine.triggers.length !== 1 || trigger?.kind !== 'once' || !run.triggerIds.includes(trigger.id) ||
+      hasSendToSessionLock(sessionId) || !current || current.scope !== scope) return { skipped: true };
+  const engine = current.engine;
+  const route = await host.outreachRoute(routine.botId);
+  if (!route) return { skipped: true };
+  const readCurrent = () => engine.list(routine.botId).find(item => item.id === routine.id);
+  const stillEnabled = () => {
+    const saved = readCurrent();
+    return !signal.aborted && saved?.enabled === true && saved.revision === routine.revision;
+  };
+  const isHome = () => !isCompanionShadowed(routine.botId) && companionHomes.isHomeHere(routine.botId)
+    && (!companionHomes.isEnabled() || !!companionHomes.homeOf(routine.botId));
+  const assertCurrent = () => {
+    assertScope(scope);
+    if (!stillEnabled() || !isHome() || host.outreachBusy!(sessionId))
+      throw new Error('Companion outreach is no longer eligible');
+  };
+  const ledger = new CompanionOutreachLedger(ownerScopedUserDataPath(), routine.botId);
+  const eventKey = JSON.stringify([routine.id, trigger.id, trigger.at]);
+  const clientId = ledger.clientId(eventKey);
+  let execution: Awaited<ReturnType<typeof executeRoutine>> | undefined;
+  try {
+    const result = await runCompanionOutreach({
+      ledger,
+      withPublicationLock: action => withSendToSessionLock(sessionId, action),
+      readAdmission: async () => {
+        assertScope(scope);
+        const live = await host.getBot(routine.botId);
+        const { session, rows } = await readOutreachConversation(sessionId, routine.botId);
+        return {
+          enabled: stillEnabled() && live.status === 'active' && live.canonicalSessionId === sessionId,
+          isHome: isHome(),
+          busy: session?.status !== 'active' || host.outreachBusy!(sessionId)
+            || Date.now() - (session.userSendAt ?? 0) < 120_000,
+          alreadyPublished: rows.some(row => row.clientId === clientId),
+          now: Date.now(),
+          conversationEpoch: JSON.stringify([session?.userSendAt, session?.clearedAt]),
+          publishedAt: rows.map(row => row.createdAt),
+        };
+      },
+      generate: async () => {
+        execution = await executeRoutine(scope, {
+          ...routine, sessionMode: 'fresh', modelOverride: route, delivery: { kind: 'none' },
+          silentWhenIdle: true, prompt: 'Write at most one short, natural companion chat message in character about the explicitly scheduled follow-up below. Use only confirmed context. Do not claim to have monitored the user or completed an activity; do not pressure them to reply. If there is no useful reason to reach out, return NO_REPLY. Do not send anything or change tasks or notes yourself.\n\n' + routine.prompt,
+        }, run, signal, () => canDispatch() && stillEnabled() && isHome() && !host.outreachBusy!(sessionId), true);
+        if ('error' in execution && execution.error) throw new Error(execution.error);
+        const text = 'resultText' in execution ? execution.resultText : undefined;
+        return text && text.trim() !== 'NO_REPLY' ? text : null;
+      },
+      publish: ({ clientId, text }) => host.publishOutreach!({ routine, runId: run.id, targetSessionId: sessionId, clientId, text, assertCurrent }),
+    }, { kind: 'agreed-follow-up', key: eventKey, occurredAt: trigger.at });
+    if (result.status === 'skipped') return { skipped: true };
+    return { ...execution, delivery: { status: result.status === 'published' ? 'delivered' as const : 'suppressed' as const } };
+  } catch (error) {
+    if (!execution) throw error;
+    return { ...execution, delivery: { status: 'failed' as const, error: String(error) } };
+  }
+}
+
+async function executeRoutine(scope: string, routine: Routine, run: RoutineRun, signal: AbortSignal, canDispatch: () => boolean, outreach = false) {
   assertScope(scope);
   const scheduler = getRoutineHost().getScheduler();
   if (!scheduler) return { deferred: true };
@@ -237,7 +313,7 @@ async function execute(scope: string, routine: Routine, run: RoutineRun, signal:
     throw new Error(controlPointStopMessage(gate));
   }
   const root = ownerScopedUserDataPath();
-  const imported = await getRoutineHost().prepareImportedAutomation?.(root, routine, run.id, signal, () => assertScope(scope));
+  const imported = outreach ? undefined : await getRoutineHost().prepareImportedAutomation?.(root, routine, run.id, signal, () => assertScope(scope));
   assertScope(scope);
   if (signal.aborted) throw new Error('Routine cancelled');
   if (!canDispatch()) return { deferred: true };
@@ -317,7 +393,7 @@ async function execute(scope: string, routine: Routine, run: RoutineRun, signal:
     // are persisted as false by RoutineEngine.
     silentWhenIdle: routine.silentWhenIdle ?? true,
     preRunHook: routine.preRunHook ?? undefined,
-    notify: { desktop: true, feishu: false },
+    notify: { desktop: !outreach, feishu: false },
     status: 'active',
     createdAt: now,
     updatedAt: now,
@@ -349,7 +425,7 @@ async function execute(scope: string, routine: Routine, run: RoutineRun, signal:
       await discardFreshLane();
       return { deferred: true };
     }
-    const result = await scheduler.runNow(id, { deferToCaller: true, internalRoutine: true, canDispatch });
+    const result = await scheduler.runNow(id, { deferToCaller: true, internalRoutine: true, canDispatch, ...(outreach ? { toolsDisabled: true as const } : {}) });
     assertScope(scope);
     // The routine queue owns this batch and its retry delay, not the backing schedule.
     // 延后＝本轮没有模型轮次，空壳任务不保留（重试会建新任务）。

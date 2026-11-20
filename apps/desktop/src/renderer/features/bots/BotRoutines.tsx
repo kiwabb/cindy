@@ -504,14 +504,17 @@ export function BotRoutines({
               options={[
                 { value: 'direct', label: t('routines.deliveryDirect') },
                 { value: 'process', label: t('routines.deliveryProcess') },
+                { value: 'outreach', label: t('routines.deliveryOutreach') },
                 { value: 'im', label: t('routines.deliveryIm') },
                 { value: 'none', label: t('routines.deliveryNone') },
               ]}
               onValueChange={(value) => setDraft({ ...draft, delivery: value === 'im'
                 ? { kind: 'im', targetId: deliveryTargets[0]?.id ?? '' }
-                : value === 'none' ? { kind: 'none' } : { kind: 'companion', mode: value as 'direct' | 'process' } })}
+                : value === 'none' ? { kind: 'none' } : { kind: 'companion', mode: value as 'direct' | 'process' | 'outreach' },
+                ...(value === 'outreach' ? { enabled: false, sessionMode: 'fresh', modelOverride: null, preRunHook: null, preRunPlugin: null } : {}),
+              })}
             />
-            <p className="text-12 text-[var(--text-secondary)]">{t('routines.deliveryHint')}</p>
+            <p className="text-12 text-[var(--text-secondary)]">{t(draft.delivery?.kind === 'companion' && draft.delivery.mode === 'outreach' ? 'routines.deliveryOutreachHint' : 'routines.deliveryHint')}</p>
             {draft.delivery?.kind === 'im' && <>
               <Select label={t('routines.deliveryRecipient')} className="w-full" disabled={busy}
                 value={draft.delivery.targetId} options={[

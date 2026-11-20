@@ -2034,6 +2034,11 @@ export class MakerScheduleRunner implements ScheduleRunner {
       // explicit guard prevents a cancellation racing the setup above from
       // dispatching a new agent turn.
       throwIfFireAborted(ctx.signal, 'agent turn dispatch');
+      if (ctx.toolsDisabled && (session.agentKind !== 'pi' || session.agentDeviceId || agentDeviceId ||
+          session.model !== 'chatgpt/gpt-6.2-sol' || runtimeModel !== 'chatgpt/gpt-6.2-sol' ||
+          getSessionProvider(session.id) !== 'openai')) {
+        throw new Error('Companion outreach route changed; the text-only turn was not dispatched');
+      }
       // 停用轴派发前重裁决(PR #744 review 第十六轮):fire 入口的裁决到这里隔着
       // 凭证切换 / createSession / 模型同步 / 交接准备等多个长 await,期间路由可能
       // 刚被停用 —— 按**实际将运行的路由**(runtimeModel + 会话此刻的来源)再判一次,
@@ -2046,6 +2051,7 @@ export class MakerScheduleRunner implements ScheduleRunner {
           runtimeModel,
           dispatchProviderId,
         );
+        if (ctx.toolsDisabled && verdict.kind !== 'pass') throw new Error('Companion outreach route was not approved');
         if (verdict.kind === 'reject') {
           throw new Error(
             `schedule route unavailable: ${describeModelRouteRejection(verdict.reason, runtimeModel, dispatchProviderId)} (${verdict.reason}, revalidated before dispatch)`,
@@ -2102,6 +2108,7 @@ export class MakerScheduleRunner implements ScheduleRunner {
       }
       sendStarted = true;
       const sendResult = await session.send(outgoingMessage as never, {
+        ...(ctx.toolsDisabled ? { toolsDisabled: true } : {}),
         origin,
         ...(isHeartbeat || schedule.source === 'bot' || agentDeviceId
           ? {
@@ -2137,6 +2144,11 @@ export class MakerScheduleRunner implements ScheduleRunner {
             }
           : {}),
         onDispatching: () => {
+          if (ctx.toolsDisabled && (getSessionProvider(session.id) !== 'openai' ||
+              session.model !== 'chatgpt/gpt-6.2-sol' || session.agentDeviceId ||
+              (ctx.canDispatch && !ctx.canDispatch()))) {
+            throw new RoutineDispatchDeferredError('Companion outreach route or authorization changed');
+          }
           const expected = routinePermissions ?? heartbeatPermissions;
           if (
             expected &&

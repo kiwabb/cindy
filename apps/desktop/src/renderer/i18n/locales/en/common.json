@@ -17887,6 +17887,8 @@
   },
   "routines": {
     "deliveryLabel": "Final delivery",
+    "deliveryOutreach": "Start a companion chat",
+    "deliveryOutreachHint": "Only for a one-time follow-up. Enable explicitly. Quiet hours are 22:00–08:00 Shanghai time, with a two-per-day limit and at least three hours between messages.",
     "deliveryDirect": "Show directly in companion chat",
     "deliveryProcess": "Ask companion to process and reply",
     "deliveryIm": "Send through a messaging bot",

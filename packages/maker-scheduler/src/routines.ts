@@ -64,7 +64,7 @@ export type RoutineSessionMode = "persistent" | "fresh";
 
 /** Delivery is separate from execution: no second model call unless explicitly selected. */
 export type RoutineDelivery =
-  | { kind: 'companion'; mode: 'direct' | 'process' }
+  | { kind: 'companion'; mode: 'direct' | 'process' | 'outreach' }
   | { kind: 'im'; targetId: string }
   | { kind: 'none' };
 
@@ -241,10 +241,16 @@ export function parseRoutineInput(value: unknown): RoutineInput {
   if (input.delivery !== undefined) {
     const value = record(input.delivery);
     if (value.kind === 'none') delivery = { kind: 'none' };
-    else if (value.kind === 'companion' && (value.mode === 'direct' || value.mode === 'process'))
+    else if (value.kind === 'companion' && (value.mode === 'direct' || value.mode === 'process' || value.mode === 'outreach'))
       delivery = { kind: 'companion', mode: value.mode };
     else if (value.kind === 'im') delivery = { kind: 'im', targetId: string(value.targetId, 4096) };
     else throw new Error('Invalid routine delivery');
+  }
+  if (delivery?.kind === 'companion' && delivery.mode === 'outreach') {
+    if (triggers.length !== 1 || triggers[0]?.kind !== 'once' || modelOverride ||
+        preRunHook || preRunPlugin || sessionMode === 'persistent') {
+      throw new Error('Proactive chat requires one scheduled follow-up, a fresh session and the companion model');
+    }
   }
   return {
     ...(delivery === undefined ? {} : { delivery }),
