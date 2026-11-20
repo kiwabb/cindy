@@ -24,7 +24,7 @@ import {
   ensureSchedulerQueueRestored, getSessionLastUserActionAt,
   isSchedulerTargetSessionBusy, withSendToSessionLock,
 } from '../maker-ipc/register.js';
-import { requestExplicitUtilityText } from '../utility-model/oneShotCandidates.js';
+import { requestExplicitUtilityText, type UtilityTextDispatchRoute } from '../utility-model/oneShotCandidates.js';
 import { CompanionOutreachLedger } from './companionOutreachLedger.js';
 import { formatCompanionOutreachNote } from './companionOutreachNote.js';
 import { decideCompanionOutreach, MAX_EVENT_AGE_MS } from './companionOutreachPolicy.js';
@@ -34,7 +34,7 @@ const HOUR = 3_600_000;
 const log = createLogger('companion-follow-up');
 const generating = new Set<string>();
 
-function supportsFollowUpRoute(route: { agentKind: 'pi' | 'codex' | 'claude-code'; providerId: string; model: string }) {
+function supportsFollowUpRoute(route: UtilityTextDispatchRoute) {
   return buildTextOneshotPinOptions(
     getActiveCatalog(), readModelDisableOverrides(), undefined, hasOneshotProviderCredential, 'auxiliary',
   ).some(option => option.providerId === route.providerId && option.agentKind === route.agentKind &&
@@ -163,7 +163,7 @@ export function withCompanionFollowUps(
     if ((agentKind !== 'pi' && agentKind !== 'codex' && agentKind !== 'cc') || !providerId || !model) {
       return skip('The main chat needs an explicit, connected model route');
     }
-    const route = { agentKind: agentKind === 'cc' ? 'claude-code' as const : agentKind, providerId, model };
+    const route: UtilityTextDispatchRoute = { agentKind: agentKind === 'cc' ? 'claude-code' : agentKind, providerId, model };
     if (!supportsFollowUpRoute(route)) return skip('The main chat route cannot generate a text-only follow-up');
     const generationKey = JSON.stringify([ownerRoot, botId]);
     if (generating.has(generationKey)) return skip('Another follow-up is in flight');
@@ -269,7 +269,7 @@ export function withCompanionFollowUps(
       }, event);
       return outcome.status === 'published'
         ? { sessionId: target.id, resultText: 'Delivered to the main chat' }
-        : skip('reason' in outcome ? outcome.reason : outcome.status);
+        : skip('reason' in outcome ? outcome.reason ?? outcome.status : outcome.status);
     } finally {
       generating.delete(generationKey);
     }
