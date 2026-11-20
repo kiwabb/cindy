@@ -945,21 +945,14 @@ export class DesktopCodexAuthAdapter implements AuthAdapter {
   }
 
   /**
-   * A read-only Dev may consume the native or Release login, but its Codex child must not
-   * receive the source auth inode: Codex can refresh auth.json in place.
+   * A read-only Dev consumes Release auth as a snapshot so its child cannot write
+   * back to Release. Native CLI auth uses a symlink, including across volumes:
+   * unlike the retired hardlink, it follows native token rotation on either disk.
    */
   private shouldSnapshotSharedCodexAuth(systemAuth: string, myAuth: string): boolean {
     if (!this.devOAuthWritesBlocked()) return false;
     if (codexAuthPathsShareEntry(systemAuth, myAuth)) return false;
-    if (codexAuthPathsShareEntry(systemAuth, getReleaseCodexAuthPath())) return true;
-    // Native auth and the Dev profile may live on different volumes. A shared
-    // link cannot cross that boundary; retain the existing read-only policy.
-    try {
-      return fs.statSync(systemAuth, { bigint: true }).dev !==
-        fs.statSync(path.dirname(myAuth), { bigint: true }).dev;
-    } catch {
-      return false;
-    }
+    return codexAuthPathsShareEntry(systemAuth, getReleaseCodexAuthPath());
   }
 
   private warnDevOAuthWriteOverride(action: string): void {
@@ -1243,6 +1236,8 @@ export class DesktopCodexAuthAdapter implements AuthAdapter {
     const wasSharedLegacyCredential =
       topology.linkType === 'file' &&
       isNativeProviderAuthSharedSystemCredential('openai');
+    const migrateNativeDevSnapshot = this.devOAuthWritesBlocked() &&
+      wasSharedLegacyCredential && !this.shouldSnapshotSharedCodexAuth(systemAuth, myAuth);
     const explicitIsolatedOwner =
       topology.linkType === 'file' && !wasSharedLegacyCredential
         ? readExplicitNativeProviderAuthOwner('openai')
@@ -1278,8 +1273,11 @@ export class DesktopCodexAuthAdapter implements AuthAdapter {
 
     // Windows without symlink privilege uses an independent native login. Keep
     // existing standalone credentials, regardless of timestamps or account equality.
+    // A proven shared Dev snapshot is not an independent login: migrate it so
+    // native rotation reaches the child without another host reconciliation.
     if (
       process.platform === 'win32' && topology.linkType === 'file' &&
+      !migrateNativeDevSnapshot &&
       !this.shouldSnapshotSharedCodexAuth(systemAuth, myAuth)
     ) {
       if (legacyExplicitOwner) {
@@ -1327,6 +1325,14 @@ export class DesktopCodexAuthAdapter implements AuthAdapter {
     const { kind, error, linkType } = await relinkSharedCodexAuth(systemAuth, myAuth);
     if (hasLocalEntry && !topology.healthy) {
       this.lastOrphanRepair = kind === 'linked' ? 'relinked' : 'failed';
+    }
+    if (migrateNativeDevSnapshot) {
+      const repaired = await inspectCodexAuthLink(systemAuth, myAuth);
+      if (!repaired.healthy || repaired.linkType !== 'symlink') {
+        // Keep the file on disk when linking is unavailable, but never dispatch
+        // a known stale shared copy as though it were an independent login.
+        throw new Error('Shared Codex auth snapshot could not be relinked; reconnect Codex');
+      }
     }
     switch (kind) {
       case 'same-entry':
