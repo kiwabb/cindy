@@ -1,3 +1,4 @@
+import { hasA2uiAnswer, a2uiReadableText } from '@cindy/maker-shared/a2ui-message';
 import { BotChatReplyTarget } from '@/features/bots/BotChatQuoteViews';
 import { BotStartedTasksFooter, type BotStartedTask } from './BotStartedTasks';
 import { useBotChatQuote } from '@/features/bots/botChatQuoteContext';
@@ -367,7 +368,7 @@ export const AssistantMessage = memo(function AssistantMessage({
       sessionId={currentSessionId}
       clientId={messageClientId}
       createdAt={createdAt}
-      copyText={richAnswerText(content)}
+      copyText={richAnswerText(a2uiReadableText(content))}
       copyLinkText={messageDeepLink}
       align="left"
       hovered={hovered}
@@ -409,7 +410,7 @@ export const AssistantMessage = memo(function AssistantMessage({
         data-plugin-appearance-speaker="assistant"
         bare={!botBubble}
         {...(botBubble ? { 'data-bot-reply-bubble': '' } : {})}
-        className={botBubble ? cn(CHAT_BUBBLE_COLUMN_CLASS, hasRichAnswer(content) ? 'w-full' : 'w-fit') : undefined}
+        className={botBubble ? cn(CHAT_BUBBLE_COLUMN_CLASS, (hasRichAnswer(content) || hasA2uiAnswer(content)) ? 'w-full' : 'w-fit') : undefined}
       >
         {botBubble && botQuote && messageClientId ? (
           <BotChatReplyTarget message={{ clientId: messageClientId, replyToClientId }} context={botQuote} />
@@ -437,7 +438,7 @@ export const AssistantMessage = memo(function AssistantMessage({
               running={false}
               sessionId={currentSessionId}
             />
-          ) : isStreaming && USE_LINE_COMMIT_STREAMING && !hasRichAnswer(content) ? (
+          ) : isStreaming && USE_LINE_COMMIT_STREAMING && !(hasRichAnswer(content) || hasA2uiAnswer(content)) ? (
             <StreamingBody
               workingDir={workingDir}
               content={displayContent}

@@ -55,6 +55,22 @@ function itemsOf(messages: ChatMessage[], snap?: GhostCardSnapshot, sessionId = 
 }
 
 describe('ghost_card · settled 配对', () => {
+  // PR #11587 review, unit tier: one A2UI Image duplicated by its tool result.
+  // The cindy-ui video regression below does not cover the official wire format.
+  it('prefers a completed A2UI image over the matching tool fallback', () => {
+    const body = '```a2ui\n' + JSON.stringify({ version: '1.0', createSurface: {
+      surfaceId: 'image', catalogId: 'https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json',
+      components: [{ id: 'root', component: 'Image', url: IMG }],
+    } }) + '\n```';
+    const video = `cindy-media://blobs/${HASH}.mp4`;
+    const tool = [mkGhostCall('image'), mkResult('result', 'tu-image', { xdt_image_urls: [IMG], xdt_video_urls: [video] })];
+    const answer: ChatMessage = { clientId: 'answer', role: 'assistant', content: body };
+    const media = (rows: ChatMessage[]) => itemsOf(rows).flatMap(item => item.type === 'tool_media' ? item.items : []);
+    expect(media([...tool, answer]).map(item => item.url)).toEqual([video]);
+    expect(media([...tool, { ...answer, isStreaming: true }])).toHaveLength(2);
+    expect(media([...tool, { clientId: 'next', role: 'user', content: 'again' }, answer])).toHaveLength(2);
+  });
+
   // Unit regression: tool media and cindy-ui independently displayed the same
   // generated video. The existing Markdown image cases do not cover components.
   it('prefers a completed rich video over its tool fallback within the same turn', () => {

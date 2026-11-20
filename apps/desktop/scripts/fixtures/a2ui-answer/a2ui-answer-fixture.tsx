@@ -2,6 +2,10 @@ import { useState } from 'react';
 import { mountPage } from '../../ui-page/harness';
 import { MarkdownRenderer } from '../../../src/renderer/components/chat/MarkdownRenderer';
 import { SessionQuickSendProvider } from '../../../src/renderer/components/chat/SessionQuickSendContext';
+import { MessageActionBar } from '../../../src/renderer/components/chat/MessageActionBar';
+import { EMPTY_PLUGIN_UI_MESSAGE_CANDIDATES } from '../../../src/renderer/cindy-brain/PluginUiContributions';
+import { a2uiReadableText } from '@cindy/maker-shared/a2ui-message';
+import { richAnswerText } from '@cindy/maker-shared/rich-answer';
 
 // UI regression fixture, not a tutor conversation or book excerpt. No model runs.
 const source = '这是一条界面回归测试消息。\n\n```a2ui\n' + JSON.stringify({
@@ -27,6 +31,7 @@ function Example({ readOnly, invalid, nested }: { readOnly: boolean; invalid: bo
   return <main style={{ padding: 16, maxWidth: 720, margin: '0 auto' }}>
     <SessionQuickSendProvider value={readOnly ? null : { send: async text => { setReceived(text); return true; } }}>
       <MarkdownRenderer content={content} workingDir="." currentSessionId="a2ui-ui-test" streamFadeKey="a2ui-ui-message" renderRichAnswers />
+      <MessageActionBar pluginUi={EMPTY_PLUGIN_UI_MESSAGE_CANDIDATES} copyText={richAnswerText(a2uiReadableText(content))} align="left" hovered />
     </SessionQuickSendProvider>
     <p>测试接收文本（未调用模型）</p>
     <pre data-testid="received" style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{received}</pre>

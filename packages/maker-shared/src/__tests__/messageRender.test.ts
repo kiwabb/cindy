@@ -14,6 +14,7 @@ import {
   type MessageRenderSourceMessageLike,
 } from '../messageRender.js';
 import type { AgentTaskUpdate } from '../agentTask.js';
+import { A2UI_BASIC_CATALOG, a2uiReadableText, a2uiMediaSources, hasA2uiAnswer } from '../a2uiMessage';
 
 type FixtureSource = MessageRenderSourceMessageLike & {
   id: string;
@@ -54,6 +55,48 @@ function at(seconds: number): string {
 }
 
 describe('message render shared model', () => {
+  // PR #11587: A2UI was missing from copy and inline artifact projections.
+  // Existing cindy-ui cases cannot exercise this wire format. Unit tier, no I/O.
+  // Minimal input: one image reused by a tool; bound text changed by an envelope.
+  const a2ui = (components: unknown[], extra: unknown[] = []) => '```a2ui\n' + JSON.stringify([
+    { version: '1.0', createSurface: { surfaceId: 'a', catalogId: A2UI_BASIC_CATALOG, components } }, ...extra,
+  ]) + '\n```';
+
+  it('copies A2UI reading text and media descriptions with bound snapshot updates, without actions or protocol JSON', () => {
+    const body = a2ui([
+      { id: 'root', component: 'Column', children: ['text', 'image', 'submit'] },
+      { id: 'text', component: 'Text', text: { '@path': '/paragraph' } },
+      { id: 'image', component: 'Image', url: { '@path': '/image' }, description: 'Book figure' },
+      { id: 'submit', component: 'Button', child: 'label', action: { event: { name: 'cindy.sendMessage', userMessage: 'Do not copy action payload' } } },
+      { id: 'label', component: 'Text', text: 'Answer' },
+    ], [{ version: '1.0', updateDataModel: { surfaceId: 'a', value: { paragraph: 'Original paragraph', image: 'https://example.invalid/book.png' } } },
+      { version: '1.0', updateDataModel: { surfaceId: 'a', path: '/paragraph', value: 'Updated paragraph' } }]);
+    expect(a2uiReadableText('Before\n\n' + body + '\n\nAfter')).toBe('Before\n\nUpdated paragraph\nBook figure\nhttps://example.invalid/book.png\nAnswer\n\nAfter');
+    expect([...a2uiMediaSources(body)]).toEqual(['https://example.invalid/book.png']);
+    const nested = '- Example\n\n' + body.split('\n').map(line => '  ' + line).join('\n');
+    expect(hasA2uiAnswer(nested)).toBe(false);
+    expect(a2uiReadableText(nested)).toBe(nested);
+    expect(a2uiMediaSources(nested).size).toBe(0);
+    const invalid = body.replace('"version":"1.0"', '"version":"9.9"');
+    expect(a2uiReadableText(invalid)).toBe(invalid);
+    expect(a2uiMediaSources(invalid).size).toBe(0);
+  });
+
+  it('deduplicates A2UI images only inside their completed turn and retains tool history', () => {
+    const url = 'cindy-media://blobs/figure.png';
+    const body = a2ui([{ id: 'root', component: 'Image', url }]);
+    const tool = message({ kind: 'tool', source: source('image', {}, 1), media: [{ kind: 'image', url }, { kind: 'image', url: 'other.png' }] });
+    const answer = message({ kind: 'assistant', source: source('answer', body, 2), body, turnCompleted: true });
+    const artifacts = (rows: FixtureMessage[]) => buildMessageRenderItems(rows).flatMap(item => item.type === 'tool_media' ? item.tools.flatMap(t => t.media ?? []) : []);
+    expect(artifacts([tool, answer]).map(m => m.url)).toEqual(['other.png']);
+    expect(tool.media).toHaveLength(2);
+    expect(artifacts([tool, { ...answer, isStreaming: true }])).toHaveLength(2);
+    expect(artifacts([tool, message({ kind: 'user', source: { ...source('next', 'again', 2), role: 'user' } }), answer])).toHaveLength(2);
+    expect(artifacts([tool, { ...answer, body: '````markdown\n' + body + '\n````' }])).toHaveLength(2);
+    const deleted = a2ui([{ id: 'root', component: 'Image', url }], [{ version: '1.0', deleteSurface: { surfaceId: 'a' } }]);
+    expect(artifacts([tool, { ...answer, body: deleted }])).toHaveLength(2);
+  });
+
   // Unit regression: a generated video appeared both as a tool artifact and a
   // cindy-ui video. Existing URL dedupe covered only tools within one segment.
   it('keeps rich-answer media once per turn without losing other artifacts or tool history', () => {

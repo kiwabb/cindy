@@ -5,8 +5,8 @@ import assert from 'node:assert/strict';
 export default {
   name: 'a2ui-answer', entry: './a2ui-answer-fixture.tsx',
   viewport: { width: 900, height: 850 },
-  real: 'Production MarkdownRenderer, official A2UI processor/surface/binding, host controls, themes and fallback Markdown',
-  notCovered: 'Authenticated host, queue delivery, actual tutor/model, learning progress or audio playback',
+  real: 'Production MarkdownRenderer and copy action bar, official A2UI processor/surface/binding, host controls, themes and fallback Markdown',
+  notCovered: 'Authenticated host, queue delivery, actual tutor/model, learning progress, OS clipboard or audio playback; clipboard and sender are test ports',
   stubs: { 'src/renderer/contexts/AuthContext': 'export const useAuth = () => ({ user: { id: "a2ui-ui-test" } }); export const useOptionalAuthDeviceId = () => null; export const useOptionalAuthUser = () => null;' },
   cases: {
     default: { about: 'Switch paragraph, inspect exact preview and explicitly submit to a test sender' },
@@ -16,7 +16,12 @@ export default {
     invalid: { about: 'An unsupported wire version falls back without hiding adjacent Markdown or cindy-ui' },
     nested: { about: 'A list-nested A2UI example stays code, without an active form' },
   },
-  async ready(page) { await page.getByText('普通 Markdown 继续显示。', { exact: true }).waitFor(); },
+  async ready(page, ui) {
+    await page.getByText('普通 Markdown 继续显示。', { exact: true }).waitFor();
+    if (ui.case === 'invalid') await page.locator('.cindy-a2ui-fallback').waitFor();
+    else if (ui.case === 'nested') await page.locator('pre').filter({ hasText: 'createSurface' }).waitFor();
+    else await page.getByRole('button', { name: '提交主旨', exact: true }).waitFor();
+  },
   async check(page, ui) {
     const submit = page.getByRole('button', { name: '提交主旨', exact: true });
     assert.equal(await page.getByTestId('received').innerText(), '');
@@ -36,6 +41,17 @@ export default {
       return;
     }
     await submit.waitFor();
+    // Exercise the production copy click without replacing the owner's OS clipboard.
+    await page.evaluate(() => {
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
+        writeText: async text => { window.__a2uiCopied = text; },
+      } });
+    });
+    await page.getByRole('button', { name: await ui.t('chat.messageActionBar.copy'), exact: true }).click();
+    const copied = await page.evaluate(() => window.__a2uiCopied);
+    assert.ok(copied.includes('段落一：这里验证段落切换。'));
+    assert.ok(copied.includes('现有 cindy-ui 继续显示。'));
+    assert.ok(!copied.includes('createSurface') && !copied.includes('cindy.sendMessage'));
     if (ui.case === 'readonly') { assert.equal(await submit.isDisabled(), true); return; }
     await page.getByRole('button', { name: '第 2 段', exact: true }).click();
     await page.getByText('段落二：输入主旨后，先核对按钮上方的发送内容，再点击提交。', { exact: true }).waitFor();

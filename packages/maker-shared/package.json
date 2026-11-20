@@ -135,7 +135,8 @@
     "./subscription-selection": "./src/subscriptionSelection.ts",
     "./host-platform-rpc": "./src/hostPlatformRpc.ts",
     "./settings-tabs": "./src/settingsTabs.ts",
-    "./settings-navigation": "./src/settingsNavigation.ts"
+    "./settings-navigation": "./src/settingsNavigation.ts",
+    "./a2ui-message": "./src/a2uiMessage.ts"
   },
   "scripts": {
     "build": "tsc --noEmit",
@@ -148,7 +149,9 @@
   },
   "license": "Apache-2.0",
   "dependencies": {
-    "parse5": "8.0.1"
+    "parse5": "8.0.1",
+    "remark-parse": "11.0.0",
+    "unified": "11.0.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

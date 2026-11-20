@@ -1,3 +1,4 @@
+import { a2uiMediaSources } from '@cindy/maker-shared/a2ui-message';
 import { appendPendingQueueItems } from './pendingQueueItems';
 import { AttachmentCollectionContext, type AttachmentCollectionItem } from './AttachmentCollection';
 import { isSharedTaskPeer } from '@cindy/device-link';
@@ -1684,6 +1685,7 @@ export function buildRenderItems(
         : extractRenderedMarkdownImageTargets(message.content);
       for (const url of imageTargets) urls.add(url);
       for (const url of richAnswerMediaSources(message.content)) urls.add(url);
+      for (const url of a2uiMediaSources(message.content)) urls.add(url);
     }
     inlineMediaUrlsByTurnStart.set(lo, urls);
   };
