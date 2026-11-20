@@ -168,6 +168,23 @@ describe('useConversationMarks', () => {
     expect(listCallsFor(sessionId)).toBe(settled);
   });
 
+  it('reads again when the first read was still out across leaving, a change and coming back', async () => {
+    const sessionId = 'first-read-in-flight';
+    store.marks.set(sessionId, []);
+    const first = deferred<ConversationMark[]>();
+    api.list.mockImplementationOnce(() => first.promise);
+    const opened = render(<Subscriber sessionId={sessionId} name="f" renders={{}} />);
+    opened.unmount();
+    store.marks.set(sessionId, [mark(sessionId)]);
+    push();
+    render(<Subscriber sessionId={sessionId} name="f" renders={{}} />);
+    expect(listCallsFor(sessionId)).toBe(1);
+    await act(async () => first.resolve([]));
+    await idle();
+    expect(screen.getByTestId('f').textContent).toBe('m1:open');
+    expect(listCallsFor(sessionId)).toBe(2);
+  });
+
   it('settles under StrictMode double subscription', async () => {
     const sessionId = 'strict';
     store.marks.set(sessionId, [mark(sessionId)]);
@@ -341,6 +358,23 @@ describe('useConversationMarkSyncStatus', () => {
     await act(async () => outstanding.resolve({ phase: 'synced', pending: 0, pendingIds: [] }));
     await idle();
     expect(screen.getByTestId('status').textContent).toBe('offline:2');
+  });
+
+  it('reads the status again when the first read was still out across leaving, a change and coming back', async () => {
+    function Status() {
+      const status = useConversationMarkSyncStatus();
+      return <div data-testid="status">{status ? `${status.phase}:${status.pending}` : 'off'}</div>;
+    }
+    const first = deferred<ConversationMarkSyncStatus | null>();
+    api.syncStatus.mockImplementationOnce(() => first.promise);
+    const opened = render(<Status />);
+    opened.unmount();
+    store.status = { phase: 'synced', pending: 0, pendingIds: [] } satisfies ConversationMarkSyncStatus;
+    push();
+    render(<Status />);
+    await act(async () => first.resolve({ phase: 'syncing', pending: 3, pendingIds: ['a', 'b', 'c'] }));
+    await idle();
+    expect(screen.getByTestId('status').textContent).toBe('synced:0');
   });
 
   it('keeps the newer status when an older read answers late', async () => {
