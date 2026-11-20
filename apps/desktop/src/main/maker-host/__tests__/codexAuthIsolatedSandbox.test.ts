@@ -22,6 +22,21 @@ import {
 import { getPreferredSharedCodexAuthPath } from '../codex-shared-auth.js';
 
 const dirs: string[] = [];
+// Native rotation tests need actual file symlinks. Probe the host capability;
+// Windows without the privilege retains the independent-login tests elsewhere.
+const canLinkFile = (() => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cindy-codex-rotation-probe-'));
+  try {
+    const target = path.join(root, 'target');
+    fs.writeFileSync(target, 'probe');
+    fs.symlinkSync(target, path.join(root, 'link'), 'file');
+    return true;
+  } catch {
+    return false;
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+})();
 const h = vi.hoisted(() => ({
   userDataDir: '',
   appDataDir: '',
@@ -568,10 +583,11 @@ describe('dev 沙箱凭证隔离(XDT_ISOLATED_AUTH)', () => {
     expect(fs.readFileSync(localAuth)).not.toEqual(releaseBytes);
   });
 
-  // Regression: native auth on C: and Dev profile on D: cannot share a hardlink (EXDEV).
-  // Existing Release snapshot tests did not exercise native fallback. Unit: explicit local
-  // login must succeed without linking, and child writes must leave native auth unchanged.
-  it('read-only Dev connects native Codex across filesystems without sharing credentials by link', async () => {
+  // Regression: 5f6b119a18 kept a cross-volume snapshot even after shared auth switched
+  // to symlinks. Unit: triggerLogin and background reconciliation must let the child's
+  // auth path follow native atomic token replacement without another host read/login.
+  // The old test only checked the initial copy, not rotation or an existing shared copy.
+  it.skipIf(!canLinkFile).each(['new', 'legacy', 'legacy-link-denied'] as const)('Dev follows native auth rotation across filesystems (%s)', async (scenario) => {
     const { systemAuth, localAuth } = fixture();
     h.dataOwnerId = 'owner-a';
     const before = fs.readFileSync(systemAuth);
@@ -591,9 +607,31 @@ describe('dev 沙箱凭证隔离(XDT_ISOLATED_AUTH)', () => {
       authenticated: true, credentialScope: 'system-shared',
     });
     expect(fs.readFileSync(localAuth)).toEqual(before);
-    expect(fs.statSync(localAuth).ino).not.toBe(fs.statSync(systemAuth).ino);
-    fs.writeFileSync(localAuth, 'child-refreshed-test-token');
     expect(fs.readFileSync(systemAuth)).toEqual(before);
+
+    if (scenario !== 'new') {
+      // Keep the shared provenance written by local login, but restore the file
+      // topology left by older cross-volume Dev builds. Never model an independent login.
+      fs.unlinkSync(localAuth);
+      fs.writeFileSync(localAuth, before);
+      if (scenario === 'legacy-link-denied') {
+        vi.spyOn(fs.promises, 'symlink').mockRejectedValue(Object.assign(new Error('test link denied'), { code: 'EPERM' }));
+        await expect(adapter.getAccessToken()).rejects.toThrow('Shared Codex auth snapshot could not be relinked');
+        expect(fs.readFileSync(localAuth)).toEqual(before);
+        expect(fs.readFileSync(systemAuth)).toEqual(before);
+        return;
+      }
+      await expect(adapter.getAccessToken()).resolves.toBe('system-token');
+    }
+
+    const renewed = JSON.stringify({ tokens: { access_token: 'rotated-native-test-token', account_id: 'acct-1' } });
+    const replacement = path.join(path.dirname(systemAuth), 'replacement.json');
+    fs.writeFileSync(replacement, renewed);
+    fs.renameSync(replacement, systemAuth);
+    // Simulate the already-running child reading its auth path, without asking the
+    // adapter to reconcile first. A snapshot would still expose the previous token.
+    expect(fs.readFileSync(localAuth, 'utf8')).toBe(renewed);
+    expect(fs.lstatSync(localAuth).isSymbolicLink()).toBe(true);
   });
 
   it('dev 默认只读共享:断开只停用 Cindy，重启不复活，显式本机连接可恢复', async () => {
