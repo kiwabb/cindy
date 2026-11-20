@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
-import { decideCompanionOutreach } from '../companionOutreachPolicy.ts';
+import { decideCompanionOutreach } from '../companionOutreachPolicy.js';
 
 const now = Date.parse('2026-11-20T12:00:00+08:00');
 const hour = 3_600_000;
