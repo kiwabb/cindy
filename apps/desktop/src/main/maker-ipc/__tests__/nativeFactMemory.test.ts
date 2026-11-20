@@ -23,16 +23,17 @@ describe('native fact binding, fixture queue', () => {
     finishNativeFactMemoryTurn(replacement, 1, 'completed');
     finishNativeFactMemoryTurn(session, 2, 'completed');
     expect(queue.finish).not.toHaveBeenCalled();
-    finishNativeFactMemoryTurn(session, 1, 'completed');
-    finishNativeFactMemoryTurn(session, 1, 'completed');
+    finishNativeFactMemoryTurn(session, 1, 'completed', 'fixture assistant reply');
+    finishNativeFactMemoryTurn(session, 1, 'completed', 'duplicate callback');
     expect(queue.finish).toHaveBeenCalledTimes(1);
+    expect(queue.finish).toHaveBeenCalledWith({ generation: 1 }, 'completed', 1, 'fixture assistant reply');
     expect(queue.drain).toHaveBeenCalledTimes(1);
     dispose(); expect(queue.dispose).toHaveBeenCalledOnce();
   });
   it('discards undispatched and failed turns without draining analysis', async () => {
     const { session, queue, dispose } = setup();
     await withNativeFactMemoryTurn(session, source, async reserved => { reserved?.(1); return { accepted: false, reason: 'cancelled-before-dispatch' }; });
-    expect(queue.finish).toHaveBeenCalledWith({ generation: 1 }, 'failed', 1);
+    expect(queue.finish).toHaveBeenCalledWith({ generation: 1 }, 'failed', 1, undefined);
     expect(queue.drain).not.toHaveBeenCalled(); dispose();
   });
   it('does not turn fact preparation failure into a broken native send', async () => {

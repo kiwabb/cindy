@@ -10644,7 +10644,7 @@
       "sourcePrivate": "Private companion memory",
       "previewLabel": "Private memory preview",
       "previewHint": "After a reply completes, organize your facts with this teammate’s selected OpenAI subscription model ({{model}}). This makes an additional model request. A selected model computer must remain online and allow access. Existing memories remain manageable when disabled.",
-      "previewUnavailable": "Select an explicit OpenAI subscription and Codex model on this computer or another computer on your account. Unavailable sources pause analysis without company or fallback models. Disable and re-enable after changing the selection.",
+      "previewUnavailable": "Private memory needs a Buddy with project memory and a supported Codex or Pi chat. An available OpenAI subscription model is required for organization.",
       "previewError": "Settings could not be saved or have changed. Reopen this page to read the current selection.",
       "privateHint": "This memory belongs to this companion. Other project tasks do not use it. Viewing or editing does not enable automatic analysis.",
       "privateDeleteBoundary": "Attributable summaries and search entries are also cleared. Chat history is kept.",

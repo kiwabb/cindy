@@ -162,12 +162,22 @@ export class MakerMemoryStore {
     this.assertScopeOk();
     this.factJournal = FactJournal.open(this.deps.db, JSON.stringify([options.scope.ownerId, options.scope.botId]));
     this.factQueue = new FactMemoryQueue({ ...options, journal: this.factJournal,
-      list: () => this.list(), apply: async (revision, mutations) => { await this.applyFacts(revision, mutations); if (mutations.length) await this.summarizeFacts(); } });
+      list: () => this.list(),
+      apply: async (revision, mutations) => {
+        const assertCurrent = () => options.assertCurrentScope(options.scope);
+        await this.applyFacts(revision, mutations, assertCurrent);
+        if (mutations.length) {
+          assertCurrent();
+          await this.summarizeFacts();
+        }
+      },
+    });
     return this.factQueue;
   }
 
-  private async applyFacts(revision: number, mutations: FactMutation[]): Promise<void> {
+  private async applyFacts(revision: number, mutations: FactMutation[], assertCurrent: () => void): Promise<void> {
     this.assertScopeOk();
+    assertCurrent();
     if (!mutations.length) {
       if (this.factJournal?.revision() !== revision) throw new MemoryError('version-conflict', 'Fact source is stale');
       return;
@@ -175,6 +185,7 @@ export class MakerMemoryStore {
     try {
       await this.storage.applyFactMutations(() => {
         this.assertScopeOk();
+        assertCurrent();
         if (this.factJournal?.revision() !== revision) throw new MemoryError('version-conflict', 'Fact source is stale');
       }, mutations);
       await this.purgeInvalidatedDerived();

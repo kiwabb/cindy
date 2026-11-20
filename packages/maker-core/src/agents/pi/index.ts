@@ -1,7 +1,9 @@
+import { HOST_TURN_CONTEXT, HOST_TURN_CONTEXT_TEXT_LIMIT, validateHostTurnContext } from '../shared/host-turn-context.js';
 import { estimatePiContext, type PiPromptSource } from './context-estimate.js';
 import {
   CINDY_PI_COMPANION_IDENTITY_EXTENSION,
   CINDY_PI_COMPANION_IDENTITY_MODE,
+  CINDY_PI_COMPANION_CONTEXT_READY, CINDY_PI_COMPANION_CONTEXT_CLOSED, type PiCompanionTurnContext,
   CINDY_PI_COMPANION_IDENTITY_SOURCE,
 } from './companion-identity-source.js';
 import { NATIVE_SUBSCRIPTION_ACCOUNT } from '../../interfaces/auth-adapter.js';
@@ -3575,6 +3577,7 @@ export class PiAgent extends BaseAgent {
     };
     let activeToolsDisabled = false;
     let textOnlyPolicyReady = false;
+    let companionContextReady = false;
     let providerRequestSequence = 0;
     let providerRequestObservedAt: number | undefined;
     let providerTurnObservedAt: number | undefined;
@@ -5907,6 +5910,14 @@ export class PiAgent extends BaseAgent {
             piAgentLifecycleSequence += 1;
           }
           if (!remote && event.type === 'extension_ui_request' && event.method === 'notify') {
+            if (event.message === `${CINDY_PI_COMPANION_CONTEXT_READY}${runtimeInstanceId}`) {
+              companionContextReady = true;
+              return;
+            }
+            if (event.message === `${CINDY_PI_COMPANION_CONTEXT_CLOSED}${runtimeInstanceId}`) {
+              companionContextReady = false;
+              return;
+            }
             if (event.message === `${CINDY_PI_TEXT_ONLY_READY_PREFIX}${runtimeInstanceId}`) {
               textOnlyPolicyReady = true;
               return;
@@ -7824,6 +7835,7 @@ export class PiAgent extends BaseAgent {
         return runtimeCapabilityManifest;
       },
       disabledSkillPaths: disabledSkillSnapshot,
+      get supportsHostTurnContext() { return Boolean(companionIdentityModePath && !hosted && !remote && companionContextReady); },
       hasProjectResourceDrift() {
         return projectResourceLaunchSnapshot !== null
           && piProjectResourcesDrifted(projectResourceLaunchSnapshot);
@@ -7847,6 +7859,11 @@ export class PiAgent extends BaseAgent {
       // Full Access 下 fail-closed 拒绝带策略的 send(与 capability
       // turnPermissionPolicy.unsupportedPermissionModes 一致,也与 CC/Codex 同口径)。
       validateSendOptions(sendOpts: SendOptions) {
+        const hostContext = sendOpts[HOST_TURN_CONTEXT];
+        if (hostContext) {
+          if (!handle.supportsHostTurnContext) throw new Error('HOST_TURN_CONTEXT_UNSUPPORTED');
+          validateHostTurnContext(hostContext);
+        }
         if (sendOpts.toolsDisabled && remote) {
           throw new Error('Host text-only Pi turns require a local runtime, not a shared remote daemon.');
         }
@@ -8048,19 +8065,31 @@ export class PiAgent extends BaseAgent {
                 rejectIfCancelled(sendOpts, 'send');
               }
               if (companionIdentityModePath) {
-                // A scheduler may target the canonical chat. Keep the choice on
-                // the serialized dispatch boundary, scoped to the accepted run.
                 if (ctx.isStreaming || ctx.pendingHostTurnStartToken) {
                   throw new TurnDispatchRejectedError('Pi turn is active before identity selection.');
                 }
                 const origin = sendOpts?.origin;
                 const companion = (!origin || origin.kind === 'user') && origin?.surface !== 'im';
-                const schedule = companion && !remote && !hosted
+                const memory = companion && handle.supportsHostTurnContext && !promptText.trimStart().startsWith('/')
+                  && !managedPackageRoute.accepted ? sendOpts?.[HOST_TURN_CONTEXT] : undefined;
+                let schedule = companion && !remote && !hosted
                   ? await opts.readPiCompanionLifeSlot?.().catch(() => undefined)
                   : undefined;
+                if (schedule && (memory?.text.length ?? 0) + JSON.stringify(schedule).length > HOST_TURN_CONTEXT_TEXT_LIMIT) {
+                  schedule = undefined;
+                }
+                const context: PiCompanionTurnContext = { companion, schedule, ...(memory ? {
+                  privateMemory: {
+                    promptHash: createHash('sha256').update(escapeLeadingSlashCommand(promptText, runtimeCapabilityManifest).trim()).digest('hex'),
+                    context: memory,
+                  },
+                } : {}) };
                 if (!managedPackageRoute.accepted) rejectIfCancelled(sendOpts, 'send');
-                await writeFile(companionIdentityModePath, JSON.stringify({ companion, schedule }));
-                if (!managedPackageRoute.accepted) rejectIfCancelled(sendOpts, 'send');
+                await writeFile(companionIdentityModePath, JSON.stringify(context));
+                if (!managedPackageRoute.accepted && sendOpts?.signal?.aborted) {
+                  if (memory) await writeFile(companionIdentityModePath, JSON.stringify({ companion: false }));
+                  rejectIfCancelled(sendOpts, 'send');
+                }
               }
               const pendingTurnStartToken = markPiHostTurnStartPending(ctx);
               promptRequestStarted = true;
@@ -8079,11 +8108,17 @@ export class PiAgent extends BaseAgent {
                 // preflight, so a healthy long compaction is not killed at 10m.
                 refreshTimeoutOnEvent: (event) =>
                   PI_PROMPT_ACCEPTANCE_PROGRESS_EVENTS.has(event.type),
-              }).then(response => {
+              }).then(async response => {
                 logPromptResponse(response.success);
+                if (!response.success && companionIdentityModePath && sendOpts?.[HOST_TURN_CONTEXT]) {
+                  await writeFile(companionIdentityModePath, JSON.stringify({ companion: false })).catch(() => {});
+                }
                 return response;
-              }, error => {
+              }, async error => {
                 logPromptResponse(false);
+                if (companionIdentityModePath && sendOpts?.[HOST_TURN_CONTEXT]) {
+                  await writeFile(companionIdentityModePath, JSON.stringify({ companion: false })).catch(() => {});
+                }
                 throw error;
               });
               // Only consume the one-shot choice after acceptance. A confirmed

@@ -10644,7 +10644,7 @@
       "sourcePrivate": "Private Begleiter-Erinnerungen",
       "previewLabel": "Private Erinnerungen (Vorschau)",
       "previewHint": "Nach einer Antwort werden persönliche Fakten mit dem gewählten OpenAI-Abonnementmodell dieses Begleiters ({{model}}) geordnet. Dafür wird eine zusätzliche Modellanfrage gesendet. Der gewählte Modellcomputer muss online sein und den Zugriff erlauben. Gespeicherte Erinnerungen bleiben auch bei deaktivierter Funktion verwaltbar.",
-      "previewUnavailable": "Wähle ein OpenAI-Abonnement und ein Codex-Modell auf diesem Computer oder einem anderen Computer deines Kontos. Ist die Quelle nicht verfügbar, pausiert die Analyse ohne Firmen- oder Ersatzmodelle. Nach einer Änderung aus- und wieder einschalten.",
+      "previewUnavailable": "Privater Speicher setzt einen Buddy im Projektmodus und einen unterstützten Codex- oder Pi-Chat voraus. Zum Ordnen ist ein verfügbares OpenAI-Abonnementmodell erforderlich.",
       "previewError": "Einstellungen konnten nicht gespeichert werden oder wurden geändert. Öffne diese Seite erneut, um die aktuelle Auswahl zu laden.",
       "privateHint": "Diese Erinnerungen gehören diesem Begleiter. Andere Projektaufgaben verwenden sie nicht. Anzeigen und Bearbeiten aktivieren keine automatische Analyse.",
       "privateDeleteBoundary": "Zugehörige Zusammenfassungen und Sucheinträge werden ebenfalls gelöscht. Der Chatverlauf bleibt erhalten.",

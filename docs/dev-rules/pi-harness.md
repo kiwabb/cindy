@@ -33,6 +33,11 @@ Cindy 以 `pi --mode rpc` spawn pi 二进制(JSONL/stdio),`translator.ts` 把 pi
   自动化先读取当前 SOUL 摘要，再随保存命令提交该摘要；角色在生成期间变化时放弃写入。
   存在当天旧计划时保留，等下一天按新规则生成。角色说明改成当轮有快照便不重复查 current，
   完整日程或历史日期仍按需查询。远端执行和非 Pi 不读取这份日程。
+- **私有伙伴记忆**：本机伙伴主会话复用 Codex 的 `HostTurnContext` 和宿主的 owner/bot 作用域。Pi 的
+  身份、当前日程与相关记忆共享 `PiCompanionTurnContext`，由同一个原生扩展消费。扩展在
+  `before_agent_start` 校验原生输入摘要并清除私有快照，再将它追加到本轮系统提示。工具续轮沿用
+  原生提示快照，下一条普通输入重新组装。只有扩展确认就绪后才绑定私有记忆。项目记忆仍走
+  项目范围，整理采用已授权的独立 OpenAI 订阅路由。
 - **权限执行**:pi 原生无工具审批(security.md 明确:非沙箱、不限制工具)。Cindy 用注入的
   `cindy-bridge.ts` 扩展在 pi 进程内 `pi.on('tool_call')` 拦截,经 `extension_ui_request`
   子协议冒泡到 `index.ts handleExtensionUiRequest`,映射成 `InteractionRequest` 交 Cindy

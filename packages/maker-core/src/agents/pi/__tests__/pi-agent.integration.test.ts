@@ -28,6 +28,7 @@ import { fileURLToPath } from 'node:url';
 import { zstdDecompressSync } from 'node:zlib';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
+import { HOST_TURN_CONTEXT } from '../../shared/host-turn-context.js';
 import { PiAgent } from '../index.js';
 import { ANSWER_DELIVERY_PROMPT, PI_ANSWER_DELIVERY_PROMPT } from '@cindy/maker-shared/rich-answer-guide';
 import { PiRpcProcess } from '../rpc-client.js';
@@ -443,6 +444,58 @@ describe.skipIf(!piAvailable)('PiAgent integration (real pi binary + fake gatewa
       resolvePiGatewayModelApi: () => 'anthropic-messages',
     };
   }
+
+  // Native Pi integration: the private payload must reach the provider system
+  // field, stay out of user history, and clear on the next input. A handle mock
+  // cannot detect regressions in Pi's hook or transcript handling.
+  it('adds private host context for one Pi input and clears it on the next', { timeout: 30_000 }, async () => {
+    const workingDir = mkdtempSync(path.join(tmpdir(), 'pi-host-context-'));
+    const fixtureFile = path.join(workingDir, 'fact-check.txt');
+    writeFileSync(fixtureFile, 'fixture');
+    let handle: AgentSessionHandle | undefined;
+    try {
+      handle = await new PiAgent(buildDeps()).startSession({
+        sessionId: 'private-host-context', workingDir, model: 'pi-test-model', permissionMode: 'bypassPermissions',
+        botProfilePrompt: 'Fixture owner-private identity',
+        readPiCompanionLifeSlot: async () => ({
+          date: '2026-11-20', timezone: 'UTC', start: '10:00', end: '11:00', activity: 'FIXTURE_SCHEDULE',
+        }),
+        botRuntimeProfile: {
+          botId: 'fixture', profileVersion: 1, projectContext: true, piOwnerPrivateChat: true,
+          skillPolicy: { mode: 'inherit', configured: [], catalog: [] },
+          mcpPolicy: { mode: 'inherit', configured: [], catalog: [] },
+          toolsetPolicy: { mode: 'inherit', configured: [], catalog: [] },
+        },
+      });
+      const send = async (text: string, memory?: string) => {
+        const current = handle!;
+        const settled = (async () => { for await (const e of current.events()) if (e.type === 'done') break; })();
+        await current.send({ type: 'user', content: text }, memory
+          ? { [HOST_TURN_CONTEXT]: { requestId: 'fixture', text: memory } } : undefined);
+        await settled;
+        return JSON.parse(seenRequests.at(-1)!.body);
+      };
+      await vi.waitFor(() => expect(handle!.supportsHostTurnContext).toBe(true));
+      const memory = 'PRIVATE_TURN_CANARY';
+      const firstRequest = seenRequests.length;
+      scriptedResponses.push(anthropicToolUseBody('read', { path: fixtureFile }), anthropicStreamBody('fixture reply'));
+      await send('first private turn', memory);
+      const requests = seenRequests.slice(firstRequest).map(request => JSON.parse(request.body));
+      expect(requests).toHaveLength(2);
+      for (const request of requests) {
+        expect(JSON.stringify(request.system)).toContain(memory);
+        expect(JSON.stringify(request.system)).toContain('FIXTURE_SCHEDULE');
+        expect(JSON.stringify(request.messages)).not.toContain(memory);
+      }
+      const next = await send('next turn without context');
+      expect(JSON.stringify(next.system)).toContain('FIXTURE_SCHEDULE');
+      expect(JSON.stringify(next)).not.toContain(memory);
+    } finally {
+      await handle?.close();
+      scriptedResponses.length = 0;
+      rmSync(workingDir, { recursive: true, force: true });
+    }
+  });
 
   // #8887, integration: the real runtime generates the retry lifecycle after
   // a completed tool request, a real HTTP 502 and successful recovery.
