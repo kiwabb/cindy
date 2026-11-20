@@ -1137,6 +1137,7 @@ export async function hydrateBotProfileRuntime(
   const runtimeEpochSha256 = createHash('sha256').update(JSON.stringify({
     profileVersion: row.profileVersion,
     profilePrompt: opts.botProfilePrompt ?? '',
+    ...(opts.botRuntimeProfile.piOwnerPrivateChat ? { piOwnerPrivateChat: true } : {}),
     contextPrompt: opts.botProfileContextPrompt ?? '',
     userProfilePrompt: opts.botUserProfilePrompt ?? '',
     // All live chats compare this epoch before their next input. Shared learning
