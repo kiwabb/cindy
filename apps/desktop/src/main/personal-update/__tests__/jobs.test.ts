@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -13,6 +14,36 @@ vi.mock('node:child_process', async importOriginal => {
   ) };
 });
 import { createPreparationJob, finishPreparationJob, cleanupAbandonedPreparation, recordPreparationWorker } from '../jobs';
+
+// Regression: on Windows the PowerShell start-time probe exited 1 for an exited PID, so a ledger left by a
+// crashed preparation was reported as PERSONAL_UPDATE_JOB_PROCESS_UNKNOWN on every poll and no personal
+// update could be prepared again. Uses the real probe (same tier as the native-helper cases below).
+describe.skipIf(process.platform !== 'win32')('Windows abandoned preparation ledger', () => {
+  let root: string;
+  beforeAll(() => { root = fs.mkdtempSync(path.join(os.tmpdir(), 'cindy-personal-jobs-win-test-')); });
+  afterAll(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  it('reclaims a ledger whose recorded owner and worker have exited', async () => {
+    const updates = path.join(root, 'abandoned');
+    const job = path.join(updates, `job-${randomUUID()}`);
+    fs.mkdirSync(path.join(updates, 'prepare.lock'), { recursive: true });
+    fs.mkdirSync(job);
+    const exited = spawnSync(process.execPath, ['-e', '']).pid;
+    fs.writeFileSync(path.join(updates, 'prepare.lock', 'owner.json'), JSON.stringify({
+      schemaVersion: 1, ownerPid: exited, ownerBirth: '1', workerPid: exited, workerBirth: '1', jobDirectory: job,
+    }));
+    await cleanupAbandonedPreparation(updates);
+    expect(fs.existsSync(job)).toBe(false);
+    expect(fs.existsSync(path.join(updates, 'prepare.lock'))).toBe(false);
+  });
+
+  it('still refuses to reclaim the ledger of a live owner', async () => {
+    const updates = path.join(root, 'live'), job = await createPreparationJob(updates);
+    await expect(createPreparationJob(updates)).rejects.toThrow('PERSONAL_UPDATE_PREPARE_BUSY');
+    expect(fs.existsSync(job)).toBe(true);
+    await finishPreparationJob(updates, job);
+  });
+});
 
 describe.skipIf(process.platform !== 'darwin')('parent-owned preparation workspace', () => {
   let root: string;
