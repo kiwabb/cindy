@@ -37,6 +37,16 @@ export async function publishCompanionOutreach(input: {
   const { captureDataOwnerBroadcastScope } = await import('../device-link/broadcast-tap.js');
   input.assertCurrent();
   const scope = captureDataOwnerBroadcastScope();
+  const beforePublish = async () => {
+    input.assertCurrent();
+    const [link] = await getDbClient().drizzle.select({ sessionId: botSessionLinks.sessionId })
+      .from(botSessionLinks).innerJoin(sessions, eq(sessions.id, botSessionLinks.sessionId))
+      .where(and(eq(botSessionLinks.botId, input.routine.botId), eq(botSessionLinks.role, 'canonical'),
+        eq(botSessionLinks.sessionId, input.targetSessionId), isNull(botSessionLinks.archivedAt),
+        eq(sessions.status, 'active'))).limit(1);
+    if (!link) throw new Error('Companion outreach target changed');
+    input.assertCurrent();
+  };
   const saved = await createMessage(input.targetSessionId, {
     clientId: input.clientId,
     role: 'assistant',
@@ -44,6 +54,6 @@ export async function publishCompanionOutreach(input: {
     agentKind: 'pi',
     agentMeta: { origin: { kind: 'scheduler', scheduleId: `routine-${input.routine.id}`,
       scheduleName: input.routine.name, runId: input.runId } },
-  }, { broadcastOwnerScope: scope, beforePublish: async () => input.assertCurrent() });
+  }, { broadcastOwnerScope: scope, beforePublish });
   return { messageId: saved.id };
 }
