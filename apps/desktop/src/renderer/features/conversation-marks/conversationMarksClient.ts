@@ -3,7 +3,7 @@
  * process's change push, plus the actions the selection pill, the highlights and the side panel
  * share. Marks are the owner's own; nothing here reaches the model.
  */
-import { useSyncExternalStore } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 import { t } from 'i18next';
 import { toast } from '@/lib/toast';
 import {
@@ -27,10 +27,16 @@ interface Entry {
   snapshot: ConversationMarksSnapshot;
   listeners: Set<() => void>;
   generation: number;
+  /** Needs a read when next watched: never read yet, or nobody watched it for a while. */
+  stale: boolean;
+  inFlight: boolean;
 }
 
 const entries = new Map<string, Entry>();
 let status: ConversationMarkSyncStatus | null = null;
+let statusStale = true;
+let statusInFlight = false;
+let statusGeneration = 0;
 const statusListeners = new Set<() => void>();
 let unsubscribePush: (() => void) | null = null;
 
@@ -38,33 +44,74 @@ function api() {
   return window.electronAPI?.localDb?.conversationMarks;
 }
 
+/** Every read returns new objects; equal content keeps the old one so nothing re-renders. */
+const sameContent = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+
 async function refresh(entry: Entry): Promise<void> {
   const generation = ++entry.generation;
+  entry.stale = false;
+  entry.inFlight = true;
+  let marks: ConversationMark[];
   try {
-    const marks = (await api()?.list(entry.scope)) ?? [];
-    if (generation !== entry.generation) return;
-    entry.snapshot = { loaded: true, marks };
+    marks = (await api()?.list(entry.scope)) ?? [];
   } catch {
-    if (generation !== entry.generation) return;
-    entry.snapshot = { loaded: true, marks: entry.snapshot.marks };
+    marks = entry.snapshot.marks;
   }
-  for (const listener of entry.listeners) listener();
+  if (generation !== entry.generation) return;
+  entry.inFlight = false;
+  if (!entry.snapshot.loaded || !sameContent(entry.snapshot.marks, marks)) {
+    entry.snapshot = { loaded: true, marks };
+    for (const listener of entry.listeners) listener();
+  }
+  // Went stale while this read was out (left and came back, with a change in between): this
+  // answer may predate the change, so read once more. Bounded: a read clears the flag.
+  if (entry.stale && entry.listeners.size > 0) void refresh(entry);
 }
 
 async function refreshStatus(): Promise<void> {
+  const generation = ++statusGeneration;
+  statusStale = false;
+  statusInFlight = true;
+  let next: ConversationMarkSyncStatus | null;
   try {
-    status = (await api()?.syncStatus()) ?? null;
+    next = (await api()?.syncStatus()) ?? null;
   } catch {
-    status = null;
+    next = null;
   }
-  for (const listener of statusListeners) listener();
+  // A late answer to an older read must not overwrite a newer one.
+  if (generation !== statusGeneration) return;
+  statusInFlight = false;
+  if (!sameContent(status, next)) {
+    status = next;
+    for (const listener of statusListeners) listener();
+  }
+  // Same as the list: stale again while out means this answer may be older than the change.
+  if (statusStale && statusListeners.size > 0) void refreshStatus();
 }
+
+function subscribeStatus(listener: () => void): () => void {
+  statusListeners.add(listener);
+  ensurePush();
+  if (statusStale && !statusInFlight) void refreshStatus();
+  return () => {
+    statusListeners.delete(listener);
+    if (statusListeners.size === 0) statusStale = true;
+  };
+}
+
+const readStatus = () => status;
 
 function ensurePush(): void {
   if (unsubscribePush || !api()) return;
   unsubscribePush = api()!.onChanged(() => {
-    for (const entry of entries.values()) if (entry.listeners.size > 0) void refresh(entry);
+    // Unwatched lists read again when next watched (a read with nobody watching, such as an
+    // undo after leaving the conversation, may have cleared the flag).
+    for (const entry of entries.values()) {
+      if (entry.listeners.size > 0) void refresh(entry);
+      else entry.stale = true;
+    }
     if (statusListeners.size > 0) void refreshStatus();
+    else statusStale = true;
   });
 }
 
@@ -72,7 +119,7 @@ function entryFor(scope: ConversationMarkScope): Entry {
   const key = scopeKey(scope);
   let entry = entries.get(key);
   if (!entry) {
-    entry = { scope, snapshot: EMPTY, listeners: new Set(), generation: 0 };
+    entry = { scope, snapshot: EMPTY, listeners: new Set(), generation: 0, stale: true, inFlight: false };
     entries.set(key, entry);
   }
   return entry;
@@ -80,33 +127,34 @@ function entryFor(scope: ConversationMarkScope): Entry {
 
 /** Marks of one conversation (local, or `hostDeviceId` for a conversation on another computer). */
 export function useConversationMarks(scope: ConversationMarkScope | null): ConversationMarksSnapshot {
-  const key = scope ? scopeKey(scope) : null;
-  const snapshot = useSyncExternalStore(
-    (listener) => {
-      if (!scope) return () => {};
-      const entry = entryFor(scope);
+  // Call sites build `scope` inline; the subscription follows the conversation it names, so a
+  // re-render does not unsubscribe and subscribe again.
+  const sessionId = scope?.sessionId;
+  const hostDeviceId = scope?.hostDeviceId ?? null;
+  const subscribe = useCallback(
+    (listener: () => void) => {
+      if (sessionId === undefined) return () => {};
+      const entry = entryFor({ sessionId, hostDeviceId });
       entry.listeners.add(listener);
       ensurePush();
-      if (entry.listeners.size === 1) void refresh(entry);
-      return () => entry.listeners.delete(listener);
+      if (entry.stale && !entry.inFlight) void refresh(entry);
+      return () => {
+        entry.listeners.delete(listener);
+        if (entry.listeners.size === 0) entry.stale = true;
+      };
     },
-    () => (key && scope ? entryFor(scope).snapshot : EMPTY),
+    [sessionId, hostDeviceId],
   );
-  return snapshot;
+  const getSnapshot = useCallback(
+    () => (sessionId === undefined ? EMPTY : entryFor({ sessionId, hostDeviceId }).snapshot),
+    [sessionId, hostDeviceId],
+  );
+  return useSyncExternalStore(subscribe, getSnapshot);
 }
 
 /** One status line for the list header; null while sync is off. */
 export function useConversationMarkSyncStatus(): ConversationMarkSyncStatus | null {
-  const value = useSyncExternalStore(
-    (listener) => {
-      statusListeners.add(listener);
-      ensurePush();
-      if (statusListeners.size === 1) void refreshStatus();
-      return () => statusListeners.delete(listener);
-    },
-    () => status,
-  );
-  return value;
+  return useSyncExternalStore(subscribeStatus, readStatus);
 }
 
 function refreshScope(scope: ConversationMarkScope): void {

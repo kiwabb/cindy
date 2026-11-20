@@ -4,7 +4,7 @@
  * virtualization and streaming, so ranges are rebuilt whenever the stream's subtree changes.
  * Styles: `::highlight(cindy-conversation-mark*)` in styles/globals.css.
  */
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 import { markBodyOf } from '@/components/chat/SelectionQuoteButton';
 import type { ConversationMark } from '../../../shared/conversationMarks';
@@ -87,10 +87,16 @@ export function ConversationMarkHighlights({
   containerRef: React.RefObject<HTMLElement | null>;
   marks: readonly ConversationMark[];
 }) {
+  // Rebuilt only when what is painted changes, not for an equal list in a new array.
+  const signature = JSON.stringify(marks.map((mark) => [mark.messageClientId, mark.quote, mark.start, mark.end, mark.state]));
+  const latest = useRef(marks);
+  latest.current = marks;
   useEffect(() => {
+    const marks = latest.current;
     const registry = typeof CSS !== 'undefined' ? CSS.highlights : undefined;
     const container = containerRef.current;
-    if (!registry || !container || typeof Highlight === 'undefined') return;
+    // No marks: nothing to paint, so the streaming conversation is not watched at all.
+    if (!registry || !container || typeof Highlight === 'undefined' || marks.length === 0) return;
     const open = new Highlight();
     const discussed = new Highlight();
     const paint = () => {
@@ -123,6 +129,6 @@ export function ConversationMarkHighlights({
       if (registry.get(MARK_HIGHLIGHT) === open) registry.delete(MARK_HIGHLIGHT);
       if (registry.get(MARK_DISCUSSED_HIGHLIGHT) === discussed) registry.delete(MARK_DISCUSSED_HIGHLIGHT);
     };
-  }, [containerRef, marks]);
+  }, [containerRef, signature]);
   return null;
 }
