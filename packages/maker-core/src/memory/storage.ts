@@ -371,14 +371,16 @@ export class MemoryStorage {
   async write(opts: WriteOptions): Promise<WriteResult> {
     const normalized: WriteOptions = { ...opts, name: normalizeShardName(opts.name) };
     this.validateOpts(normalized);
-    // Fact memory invalidates the files a write touches; an alias may resolve
-    // to an existing shard, so report that shard too once it is known.
-    const canonical = buildFilename(normalized.type, normalized.name);
+    // Fact memory invalidates the files a write touches. Index-style names and
+    // aliases resolve to their shard only inside the lock, so report that shard
+    // too once it is known; resolveFilename still owns the validation errors.
+    let canonical: string | undefined;
+    try { canonical = buildFilename(normalized.type, normalized.name); } catch { canonical = undefined; }
     return this.mutate(async () => {
       const filename = await this.resolveFilename(normalized.type, opts.name);
       if (filename !== canonical) this.beforeMutation?.([filename]);
       return this.writeFile(normalized, filename);
-    }, undefined, [canonical]);
+    }, undefined, canonical ? [canonical] : []);
   }
 
   /**
