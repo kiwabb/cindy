@@ -52,7 +52,12 @@ export type XdtHelperToolCategory =
   | 'bots'
   | 'github'
   | 'todos'
-  | 'settings';
+  | 'settings'
+  | 'terminal'
+  | 'files'
+  | 'storage'
+  | 'usage'
+  | 'discovery';
 
 export type XdtHelperToolContentBlock =
   | { type: 'text'; text: string }

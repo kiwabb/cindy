@@ -1,3 +1,4 @@
+import { subscriptionQuotaOverview } from '@cindy/maker-shared/subscription-selection';
 import { modelNeedsReselection } from './modelReselection';
 import { mobileProviderAccountTitle } from "./mobileModelRowPresentation";
 import { mobileCostMarks } from "./mobileModelRowPresentation";
@@ -14,9 +15,18 @@ import {
 import { useTranslation } from "react-i18next";
 import type { MobileProviderMarkProps } from "./MobileProviderMark";
 import type { AgentKind } from "@cindy/model-providers/types";
-import { resolveStoredModelEntry, type UnifiedModelEntry } from "@cindy/model-providers";
+import { listedSourceFolds, resolveStoredModelEntry, sameRunLocationProvider, type ProviderView, type UnifiedModelEntry } from "@cindy/model-providers";
 import type { MobileAgentCapabilities } from "./agentCapabilities";
 import type { ModelPickerSheetProps } from "./ModelPickerSheet";
+import {
+  buildPluginEngineGroups,
+  type MobilePluginEngine,
+  type MobilePluginEngineSelection,
+  type PluginEngineEffort,
+  type UnifiedMobilePluginEngineGroup,
+  type UnifiedMobilePluginEngineRow,
+} from "./pluginEngines";
+export { buildPluginEngineGroups, type UnifiedMobilePluginEngineGroup, type UnifiedMobilePluginEngineRow };
 import { buildMobileModelSections } from "./providerModelSections";
 import { useMobileModelPreferences } from "./mobileModelPreferences";
 import {
@@ -134,6 +144,7 @@ export interface UnifiedMobileRemoteOptions {
    * (provider-groups.md §10)。缺省 = 不收起。
    */
   hostDeviceId?: string;
+  hostDeviceName?: string | null;
   /**
    * 已建任务:这个任务此刻归哪个组(null = 没归组)与 Agent 此刻在哪台、用哪个供应商(null = 被控电脑)。
    * 归组的任务在组那一项里显示为正在用的,在里面选模型 = 留在此刻运行的那台、只换模型。
@@ -145,15 +156,11 @@ export interface UnifiedMobileRemoteOptions {
 }
 
 /**
- * 只限本机的原因是封闭清单，与桌面 ModelSelectorLocalOnlyReason 同口径；规则见
- * docs/product-rules/model-selector-unified.md。
+ * 每个入口都必须声明模型来源；remote 为 undefined 只表示此刻不可用（如旧版被控电脑）。
+ * 手机端目前没有只限本机的入口；新增例外须同时改
+ * docs/product-rules/model-selector-unified.md 与 modelPickerSourceGuard.test.ts。
  */
-export type MobileModelPickerLocalOnlyReason = 'plugin-task-local-route';
-
-/** 每个入口都必须声明模型来源；remote 为 undefined 只表示此刻不可用（如旧版被控电脑）。 */
-export type MobileModelPickerSource =
-  | { remote: UnifiedMobileRemoteOptions | undefined; localOnlyReason?: never }
-  | { remote?: never; localOnlyReason: MobileModelPickerLocalOnlyReason };
+export type MobileModelPickerSource = { remote: UnifiedMobileRemoteOptions | undefined };
 
 export type UnifiedMobilePickerOptions = UnifiedMobilePickerBaseOptions & MobileModelPickerSource;
 
@@ -178,7 +185,23 @@ export interface UnifiedMobilePickerBaseOptions {
     configuration: MobileModelConfiguration,
     source?: { deviceId: string | null },
   ): Promise<boolean>;
+  /**
+   * 被控电脑上插件提供的执行引擎(Desktop docs/plans/acp-plugin-bridge.md)：「全部」里每个引擎
+   * 一段，列在内置模型之前。只给能用插件引擎的入口传(被控电脑本机的普通任务 / 新任务)。
+   */
+  pluginEngines?: UnifiedMobilePluginEngineOptions;
 }
+
+export interface UnifiedMobilePluginEngineOptions {
+  engines: readonly MobilePluginEngine[];
+  /** 当前选中的引擎与模型(新任务的选择、插件引擎任务自己的引擎、或待切到的引擎)；null = 选的是内置模型。 */
+  active: MobilePluginEngineSelection | null;
+  /** 返回 false = 没有应用(选择器留在原地)。 */
+  onSelect(selection: MobilePluginEngineSelection): Promise<boolean> | boolean;
+  /** 选择器打开时调用：读一次列表，请插件重新上报模型。 */
+  onOpen?(): void;
+}
+
 export interface UnifiedMobileRow {
   key: string;
   entry: UnifiedModelEntry;
@@ -187,6 +210,7 @@ export interface UnifiedMobileRow {
   selected: boolean;
   disabled: boolean;
   subtitle: string;
+  sourceUnavailableReason?: string;
   costMarks: string | null;
   effortLabel: string;
   quotaLabel: string | null;
@@ -194,10 +218,21 @@ export interface UnifiedMobileRow {
   /** 这一行来自哪台其他电脑的目录(图标带远程标记);缺省 = 被控电脑自己的。 */
   remoteDevice?: { deviceId: string; name: string };
 }
+export interface UnifiedMobileQuota {
+  remaining?: number;
+  label: string;
+  summary?: string;
+  resetSoon?: boolean;
+  reset?: { remaining: number; time: string; level: 'normal' | 'warn' | 'crit' };
+  resetParts?: string[];
+  resetDescription?: string;
+  members?: { remaining?: number; label: string }[];
+}
 export interface UnifiedMobileGroup {
   key: string;
   title: string;
   rows: UnifiedMobileRow[];
+  quota?: UnifiedMobileQuota;
 }
 export interface UnifiedMobilePickerViewProps {
   visible: boolean;
@@ -214,7 +249,8 @@ export interface UnifiedMobilePickerViewProps {
     id: string;
     label: string;
     providerMark?: MobileProviderMarkProps;
-    quota?: { remaining: number; label: string };
+    quota?: UnifiedMobileQuota;
+    sourceUnavailableReason?: string;
     /**
      * 另一台电脑上的供应商:来源页里每台电脑单独一块(块标题 = 电脑名,行标题 = providerLabel),
      * 图标带远程标记;label 是带电脑名的完整说法,用在搜索栏旁的来源按钮上。
@@ -222,6 +258,11 @@ export interface UnifiedMobilePickerViewProps {
     remote?: { deviceId: string; deviceName: string; providerLabel: string };
   }[];
   groups: UnifiedMobileGroup[];
+  /** 插件引擎分组(列在 groups 之前)；effort 只改思考深度、不关闭选择器。 */
+  pluginEngines?: {
+    groups: UnifiedMobilePluginEngineGroup[];
+    onSelect(row: UnifiedMobilePluginEngineRow, effort?: PluginEngineEffort): void;
+  };
   busy: boolean;
   error: string | null;
   loading: boolean;
@@ -253,10 +294,12 @@ export function UnifiedModelPickerSheet(
   p: ModelPickerSheetProps & { unified: UnifiedMobilePickerOptions },
 ) {
   const { t } = useTranslation();
-  const { quotas, now } = useMobileModelQuotas(
+  const { quotas, now, quotaOf } = useMobileModelQuotas(
     p.unified.scope,
     p.visible,
     p.providers,
+    p.unified.remote?.catalogs ?? NO_REMOTE_CATALOGS,
+    p.subscriptionTaskId,
   );
   const prefs = useMobileModelPreferences(p.unified.scope, p.visible, p.unified.preferenceScope === 'request');
   const rememberRemote = p.unified.preferenceScope !== 'request';
@@ -294,6 +337,14 @@ export function UnifiedModelPickerSheet(
   const lock = useRef(false);
   const opening = useRef(0);
   const [error, setError] = useState<string | null>(null);
+  // 选择器打开：读一次插件引擎列表，并请那台电脑的插件重新上报模型(不轮询)。
+  const pluginEngineOptions = p.unified.pluginEngines;
+  const onPluginEnginesOpen = pluginEngineOptions?.onOpen;
+  useEffect(() => {
+    if (p.visible) onPluginEnginesOpen?.();
+  }, [p.visible, onPluginEnginesOpen]);
+  // 选中的是插件引擎时，内置模型行都不显示选中态(也不列「推荐」)。
+  const pluginEngineActive = !!pluginEngineOptions?.active;
   useEffect(() => {
     if (!p.visible) return;
     if (rememberRemote) void hydrateRemoteAgentModelMemory();
@@ -459,6 +510,27 @@ export function UnifiedModelPickerSheet(
       p.existingSessionRoute,
     ],
   );
+  // Presentation only: keep complete catalogs for favorites and the task's saved route.
+  // Same rule as desktop Settings and the desktop picker (listedSourceFolds), based on the browsed computer.
+  const { hiddenSources, unavailableBaseByRemoteSource } = useMemo(() => {
+    const folds = listedSourceFolds({
+      base: p.providers,
+      baseExempt: (providerId) => providerGroups.sizes.has(providerGroupEntryKey(null, providerId)),
+      others: remoteCatalogs
+        .filter(catalog => !isProviderShareAgentDeviceId(catalog.deviceId) && !catalog.offline)
+        .map(catalog => ({
+          deviceId: catalog.deviceId,
+          providers: catalog.providers.filter(provider =>
+            !providerGroups.sizes.has(providerGroupEntryKey(catalog.deviceId, provider.id))
+            && !providerGroups.hidden.has(providerGroupEntryKey(catalog.deviceId, provider.id))),
+        })),
+      current: p.selectedProviderId ? { deviceId: selectedDeviceId, providerId: p.selectedProviderId } : null,
+      honorRunLocation: true,
+    });
+    const hidden = new Set(folds.hiddenBase);
+    for (const [deviceId, ids] of folds.hiddenOther) for (const id of ids) hidden.add(remoteFilterId(deviceId, id));
+    return { hiddenSources: hidden, unavailableBaseByRemoteSource: folds.askBeforeUse };
+  }, [p.providers, p.selectedProviderId, providerGroups, remoteCatalogs, selectedDeviceId]);
   const sourceId =
     boundGroup?.deviceId === null
       ? boundGroup.providerId
@@ -506,21 +578,54 @@ export function UnifiedModelPickerSheet(
           defaultValue: config.effort,
         })
       : "";
+  const accountQuotaOf = (providerId: string, sourceDeviceId?: string) =>
+    sourceDeviceId ? quotaOf(sourceDeviceId, providerId) : quotas[providerId];
+  const accountIdentityOf = (providerId: string, sourceDeviceId?: string) => {
+    const quota = accountQuotaOf(providerId, sourceDeviceId);
+    if (quota?.members?.length) return t('models.unified.accountCount', { count: quota.members.length });
+    // null: still reading, failed, or nothing assignable. The account is assigned when the
+    // message is sent, so name none here; "" also keeps the CLI default account from showing.
+    const identity = quota?.accountIdentity;
+    return identity === null ? "" : identity;
+  };
   const describe = (
     entry: UnifiedModelEntry,
     config: MobileModelConfiguration,
     providers: readonly (typeof p.providers)[number][] = p.providers,
+    sourceDeviceId?: string,
   ) => {
     const provider = providers.find((item) => item.id === entry.providerId);
-    const identity =
-      provider?.openAiAccount?.identity?.trim() ||
-      provider?.subscriptionAccount?.identity?.trim();
+    const identity = accountIdentityOf(entry.providerId, sourceDeviceId) ?? (
+      provider?.openAiAccount?.identity?.trim() || provider?.subscriptionAccount?.identity?.trim());
     return [identity, effortText(config)].filter(Boolean).join(" · ");
+  };
+  const modelQuotaLabel = (providerId: string, modelId: string, deviceId?: string) => {
+    const q = accountQuotaOf(providerId, deviceId);
+    if (q?.members?.length) return null;
+    const modelQuota = q
+      ? mobileWeeklyQuota(q.source, q.raw, now, modelId)
+      : null;
+    return modelQuota
+      ? [
+          modelQuota.resetsAt
+            ? formatQuotaResetCountdown(
+                modelQuota.resetsAt,
+                now,
+                t,
+                modelQuota.windowMinutes,
+              )
+            : null,
+          `${modelQuota.remaining}%`,
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      : null;
   };
   const makeRow = (
     entry: UnifiedModelEntry,
     favorite?: MobileModelFavorite,
   ): UnifiedMobileRow => {
+    const provider = p.providers.find((item) => item.id === entry.providerId);
     const selected =
       entry.providerId === sourceId && matchesEntry(entry, p.activeModelId);
     const config = resolveMobileModelConfig(entry, {
@@ -536,57 +641,32 @@ export function UnifiedModelPickerSheet(
       entry,
       config,
       favorite,
-      providerMark: (() => {
-        const provider = p.providers.find(
-          (item) => item.id === entry.providerId,
-        );
-        return {
-          providerId: entry.providerId,
-          name: provider?.name ?? entry.providerId,
-          routing: provider?.routing,
-          logoKind: provider?.logoKind,
-        };
-      })(),
-      selected: !favorite && selected,
+      providerMark: {
+        providerId: entry.providerId,
+        name: provider?.name ?? entry.providerId,
+        routing: provider?.routing,
+        logoKind: provider?.logoKind,
+      },
+      selected: !favorite && selected && !pluginEngineActive,
       disabled:
         !caps[config.agent] ||
         budgetRowDisabled(
           config.modelId,
           p.apiKeyStatus ?? "unknown",
-          p.providers.find((item) => item.id === entry.providerId),
+          provider,
         ),
       subtitle: describe(entry, config),
+      sourceUnavailableReason: sourceUnavailableReason(provider, null),
       effortLabel: effortText(config),
       costMarks: mobileCostMarks(
-        p.providers.find((item) => item.id === entry.providerId),
+        provider,
         config.modelId,
         config.agent,
         p.pricing,
       ),
-      quotaLabel: (() => {
-        const q = quotas[entry.providerId];
-        const modelQuota = q
-          ? mobileWeeklyQuota(q.source, q.raw, now, entry.modelId)
-          : null;
-        return modelQuota
-          ? [
-              modelQuota.resetsAt
-                ? formatQuotaResetCountdown(
-                    modelQuota.resetsAt,
-                    now,
-                    t,
-                    modelQuota.windowMinutes,
-                  )
-                : null,
-              `${modelQuota.remaining}%`,
-            ]
-              .filter(Boolean)
-              .join(" · ")
-          : null;
-      })(),
+      quotaLabel: modelQuotaLabel(entry.providerId, entry.modelId),
     };
   };
-  const rows = entries.map((entry) => makeRow(entry));
   // 供应商组只写组里有几台,不写是哪几台(provider-groups.md §10):「Claude · 供应商组 · 3 台电脑」。
   const groupBadge = (deviceId: string | null, id: string) => {
     const size = providerGroups.sizes.get(providerGroupEntryKey(deviceId, id));
@@ -603,12 +683,12 @@ export function UnifiedModelPickerSheet(
   const providerName = (id: string) => {
     const provider = p.providers.find((item) => item.id === id);
     if (!provider) return id;
-    return withGroupBadge(null, id, mobileProviderAccountTitle(provider));
+    return withGroupBadge(null, id, mobileProviderAccountTitle(provider, accountIdentityOf(id)));
   };
   // 另一台电脑目录里的供应商,说法带电脑名(「Claude 订阅 · 工作室 Mac」)。
   const remoteAccountTitle = (catalog: RemoteAgentCatalog, id: string) => {
     const provider = catalog.providers.find((item) => item.id === id);
-    return provider ? mobileProviderAccountTitle(provider) : id;
+    return provider ? mobileProviderAccountTitle(provider, accountIdentityOf(id, catalog.deviceId)) : id;
   };
   const remoteProviderName = (catalog: RemoteAgentCatalog, id: string) =>
     withGroupBadge(catalog.deviceId, id, remoteAccountTitle(catalog, id));
@@ -622,6 +702,34 @@ export function UnifiedModelPickerSheet(
       ? t("models.unified.remoteProviderGroup", { ...values, group })
       : t("models.unified.remoteProvider", values);
   };
+  const runningDeviceId = groupInfo?.running.deviceId ?? null;
+  const runningCatalog = remoteCatalogs.find(catalog =>
+    catalog.deviceId === runningDeviceId && !isProviderShareAgentDeviceId(catalog.deviceId));
+  const runningProviders = runningDeviceId === null ? p.providers : runningCatalog?.providers;
+  const unavailableRunningProvider = runningProviders?.find(provider =>
+    provider.id === groupInfo?.running.providerId
+    && (!provider.connected || provider.suspended || provider.removed || runningCatalog?.offline));
+  const unavailableOn = (provider: string, device?: string | null) => device
+    ? t("models.unified.remoteCopyUnavailableOn", { provider, device })
+    : t("models.unified.remoteCopyUnavailableOnTaskComputer", { provider });
+  const sourceUnavailableReason = (target: ProviderView | undefined, deviceId: string | null) => {
+    if (!p.existingSessionRoute || !target) return undefined;
+    // The running source remains authoritative until the next send applies the selection.
+    if (unavailableRunningProvider && runningDeviceId !== deviceId
+      && !isProviderShareAgentDeviceId(deviceId)
+      && target.connected && !target.suspended && !target.removed
+      && !providerGroups.sizes.has(providerGroupEntryKey(deviceId, target.id))
+      && sameRunLocationProvider(unavailableRunningProvider, target)) {
+      return runningCatalog
+        ? unavailableOn(remoteProviderName(runningCatalog, unavailableRunningProvider.id), runningCatalog.name)
+        : unavailableOn(providerName(unavailableRunningProvider.id), p.unified.remote?.hostDeviceName);
+    }
+    const baseProviderId = runningDeviceId === null && deviceId
+      ? unavailableBaseByRemoteSource.get(`${deviceId}\n${target.id}`)
+      : undefined;
+    return baseProviderId ? unavailableOn(providerName(baseProviderId), p.unified.remote?.hostDeviceName) : undefined;
+  };
+  const rows = entries.map((entry) => makeRow(entry));
   const makeRemoteRow = (
     directory: (typeof remoteDirectories)[number],
     entry: UnifiedModelEntry,
@@ -653,7 +761,7 @@ export function UnifiedModelPickerSheet(
         // Remote catalog capabilities are independent of the host installation.
         fastCapable: () => true,
       });
-    const details = describe(entry, config, catalog.providers);
+    const details = describe(entry, config, catalog.providers, catalog.deviceId);
     return {
       key,
       entry,
@@ -672,6 +780,7 @@ export function UnifiedModelPickerSheet(
       subtitle: favorite
         ? [catalog.name, details].filter(Boolean).join(" · ")
         : details,
+      sourceUnavailableReason: catalog.offline ? undefined : sourceUnavailableReason(provider, catalog.deviceId),
       effortLabel: effortText(config),
       costMarks: mobileCostMarks(
         provider,
@@ -679,8 +788,7 @@ export function UnifiedModelPickerSheet(
         config.agent,
         p.pricing,
       ),
-      // 用量镜像按被控电脑的供应商取,另一台电脑的不在这里显示。
-      quotaLabel: null,
+      quotaLabel: modelQuotaLabel(entry.providerId, entry.modelId, catalog.deviceId),
     };
   };
   const remoteRows = remoteDirectories.map((directory) => ({
@@ -760,7 +868,7 @@ export function UnifiedModelPickerSheet(
   const shownFilter = hiddenFilterTarget ?? filter;
   const all = query.trim() || shownFilter === "all";
   const filtered = rows.filter(
-    (row) => matches(row) && (all || shownFilter === row.entry.providerId),
+    (row) => !hiddenSources.has(row.entry.providerId) && matches(row) && (all || shownFilter === row.entry.providerId),
   );
   const groups: UnifiedMobileGroup[] = [];
   const favoriteRows = favorites.filter(matches);
@@ -771,7 +879,7 @@ export function UnifiedModelPickerSheet(
       rows: favoriteRows,
     });
   const recommended =
-    all && p.existingSessionRoute
+    all && p.existingSessionRoute && !pluginEngineActive
       ? filtered
           .filter((row) => row.selected || row.config.agent === p.agentKind)
           .sort((a, b) => Number(b.selected) - Number(a.selected))
@@ -792,6 +900,7 @@ export function UnifiedModelPickerSheet(
         groups.push({
           key: provider.id,
           title: providerName(provider.id),
+          quota: poolQuota(provider.id),
           rows: group,
         });
     }
@@ -799,6 +908,7 @@ export function UnifiedModelPickerSheet(
   for (const { catalog, rows: deviceRows } of remoteRows)
     for (const provider of catalog.providers) {
       const id = remoteFilterId(catalog.deviceId, provider.id);
+      if (hiddenSources.has(id)) continue;
       if (!all && shownFilter !== id) continue;
       const group = deviceRows.filter(
         (row) => row.entry.providerId === provider.id && matches(row),
@@ -807,9 +917,30 @@ export function UnifiedModelPickerSheet(
         groups.push({
           key: id,
           title: remoteProviderLabel(catalog, provider.id),
+          quota: poolQuota(provider.id, catalog.deviceId),
           rows: group,
         });
     }
+  // 插件引擎(「全部」或搜索命中时)：每个引擎一段，列在内置模型之前(与 Desktop 面板顺序一致)。
+  const pluginEngineGroups = pluginEngineOptions && all
+    ? buildPluginEngineGroups(pluginEngineOptions, query, {
+        defaultModel: t("models.pluginEngines.defaultModel"),
+        effort: (effort) => t(`models.options.effortLevels.${effort}`, { defaultValue: effort }),
+        unavailable: (name, hint) => hint
+          ? t("models.pluginEngines.unavailableWithHint", { engine: name, hint })
+          : t("models.pluginEngines.unavailable", { engine: name }),
+      })
+    : [];
+  // Recommended/favorites can contain the only rows for a source. Keep its
+  // overview visible there when no provider section already presents it.
+  for (const group of groups) {
+    if (group.quota || !group.rows.length) continue;
+    const first = group.rows[0];
+    const sameSource = (row: UnifiedMobileRow) => row.entry.providerId === first.entry.providerId
+      && row.remoteDevice?.deviceId === first.remoteDevice?.deviceId;
+    if (group.rows.every(sameSource) && !groups.some(other => other !== group && other.quota && other.rows.every(sameSource)))
+      group.quota = poolQuota(first.entry.providerId, first.remoteDevice?.deviceId);
+  }
   const sourceRow = target
     ? (target.deviceId
         ? remoteRows.find((item) => item.catalog.deviceId === target.deviceId)
@@ -992,6 +1123,19 @@ export function UnifiedModelPickerSheet(
         p.onClose();
     });
   };
+  // 插件引擎行：选中模型时关闭选择器；只改思考深度时留在原地。
+  const selectPluginEngine = (row: UnifiedMobilePluginEngineRow, effort?: PluginEngineEffort) => {
+    if (row.disabled || !pluginEngineOptions) return;
+    void transact(async (isCurrent) => {
+      const nextEffort = effort ?? row.effort ?? undefined;
+      const applied = await pluginEngineOptions.onSelect({
+        providerId: row.providerId,
+        modelId: row.modelId,
+        ...(nextEffort ? { effort: nextEffort } : {}),
+      });
+      if (applied !== false && effort === undefined && isCurrent()) p.onClose();
+    });
+  };
   const change = (config: MobileModelConfiguration, reset = false) => {
     if (!row) return;
     if (favoriteEdit) {
@@ -1134,12 +1278,52 @@ export function UnifiedModelPickerSheet(
       })
     : null;
   // 来源页:其他电脑的供应商按电脑分块(一个都没开放的电脑没有行,整块不出现)。
+  function poolQuota(providerId: string, deviceId?: string): UnifiedMobileQuota | undefined {
+    const quota = accountQuotaOf(providerId, deviceId);
+    if (!quota?.members?.length) return undefined;
+    const overview = subscriptionQuotaOverview(quota.members, now);
+    const summary = overview.average === null ? t('models.unified.quotaUpdating')
+      : t('models.unified.quotaAverage', { percent: overview.average });
+    const members = quota.members.map((member, index) => ({
+      remaining: overview.members[index].remaining ?? undefined,
+      label: [member.accountIdentity ?? t('models.unified.accountFallback', { index: index + 1 }),
+        overview.members[index].remaining === null ? '—' : t('session.menu.usage.remaining', { percent: overview.members[index].remaining }),
+        overview.members[index].resetSoon ? t('models.unified.quotaResetSoon') : null,
+        member.resetsAt ? formatQuotaResetCountdown(member.resetsAt, now, t, member.windowMinutes ?? null) : null,
+      ].filter(Boolean).join(' · '),
+    }));
+    const nextReset = overview.nextResetIndex === null ? null : quota.members[overview.nextResetIndex];
+    const resetDescription = nextReset ? [
+      t('models.unified.quotaResetIn', { duration: formatQuotaResetCountdown(nextReset.resetsAt!, now, t, nextReset.windowMinutes ?? null) }),
+      t('session.menu.usage.remaining', { percent: overview.members[overview.nextResetIndex!].remaining }),
+    ].filter(Boolean).join(' · ') : undefined;
+    return { remaining: overview.average ?? undefined, summary, reset: overview.reset ?? undefined, resetParts: t('models.unified.quotaResetIn', { duration: '{time}' }).split('{time}'), resetDescription,
+      resetSoon: overview.resetSoonCount > 0, members,
+      label: [summary, ...members.map(member => member.label), t('models.unified.quotaAverageHint'),
+        overview.resetSoonCount ? t('models.unified.quotaResetHint') : null].filter(Boolean).join('\n'),
+    };
+  }
+  const sourceQuota = (providerId: string, deviceId?: string) => {
+    const pool = poolQuota(providerId, deviceId);
+    if (pool) return pool;
+    const quota = accountQuotaOf(providerId, deviceId);
+    return quota?.remaining === undefined ? undefined : {
+      remaining: quota.remaining,
+      label: [
+        (quota.resetsAt ? formatQuotaResetCountdown(quota.resetsAt, now, t, quota.windowMinutes ?? null) : null)
+          ?? t("session.menu.usage.week"),
+        t("session.menu.usage.remaining", { percent: quota.remaining }),
+      ].join(" · "),
+    };
+  };
   const remoteFilters = remoteDirectories.flatMap(({ catalog, entries }) =>
     catalog.providers
-      .filter((provider) => entries.some((e) => e.providerId === provider.id))
+      .filter((provider) => !hiddenSources.has(remoteFilterId(catalog.deviceId, provider.id)) && entries.some((e) => e.providerId === provider.id))
       .map((provider) => ({
         id: remoteFilterId(catalog.deviceId, provider.id),
         label: remoteProviderLabel(catalog, provider.id),
+        quota: sourceQuota(provider.id, catalog.deviceId),
+        sourceUnavailableReason: catalog.offline ? undefined : sourceUnavailableReason(provider, catalog.deviceId),
         providerMark: {
           providerId: provider.id,
           name: provider.name,
@@ -1215,30 +1399,13 @@ export function UnifiedModelPickerSheet(
           : []),
         ...p.providers
           .filter((provider) =>
-            entries.some((e) => e.providerId === provider.id),
+            !hiddenSources.has(provider.id) && entries.some((e) => e.providerId === provider.id),
           )
           .map((provider) => ({
             id: provider.id,
             label: providerName(provider.id),
-            quota:
-              quotas[provider.id]?.remaining !== undefined
-                ? {
-                    remaining: quotas[provider.id]!.remaining!,
-                    label: [
-                      (quotas[provider.id]!.resetsAt
-                        ? formatQuotaResetCountdown(
-                            quotas[provider.id]!.resetsAt!,
-                            now,
-                            t,
-                            quotas[provider.id]!.windowMinutes ?? null,
-                          )
-                        : null) ?? t("session.menu.usage.week"),
-                      t("session.menu.usage.remaining", {
-                        percent: quotas[provider.id]!.remaining,
-                      }),
-                    ].join(" · "),
-                  }
-                : undefined,
+            quota: sourceQuota(provider.id),
+            sourceUnavailableReason: sourceUnavailableReason(provider, null),
             providerMark: {
               providerId: provider.id,
               name: provider.name,
@@ -1249,6 +1416,9 @@ export function UnifiedModelPickerSheet(
         ...remoteFilters,
       ]}
       groups={groups}
+      {...(pluginEngineGroups.length
+        ? { pluginEngines: { groups: pluginEngineGroups, onSelect: selectPluginEngine } }
+        : {})}
       busy={busy || !!p.disabled || !prefs.ready}
       error={error ?? (selectedDeviceId === null && p.providersReady && modelNeedsReselection(p.modelVisibilityOverrides, p.agentKind, p.activeModelId, p.selectedProviderId)
         ? t('session.common.modelHiddenReselect', { model: p.activeModelId }) : null)}

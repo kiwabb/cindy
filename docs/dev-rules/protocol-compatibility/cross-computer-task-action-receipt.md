@@ -44,3 +44,24 @@
   不需要迁移。
   没有新 relay channel、服务端变更或数据库 migration。产品语义见
   [消息来源](../../product-rules/message-source.md#跨任务委派代办轮的转交带授权正文是原文)。
+
+## 普通任务远程创建与项目发现（2026-11-11）
+
+同一 `maker:session:handoff` 通道增加 `ordinaryCreateVersion: 1`、`projectCatalogVersion: 1` 能力。
+新发送端先探测；旧接收端没有能力时不发送创建请求。旧的既有任务投递与 `plainRequestBody` 协商不变。
+
+- `action: create` 携带预分配 UUID、普通创建选项 `create`、原有正文与来源回执。
+  模型、项目与工作目录在接收端解析；权限档由发送宿主读取来源任务，不能由工具参数指定。
+  不携带 Worker、父任务、Bot 关系或自动回传配置。
+- 行动回执增加可选 `operation`，创建时为严格解析后的完整配置序列化结果。接收端在准备与首次
+  持久化前核对原宿主回执，防止同一正文被换成不同目录、模型或权限档。
+- 支持自动命名的接收端在同一次能力查询返回 `ordinaryCreateAutoTitle: 1`。普通任务的委托未指定标题时，
+  新发送端向有此能力的电脑省略 `create.title`，由接收端从委托正文提炼主题。向只支持
+  `ordinaryCreateVersion: 1` 的电脑发送时，先从委托正文生成可读短标题，再把实际发送的创建参数绑定到回执。
+  旧发送端传入的标题和调用方指定的标题按原值处理。插件沿用自身的命名约定。
+- 同一回执只能认领一次；UUID 已存在时不修改、不重发首条消息。已建任务后的发送失败返回
+  `CREATED_NOT_DELIVERED`，无法确定持久化结果返回 `DELIVERY_UNKNOWN`，工具保留 qualified ID
+  供读取记录与队列；不自动重建。创建成功后首条消息沿原有普通输入队列消费。
+- `action: list-projects` 只读目标账号已有项目，使用已有分页与隐藏项目标记。只对同账号远控开放，
+  不经 preload 暴露、不给共享访客开放。无新 channel、relay 载荷类型、服务端或数据库 migration；
+  自建中转仍透传原有加密 invoke，对新旧两端都不增加中转要求。

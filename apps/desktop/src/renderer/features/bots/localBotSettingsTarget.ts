@@ -121,6 +121,7 @@ export const localBotSettingsTarget: BotSettingsTarget = {
   kind: 'local',
   online: true,
   pages: new Set<string>(ALL_PAGES),
+  projectRepository: (botId, retry) => api().projectRepository(botId, retry),
   // Store functions are read on use, so a module that never opens these pages never needs them.
   profile: {
     update: (...args) => updateBotProfile(...args),
