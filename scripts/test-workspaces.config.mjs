@@ -602,6 +602,8 @@ export default {
         },
       },
     },
+    noCollectableWorkspace('@cindy/a2ui-renderer', 'packages/a2ui-renderer',
+      'Re-export shim that pins the official A2UI SDK; the Desktop A2uiAnswer suite exercises it through the real processor and renderer.'),
     noCollectableWorkspace('@cindy/embedding-client', 'packages/embedding-client'),
     requiredUnitWorkspace('@cindy/file-browser-core', 'packages/file-browser-core'),
     noCollectableWorkspace('@cindy/github-client', 'packages/github-client'),

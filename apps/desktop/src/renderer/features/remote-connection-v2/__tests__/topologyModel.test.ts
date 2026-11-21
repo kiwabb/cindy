@@ -23,7 +23,6 @@ import { pathLabel } from '../topologyPresentation';
 import { SPECK_H, SPECK_W, groupLines, layoutTopology, samplePath, speckKeyframes } from '../topologyGeometry';
 import { SPACING, SPEED, streamFor } from '../TopologyFlow';
 import { remoteSwitchAvailability } from '../agentNetRemoteSwitch';
-import { pathLabel } from '../topologyPresentation';
 import { appendPresenceEvent } from '../useRecentPresence';
 import {
   _resetRemoteConnectionV2ForTests,
