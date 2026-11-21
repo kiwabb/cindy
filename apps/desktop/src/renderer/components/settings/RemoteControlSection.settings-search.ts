@@ -27,6 +27,7 @@ export const remoteControlSettings = defineSettings({
     targetId: 'settings-search-target-remote-devices',
     titleKey: 'settings.remoteControl.sections.myDevices',
     sectionKey: 'settings.sections.remoteControl',
+    keywordKeys: ['settings.devices.delete', 'settings.devices.deleteTitle'],
     aliases: ['device link', 'devices', '设备互联', '我的设备', '设备列表'],
   },
   v2: {
@@ -36,19 +37,8 @@ export const remoteControlSettings = defineSettings({
     targetId: 'settings-search-target-remote-v2',
     titleKey: 'settings.remoteControl.v2.switch.title',
     descriptionKey: 'settings.remoteControl.v2.switch.hint',
-    sectionKey: 'settings.sections.remoteControl',
+    sectionKey: 'settings.remoteControl.v2.sectionTitle',
     aliases: ['Agent-Net', 'agent net', 'device-link', 'topology', 'new connection', '拓扑', '新版连接', '连接拓扑'],
-  },
-  onlyEncrypted: {
-    id: 'remoteControl.onlyEncrypted',
-    isVisible: ({ mode }) => mode === 'cloud',
-    tab: 'remote-control',
-    targetId: 'settings-search-target-remote-only-encrypted',
-    fallbackTargetId: 'settings-search-target-remote-v2',
-    titleKey: 'settings.remoteControl.v2.onlyEncrypted',
-    descriptionKey: 'settings.remoteControl.v2.onlyEncryptedHint',
-    sectionKey: 'settings.sections.remoteControl',
-    aliases: ['Agent-Net only', 'encrypted connections', '仅使用 Agent-Net', '加密连接'],
   },
   ssh: {
     id: 'remoteControl.ssh',
@@ -56,6 +46,7 @@ export const remoteControlSettings = defineSettings({
     targetId: 'settings-search-target-remote-ssh',
     titleKey: 'settings.remoteControl.sections.ssh',
     sectionKey: 'settings.sections.remoteControl',
+    keywordKeys: ['settings.remote.importedAgentHint'],
     aliases: ['SSH', 'SSH host', 'SSH hosts', 'SSH主机', 'remote host', '远程主机', '主机'],
   },
   remoteControl: {

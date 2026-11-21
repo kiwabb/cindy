@@ -44,6 +44,7 @@ const updateStatus = vi.hoisted(() => ({
     displayVersion?: string;
     errorCode: string | null;
     downloadUrl?: string;
+    manualReason?: 'storage' | 'signing' | 'failed';
   },
 }));
 
@@ -381,6 +382,32 @@ describe('update banner for a release that needs a manual install', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'update.banner.manualAria' })).toBeTruthy());
     fireEvent.click(screen.getByRole('button', { name: 'update.banner.manualAria' }));
     expect(openExternal).toHaveBeenLastCalledWith(URL_R2);
+  });
+
+  // Regression: a version that cannot install automatically used to stay silent; the banner now says why.
+  // The data-format case keeps the title alone, as before.
+  it.each([
+    ['signing', 'update.banner.manualReasonSigning'],
+    ['failed', 'update.banner.manualReasonFailed'],
+    ['storage', null],
+  ] as const)('explains a %s manual install', (manualReason, key) => {
+    updateStatus.current = { ...manual('personal-r1'), manualReason };
+    render(<UpdateBanner isCollapsed={false} />);
+    expect(screen.getByText('update.banner.manualTitle')).toBeTruthy();
+    for (const reason of ['update.banner.manualReasonSigning', 'update.banner.manualReasonFailed']) {
+      expect(Boolean(screen.queryByText(reason))).toBe(reason === key);
+    }
+  });
+});
+
+// Regression: a manual check whose download could not be prepared reported "check failed, check the network".
+describe('manual update check when the new version cannot be prepared yet', () => {
+  it('says the download is waiting to be prepared instead of a failed check', async () => {
+    const { toast } = await import('@/lib/toast');
+    window.electronAPI.checkForUpdate = vi.fn().mockResolvedValue({ result: 'prepare_failed' });
+    await checkForUpdateWithToast((key) => key);
+    expect(toast.warning).toHaveBeenLastCalledWith('titleBar.updateCheckToast.prepareDeferred');
+    expect(toast.error).not.toHaveBeenCalled();
   });
 });
 

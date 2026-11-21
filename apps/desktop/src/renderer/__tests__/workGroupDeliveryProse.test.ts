@@ -106,6 +106,18 @@ function briefThenNotifyTurn(body: string): ChatMessage[] {
 // ── 主 case ────────────────────────────────────────────────────────────────
 
 describe('交付正文不被收尾动作顶进「已工作 Xs」', () => {
+  // PR #11587 review: the new fence was absent from the shared delivery classifier.
+  // Existing prose cases do not exercise cards. Unit: one short card before a tool.
+  it('keeps a short A2UI card visible before a trailing tool action', () => {
+    const body = '```a2ui\n' + JSON.stringify({ version: '1.0', createSurface: {
+      surfaceId: 'a', catalogId: 'https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json',
+      components: [{ id: 'root', component: 'Text', text: 'Read this paragraph.' }],
+    } }) + '\n```';
+    const items = groupWorkRuns(buildRenderItems(briefThenNotifyTurn(body)).items, false);
+    expect(topLevelMessageIds(items)).toEqual(['u1', 'brief', 'wrap']);
+    expect(isFoldedIntoWorkGroup(items, 'brief')).toBe(false);
+  });
+
   it('长正文排在收尾动作之前也平铺可见', () => {
     expect(longPlainProse.length).toBeGreaterThanOrEqual(600);
 

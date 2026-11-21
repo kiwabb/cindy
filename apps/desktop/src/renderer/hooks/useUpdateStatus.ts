@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { DownloadProgress } from '../../shared/downloadProgress';
 
 /**
  * useUpdateStatus — listens to the main-process `update-status` IPC channel
@@ -17,6 +18,10 @@ export function useUpdateStatus() {
   // 快照不含 progress，错过的进度由下一条推送补上即可。
   const [progress, setProgress] = useState<number | undefined>();
   const [downloadUrl, setDownloadUrl] = useState<string | undefined>();
+  // Standard progress (retrying and why, verifying, speed, time left) from the
+  // `app-update-progress` channel; cleared once the update stops downloading.
+  const [download, setDownload] = useState<DownloadProgress | undefined>();
+  const [manualReason, setManualReason] = useState<UpdateStatusPayload['manualReason']>();
 
   useEffect(() => {
     const api = window.electronAPI;
@@ -29,6 +34,7 @@ export function useUpdateStatus() {
         setDisplayVersion(initial.displayVersion);
         setErrorCode(initial.errorCode);
         setDownloadUrl(initial.downloadUrl);
+        setManualReason(initial.manualReason);
       }
     }).catch(() => {});
 
@@ -43,12 +49,21 @@ export function useUpdateStatus() {
         setDisplayVersion(payload.displayVersion);
         setErrorCode(payload.errorCode);
         setDownloadUrl(payload.downloadUrl);
+        setManualReason(payload.manualReason);
         setProgress(typeof payload.progress === 'number' ? payload.progress : undefined);
+        if (payload.status !== 'downloading' && payload.status !== 'superseding')
+          setDownload(undefined);
       }
     });
+    const unsubscribeProgress = api.onAppUpdateProgress?.((payload) => {
+      if (payload?.download) setDownload(payload.download);
+    });
 
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      unsubscribeProgress?.();
+    };
   }, []);
 
-  return { status, version, displayVersion, errorCode, progress, downloadUrl };
+  return { status, version, displayVersion, errorCode, progress, downloadUrl, download, manualReason };
 }

@@ -27,5 +27,9 @@ export async function checkForUpdateWithToast(t: Translate): Promise<void> {
       // Only the personal channel reports this (newer release, incompatible storage); same label as the banner.
       toast.warning(t('update.banner.manualTitle'));
       break;
+    case 'prepare_failed':
+      // Personal channel: downloaded, but preparation could not run this time; the next check retries.
+      toast.warning(t('titleBar.updateCheckToast.prepareDeferred'));
+      break;
   }
 }

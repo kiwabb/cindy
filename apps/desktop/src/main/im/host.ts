@@ -11,6 +11,7 @@
  */
 
 import path from 'node:path';
+import { readBotImConnection } from './shared/botImConnectionStore';
 import { app, ipcMain, BrowserWindow, net, shell } from 'electron';
 
 import {
@@ -47,6 +48,7 @@ import { pinBlob } from '../cindy-media/ledger';
 import { t } from '../i18n.desktop';
 import { discordUiText } from './discord/uiText';
 import { discordChannelAccessStore } from './discord/channelAccessStore';
+import { discordFinalTextStorage } from './discord/finalTextStorage';
 import { telegramUiText } from './telegram/uiText';
 import {
   patchTelegramBehavior,
@@ -71,6 +73,8 @@ import {
 import { fetchPublicImageBytes } from './publicImageFetch';
 import { buildPersonalBotCommandMenu } from './shared/botCommands';
 import { shouldAnnounceFeishuLifecycle } from './feishu/lifecycleAnnouncements';
+// lizi-im 传输层文案随界面语言：注册一次解析器，缺 key 时回退包内中文。
+import './transportText';
 
 const log = createLogger('im/host');
 
@@ -133,12 +137,13 @@ const host: IMHost = {
       // transport-owned boundary immediately before pinning so stale media is
       // not promoted without a message/session owner.
       if (options?.shouldReuse?.() === false) return null;
-      // 命中路径不走 cacheImage,但 IM 复用的可能是 MCP 侧 isCache=true 的缓存
+      // 背景附件复用保留 isCache 状态，由缓存回收管理生命周期。
+      // 普通入站命中不走 cacheImage,但 IM 复用的可能是 MCP 侧 isCache=true 的缓存
       // blob(feishu 两边有意共用 `feishu:<token>` 命名空间)——IM 语义是用户
       // 附件,同 cacheImage 口径降级为非 cache(review P1);降级失败只警告,
       // 不阻断附件复用(消息落库挂账钩子的 pinBlob 是第二道自愈)。
       try {
-        await pinBlob(hit.hash);
+        if (!options?.staging) await pinBlob(hit.hash);
       } catch (err) {
         log.warn('im getCachedImage: pinBlob failed', {
           integration,
@@ -201,7 +206,7 @@ export const feishuIm = createFeishuIM(host, {
 });
 /**
  * 伙伴自有飞书 / Lark 连接的传输层实例: 凭证与 TOFU 主人按连接前缀隔离、不注册设置卡
- * IPC、对外开放(非主人的私聊与群 @ 带非主人标记进业务层)。
+ * IPC。非主人仅可通过群 @ 进业务层，私聊只认已绑定主人。
  */
 export function createBotFeishuIM(secretKeyPrefix: string): FeishuIM {
   return createFeishuIM(host, {
@@ -212,15 +217,16 @@ export function createBotFeishuIM(secretKeyPrefix: string): FeishuIM {
   });
 }
 export const discordIm = createDiscordIM(host, {
+  finalTextStorage: () => discordFinalTextStorage('personal', true),
   channelAccess: discordChannelAccessStore,
   ownerOnlyCardNotice: () => t('settings.discordBot.channels.ownerOnlyCardNotice'),
   resolveImageUrl: resolveManagedImageAbsPath,
-  expiredCardNotice: discordUiText.expiredCardNotice,
+  expiredCardNotice: () => discordUiText.expiredCardNotice,
   ownerNoticeText: (phase) => t(`settings.discordBot.ownerNotice.${phase}`),
 });
 export const telegramIm = createTelegramIM(host, {
   resolveImageUrl: resolveManagedImageAbsPath,
-  expiredCardNotice: telegramUiText.expiredCardNotice,
+  expiredCardNotice: () => telegramUiText.expiredCardNotice,
   ownerNoticeText: (phase) => t(`settings.telegramBot.ownerNotice.${phase}`),
   // 行为配置 getter: transport 每次使用时现读 → 设置卡改动即生效。
   behavior: readTelegramBehavior,
@@ -229,7 +235,7 @@ export const telegramIm = createTelegramIM(host, {
 });
 /**
  * 伙伴自有 Telegram 连接的传输层实例: 与设置页那份同一套宿主能力, 但凭证按连接
- * 前缀隔离、不注册设置卡 IPC、对外开放私聊(陌生人消息带非主人标记进业务层)。
+ * 前缀隔离、不注册设置卡 IPC；私聊只认已绑定主人，群参与方式沿用原配置。
  * 行为配置由连接记录给(群参与模式按连接各一份, 表情 / 引用档位用默认值 —— 伙伴的
  * 身份与分寸来自它的 SOUL, 不读设置页的人格); 命令菜单去掉交给伙伴后不在渠道里改的
  * 模型 / 权限 / 工作目录三条。
@@ -240,13 +246,12 @@ export function createBotTelegramIM(
 ): TelegramIM {
   return createTelegramIM(host, {
     resolveImageUrl: resolveManagedImageAbsPath,
-    expiredCardNotice: telegramUiText.expiredCardNotice,
+    expiredCardNotice: () => telegramUiText.expiredCardNotice,
     ownerNoticeText: (phase) => t(`settings.telegramBot.ownerNotice.${phase}`),
     behavior: options.behavior,
     commandMenu: buildPersonalBotCommandMenu((key) => t(key), { surface: 'companion' }),
     secretKeyPrefix,
     ipc: false,
-    guestDm: true,
   });
 }
 export const dingtalkIm = createDingTalkIM(host, {
@@ -273,11 +278,12 @@ export function createBotDiscordIM(
   options: { channelAccess?: DiscordChannelAccessStore } = {},
 ): DiscordIM {
   return createDiscordIM(host, {
+    finalTextStorage: () => discordFinalTextStorage(secretKeyPrefix, false),
     // 服务器频道白名单按连接各一份、由连接记录提供（缺省 = 不开放任何频道）。
     ...(options.channelAccess ? { channelAccess: options.channelAccess } : {}),
     ownerOnlyCardNotice: () => t('settings.discordBot.channels.ownerOnlyCardNotice'),
     resolveImageUrl: resolveManagedImageAbsPath,
-    expiredCardNotice: discordUiText.expiredCardNotice,
+    expiredCardNotice: () => discordUiText.expiredCardNotice,
     ownerNoticeText: (phase) => t(`settings.discordBot.ownerNotice.${phase}`),
     secretKeyPrefix,
     ipc: false,
@@ -399,6 +405,7 @@ export function createBotIMessageIM(secretKeyPrefix: string, connectionId: strin
   return new BlueBubblesIM(host, {
     secretPrefix: secretKeyPrefix,
     storage: blueBubblesStateStorage(connectionId),
+    contextId: () => readBotImConnection(connectionId)?.botContextId ?? null,
     receiver: (listenHost, port) => {
       const key = `${listenHost}:${port}`;
       let receiver = localImReceivers.get(key);

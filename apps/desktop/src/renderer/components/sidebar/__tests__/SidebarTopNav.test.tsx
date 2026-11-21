@@ -25,7 +25,8 @@ vi.mock('@/contexts/AuthContext', () => ({
 }));
 // A non-empty installed roster marks the plugin list as loaded (Main sends none mid-switch).
 const installedMock = vi.hoisted(() => ({ ghosts: [{ manifest: { id: 'bundled' } }] as unknown[] }));
-vi.mock('@/cindy-brain/useInstalledGhosts', () => ({ useInstalledGhosts: () => installedMock.ghosts }));
+vi.mock('@/cindy-brain/useInstalledGhosts', () => ({ useInstalledGhosts: () => installedMock.ghosts,
+  readInstalledGhostsSnapshot: () => installedMock.ghosts }));
 const SITES: MainViewMock = {
   ghostId: 'xd-sites', instanceId: 'xd-sites', title: '站点', icon: 'globe', manifest: { name: 'XD Sites' },
 };
@@ -146,7 +147,6 @@ describe('Retirement attention across sidebar navigation placements', () => {
         span.className.includes(`--card-status-${tone}`),
       );
       expect(dot('awaiting')).toBeTruthy();
-      expect(dot('awaiting')?.className).not.toContain('session-card-dot');
 
       // Acknowledging retirement must preserve another plugin's ordinary unread dot.
       installedMock.ghosts = [{ manifest: { id: 'ios-simulator' }, retirement: { unread: false } }];

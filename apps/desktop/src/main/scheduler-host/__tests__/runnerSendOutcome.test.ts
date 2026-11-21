@@ -1,5 +1,5 @@
 import type { ScheduledModelSelection } from '../../maker-ipc/scheduledModelSelection';
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, onTestFinished } from 'vitest';
 
 import type {
   AgentEvent,
@@ -496,6 +496,23 @@ describe('MakerScheduleRunner send outcome policy', () => {
     expect(update).not.toHaveBeenCalled();
   });
 
+  // Schedules do not run plugin-engine (ACP) tasks (docs/plans/acp-plugin-bridge.md, 排除范围).
+  // A bound one must fail visibly before restore or any engine switch, never run on a built-in
+  // engine. Minimal input: target row agent_kind='acp'. Unit fixture.
+  it('refuses a target task that runs on a plugin engine before restoring or switching it', async () => {
+    mocks.getSessionRowSnapshot.mockResolvedValue({ status: 'archived', agentKind: 'acp' });
+    const h = createSessionHarness(async () => ({ accepted: true }));
+    const acquirePendingAgentSwitch = vi.fn();
+    const { runner, maker, notifier } = createRunnerHarness(h.session, { acquirePendingAgentSwitch });
+    await expect(runner.fire(baseSchedule({ targetSessionId: h.session.id }), createFireContext()))
+      .rejects.toMatchObject({ code: 'PLUGIN_ENGINE_UNSUPPORTED' });
+    expect(latestNotifiedRun(notifier)).toMatchObject({ status: 'failed', errorMsg: expect.stringContaining('plugin engine') });
+    expect(mocks.restoreArchivedSessionForSend).not.toHaveBeenCalled();
+    expect(acquirePendingAgentSwitch).not.toHaveBeenCalled();
+    expect(maker.createSession).not.toHaveBeenCalled();
+    expect(h.send).not.toHaveBeenCalled();
+  });
+
   it('keeps the schedule active when the target is archived again during preparation', async () => {
     const h = createSessionHarness(async () => ({ accepted: true }));
     mocks.getSessionRowSnapshot.mockResolvedValueOnce({ status: 'active' })
@@ -694,6 +711,10 @@ describe('MakerScheduleRunner send outcome policy', () => {
   });
 
   it('projects tool-loop terminal errors to a safe scheduler notification', async () => {
+    // 终止原因文案随界面语言（imBot.text.shared.*），这里固定中文以核对投影内容。
+    const { setMainLocale } = await import('../../i18n.desktop');
+    setMainLocale('zh-CN');
+    onTestFinished(() => setMainLocale('en'));
     const h = createSessionHarness(async (_message, opts) => {
       await opts?.onAccepted?.();
       return { accepted: true };

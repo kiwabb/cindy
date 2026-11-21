@@ -7,6 +7,8 @@
  */
 
 export const VERSION = '0.0.0';
+export { setTransportTextResolver } from './transportText.js';
+export type { TransportTextResolver, TransportTextVars } from './transportText.js';
 export { UnsupportedInboundMediaError } from './inboundKind.js';
 export { buildInboundMessageFacts } from './inboundFacts.js';
 export type { InboundMessageFacts } from './inboundFacts.js';
@@ -62,6 +64,9 @@ export type { DownloadResult as FeishuDownloadResult } from './feishu/attachment
 
 export { DiscordIM, createDiscordIM } from './discord/index.js';
 export type { DiscordConfigState, DiscordIMOptions } from './discord/index.js';
+export { DiscordOperationError, discordOperationFailure } from './discord/operations.js';
+export type { DiscordOperations, DiscordHistoryMessage } from './discord/operations.js';
+export type { DiscordFinalTextStorage } from './discord/finalTextOutbox.js';
 export {
   decodeDiscordLaneUserId,
   encodeDiscordLaneUserId,

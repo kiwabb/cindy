@@ -1,7 +1,7 @@
 import type { ScrollViewInstance } from 'react-native';
 import { IssueConfirmCard, type MobileIssueConfirmRequest } from './IssueConfirmCard';
 import { clearIssueConfirmDraft } from './interactionDraftStore';
-import { askAnswerError, askQuestionOptions, interactionPriority } from '@cindy/maker-shared/interaction';
+import { askAnswerError, askQuestionOptions } from '@cindy/maker-shared/interaction';
 import { deviceDisplayName } from '@/device-link/deviceName';
 import { PluginSetupNativeActions } from '@/plugins/PluginSetupNativeActions';
 import { sha256 } from '@noble/hashes/sha256';
@@ -10,7 +10,7 @@ import { InputHandoffCard } from '@/inputHandoff/InputHandoffCard';
 import { parseInputHandoffSnapshotLike } from '@/inputHandoff/inputHandoffNative';
 import { mobilePluginSetupActions } from '@/plugins/pluginSetupActions';
 import { usePaneViewport } from '@/platform/AdaptiveWindowContext';
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGuardedPush } from '@/utils/useGuardedPush';
 import { isSharedTaskPeer } from '@cindy/device-link';
@@ -38,6 +38,7 @@ import {
   StyleSheet,
   View,
   useWindowDimensions,
+  type LayoutChangeEvent,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
@@ -49,6 +50,7 @@ import { formatRemoteError } from '@/device-link/remoteStatus';
 import { useMobileMakerTransport } from '@/device-link/useMobileMakerTransport';
 import { asyncQuestionNeedsSupplement, formatAsyncQuestionReplyDisplay, formatAsyncQuestionSupplement, withdrawnQuestionDraftText } from '@cindy/maker-shared/interaction';
 import { useAskCardVoice } from '@/session/useAskCardVoice';
+import { PendingAnswerTrailingInsetContext } from '@/session/usePendingQuestionScroll';
 import { buildQueuedTextMessage } from '@/session/inputProjection';
 import {
   answerKey,
@@ -78,7 +80,7 @@ import {
   remoteInteractionHandling,
   selectionFromAnswer,
   sessionScopedPermissionSuggestions,
-  sortPendingInteractions,
+  selectPendingInteractionByRequestId,
   type AskQuestion,
   type PermissionReviewPresentation,
   type PlanReviewEvidencePresentation,
@@ -186,6 +188,7 @@ function InteractionPanelContent({
   collapse,
   deviceId,
   fillAvailableHeight = false,
+  pinPermissionActions = false,
   sessionId,
   interactions,
   activeRequestId: controlledActiveRequestId,
@@ -210,6 +213,7 @@ function InteractionPanelContent({
   };
   deviceId: string;
   fillAvailableHeight?: boolean;
+  pinPermissionActions?: boolean;
   sessionId: string;
   interactions: PendingInteraction[];
   activeRequestId?: string | null;
@@ -221,10 +225,6 @@ function InteractionPanelContent({
   const styles = useInteractionStyles();
   const { colors } = useTheme();
   const { t } = useTranslation();
-  const sortedInteractions = useMemo(
-    () => sortPendingInteractions(interactions),
-    [interactions],
-  );
   const [localActiveRequestId, setLocalActiveRequestId] = useState<string | null>(null);
   const activeRequestId = controlledActiveRequestId !== undefined
     ? controlledActiveRequestId
@@ -233,25 +233,21 @@ function InteractionPanelContent({
     if (controlledActiveRequestId !== undefined) onActiveRequestIdChange?.(requestId);
     else setLocalActiveRequestId(requestId);
   };
-  const fallbackInteraction = sortedInteractions[0] ?? null;
-  const activeInteraction = useMemo(() => {
-
-    if (!activeRequestId) return fallbackInteraction;
-    const selected = sortedInteractions.find((item) => readRequestId(item) === activeRequestId);
-    if (!selected || (fallbackInteraction && interactionPriority(fallbackInteraction) < interactionPriority(selected))) return fallbackInteraction;
-    return selected;
-  }, [activeRequestId, fallbackInteraction, sortedInteractions]);
+  const activeInteraction = useMemo(
+    () => selectPendingInteractionByRequestId(interactions, activeRequestId),
+    [interactions, activeRequestId],
+  );
   const { width: screenWidth } = usePaneViewport();
   useEffect(() => {
     if (!activeRequestId) return;
-    if (!sortedInteractions.some((item) => readRequestId(item) === activeRequestId)) {
+    if (!interactions.some((item) => readRequestId(item) === activeRequestId)) {
       setActiveRequestId(null);
     }
-  }, [activeRequestId, sortedInteractions]);
+  }, [activeRequestId, interactions]);
   if (!activeInteraction) return null;
   const kind = interactionKind(activeInteraction);
-  const queuePresentation = buildPendingInteractionQueuePresentation(sortedInteractions, {
-    maxVisible: sortedInteractions.length || 1,
+  const queuePresentation = buildPendingInteractionQueuePresentation(interactions, {
+    maxVisible: interactions.length || 1,
   }, mobilePresentationLocalizer);
   const activeRequestIdForPresentation = readRequestId(activeInteraction);
   const selectedQueueItem = queuePresentation.items.find((item) => item.requestId === activeRequestIdForPresentation)
@@ -387,6 +383,7 @@ function InteractionPanelContent({
         sessionId={sessionId}
         item={activeInteraction}
         embedded={embedded}
+        pinPermissionActions={pinPermissionActions}
         planViewerState={planViewerState}
         onPlanViewerStateChange={onPlanViewerStateChange}
         onError={onError}
@@ -535,6 +532,7 @@ function InteractionItem({
   sessionId,
   item,
   embedded,
+  pinPermissionActions,
   planViewerState,
   onPlanViewerStateChange,
   onError,
@@ -545,6 +543,7 @@ function InteractionItem({
   sessionId: string;
   item: PendingInteraction;
   embedded: boolean;
+  pinPermissionActions: boolean;
   planViewerState?: MobilePlanViewerState;
   onPlanViewerStateChange?(state: MobilePlanViewerState): void;
   onError(message: string | null): void;
@@ -684,6 +683,8 @@ function InteractionItem({
   if (kind === 'permission') {
     return (
       <PermissionCard
+        pinActions={pinPermissionActions}
+        key={readRequestId(item)}
         busy={busy}
         item={item}
         onDecision={(decision) => void submitDecision(decision)}
@@ -808,12 +809,14 @@ function PermissionCard({
   busy,
   item,
   onDecision,
+  pinActions,
   touchLayout,
 }: {
   onError(message: string | null): void;
   busy: boolean;
   item: PendingInteraction;
   onDecision(decision: Record<string, unknown>): void;
+  pinActions: boolean;
   touchLayout: InteractionTouchLayout;
 }) {
   const styles = useInteractionStyles();
@@ -830,6 +833,10 @@ function PermissionCard({
   const suggestions = sessionScopedPermissionSuggestions(item.request.suggestions);
   const requestId = readRequestId(item);
   const [armedDecision, setArmedDecision] = useState<'allow-once' | 'always-allow' | null>(null);
+  const isPluginInstall = item.request.toolName === 'cindy.plugin.install';
+  const isFirstInstall = isPluginInstall && (item.request.input as { operation?: unknown } | null)?.operation === 'install';
+  const [showInstallDetails, setShowInstallDetails] = useState(false);
+  const installSummary = isPluginInstall && !showInstallDetails;
   const permissionState = buildMobilePermissionCardState({ armedDecision, presentation });
   const requestDecision = (
     action: 'allow-once' | 'always-allow',
@@ -855,7 +862,7 @@ function PermissionCard({
       variant="secondary"
     />
   );
-  const alwaysButton = permissionState.canShowAlwaysAllow ? (
+  const alwaysButton = !isPluginInstall && permissionState.canShowAlwaysAllow ? (
     <ResolveButton
       key="always"
       accessibilityLabel={t('interaction.permission.alwaysAllowAccessibility')}
@@ -876,20 +883,20 @@ function PermissionCard({
   const allowButton = (
     <ResolveButton
       key="allow"
-      accessibilityLabel={t(isMcpUrl ? 'interaction.permission.mcpComplete' : 'interaction.permission.allowOnceAccessibility')}
+      accessibilityLabel={t(isFirstInstall ? 'interaction.permission.install' : installSummary ? 'interaction.companion.details' : isMcpUrl ? 'interaction.permission.mcpComplete' : 'interaction.permission.allowOnceAccessibility')}
       armed={armedDecision === 'allow-once'}
       busy={busy}
       confirmLabel={t('interaction.permission.allowOnceConfirm')}
-      label={t(isMcpUrl ? 'interaction.permission.mcpComplete' : 'interaction.permission.allowOnce')}
-      onPress={() => requestDecision('allow-once', buildPermissionDecision('allow'))}
+      label={t(isFirstInstall ? 'interaction.permission.install' : installSummary ? 'interaction.companion.details' : isMcpUrl ? 'interaction.permission.mcpComplete' : 'interaction.permission.allowOnce')}
+      onPress={() => installSummary && !isFirstInstall ? setShowInstallDetails(true) : requestDecision('allow-once', buildPermissionDecision('allow'))}
       requestId={requestId}
       touchStyle={resolveButtonLayoutStyle(touchLayout, 'primary', companion)}
       testID="interaction.permission.allowOnceButton"
       variant="primary"
     />
   );
-  return (
-    <View style={cardStyle(styles, touchLayout, companion)} testID="interaction.permission.card">
+  const details = (
+    <>
       {companion ? <>
         <View style={styles.companionCaption} testID="interaction.permission.requester">
           {!hung ? companionIdentity?.avatar : null}
@@ -899,7 +906,7 @@ function PermissionCard({
             {!hung && companionIdentity ? <Text style={styles.kind}>{permissionState.title}</Text> : null}
           </View>
         </View>
-        {presentation.description ? <Text style={styles.companionDescription}>{presentation.description}</Text> : null}
+        {!installSummary && presentation.description ? <Text style={styles.companionDescription}>{presentation.description}</Text> : null}
       </> : <View style={styles.compactCardHeader}>
         <Text style={styles.kind}>{t('interaction.permission.kind')}</Text>
         <Text numberOfLines={1} style={styles.compactCardTitle}>{permissionState.title}</Text>
@@ -909,13 +916,33 @@ function PermissionCard({
         onPress={() => { void Linking.openURL(url).catch((error) => onError(formatRemoteError(error))); }}>
         {url}
       </Text> : null}
-      {isMcpUrl ? (!companion && presentation.description ? <Text style={styles.body}>{presentation.description}</Text> : null) : <PermissionEvidence
+      {installSummary ? <Text style={styles.body}>{presentation.description?.split('\n', 1)[0]}</Text> : isMcpUrl ? (!companion && presentation.description ? <Text style={styles.body}>{presentation.description}</Text> : null) : <PermissionEvidence
         input={item.request.input}
         armed={!!armedDecision}
         presentation={presentation}
         riskWarningText={permissionState.riskWarningText}
         touchLayout={touchLayout}
       />}
+      {isFirstInstall && <InteractionTouchButton
+        accessibilityLabel={t('interaction.companion.details')} expanded={showInstallDetails}
+        disabled={busy} onPress={() => setShowInstallDetails(open => !open)} style={styles.companionDetailsButton}>
+        <Text style={styles.companionDetailsText}>{t('interaction.companion.details')}</Text>
+      </InteractionTouchButton>}
+    </>
+  );
+  return (
+    <View style={[cardStyle(styles, touchLayout, companion), pinActions && styles.permissionScrollable]} testID="interaction.permission.card">
+      {pinActions ? (
+        <ScrollView
+          style={styles.permissionScrollable}
+          contentContainerStyle={{ gap: companion ? spacing.sm : touchLayout.cardGap }}
+          keyboardShouldPersistTaps="handled"
+          nestedScrollEnabled
+          testID="interaction.permission.scroll"
+        >
+          {details}
+        </ScrollView>
+      ) : details}
       <InteractionActions touchLayout={touchLayout}>
         {[denyButton, alwaysButton, allowButton]}
       </InteractionActions>
@@ -1139,6 +1166,31 @@ function AskUserQuestionForm({
   }, mobilePresentationLocalizer), [currentIndex, i18nInstance.language, questions]);
   const current = presentation.current;
   const isWithdrawn = typeof item.request.withdrawalReason === 'string';
+  // A question whose only answer is free text keeps the question readable while
+  // typing: report what sits below the answer box inside this card so the page
+  // reveals the box, not the trailing Skip/Close row (2026-11-12, question
+  // scrolled out of view). The panel's bottom padding stays below the box, the
+  // same gap the end of the card gets, because it sits behind the keyboard.
+  const freeTextOnly = !!current && (isWithdrawn || askQuestionOptions(current).length === 0);
+  const reportTrailingInset = useContext(PendingAnswerTrailingInsetContext);
+  const answerLayoutRef = useRef({ cardHeight: 0, composerBottom: 0 });
+  const syncTrailingInset = useCallback(() => {
+    const { cardHeight, composerBottom } = answerLayoutRef.current;
+    if (cardHeight > 0 && composerBottom > 0) reportTrailingInset?.(Math.max(0, cardHeight - composerBottom));
+  }, [reportTrailingInset]);
+  const onCardLayout = (event: LayoutChangeEvent) => {
+    answerLayoutRef.current.cardHeight = event.nativeEvent.layout.height;
+    if (freeTextOnly) syncTrailingInset();
+  };
+  const onFreeTextComposerLayout = (event: LayoutChangeEvent) => {
+    const { y, height } = event.nativeEvent.layout;
+    answerLayoutRef.current.composerBottom = y + height;
+    syncTrailingInset();
+  };
+  useEffect(() => {
+    if (!freeTextOnly) reportTrailingInset?.(0);
+    return () => reportTrailingInset?.(0);
+  }, [freeTextOnly, reportTrailingInset]);
   const withdrawnDraftRef = useRef<string | null>(null);
   useEffect(() => {
     const key = `${requestId}:${currentIndex}`;
@@ -1309,7 +1361,7 @@ function AskUserQuestionForm({
   </View>;
 
   return (
-    <View style={cardStyle(styles, touchLayout, companion)} testID="interaction.ask.card">
+    <View onLayout={onCardLayout} style={cardStyle(styles, touchLayout, companion)} testID="interaction.ask.card">
       {/* 收起入口统一在队列头(PendingTaskHeader),卡内不再自持一份 collapsed state:
           两套状态时页面级那份被卡片 key 变化冲掉,收起会自己弹回来。 */}
       <View style={styles.compactCardHeader}>
@@ -1379,7 +1431,7 @@ function AskUserQuestionForm({
             );
           })}
           {!current.answerConstraints?.choices && (showCustomInput ? (
-            <View style={styles.answerComposer} testID="interaction.ask.composer">
+            <View style={styles.askAnswerComposer} testID="interaction.ask.composer">
               <TextInput
                 accessibilityLabel={t('interaction.panel.customAnswerInputAccessibility')}
                 autoFocus
@@ -1393,7 +1445,7 @@ function AskUserQuestionForm({
                 onSelectionChange={(event) => { if (!voice.busy) selectionRef.current = event.nativeEvent.selection; }}
                 placeholder={t('interaction.panel.customAnswerPlaceholder')}
                 placeholderTextColor={colors.textPlaceholder}
-                style={styles.answerComposerInput}
+                style={styles.askAnswerInput}
                 multiline
                 testID="interaction.ask.customInput"
                 value={customInput}
@@ -1430,10 +1482,10 @@ function AskUserQuestionForm({
           ))}
         </View>
       ) : (
-        <View style={styles.answerComposer} testID="interaction.ask.composer">
+        <View onLayout={onFreeTextComposerLayout} style={styles.askAnswerComposer} testID="interaction.ask.composer">
+          {/* No autoFocus: the keyboard would cover the question before it is read. */}
           <TextInput
             accessibilityLabel={t('interaction.panel.answerInput')}
-            autoFocus
             editable={!busy && !voiceLocked}
             onKeyPress={({ nativeEvent }) => { if (nativeEvent.key.length === 1) onStartAnswer(); }}
             onChangeText={(text) => {
@@ -1444,7 +1496,7 @@ function AskUserQuestionForm({
             onSelectionChange={(event) => { if (!voice.busy) selectionRef.current = event.nativeEvent.selection; }}
             placeholder={t('interaction.panel.answerInput')}
             placeholderTextColor={colors.textPlaceholder}
-            style={styles.answerComposerInput}
+            style={styles.askAnswerInput}
             testID="interaction.ask.textInput"
             multiline
             value={customInput}
@@ -2467,6 +2519,7 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     fontSize: typeScale.caption,
     lineHeight: lineHeight.caption,
   },
+  permissionScrollable: { flexGrow: 0, flexShrink: 1, minHeight: 0 },
   permissionEvidence: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
@@ -2626,6 +2679,19 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     fontWeight: fontWeight.regular, textAlignVertical: 'top',
   },
   answerComposerActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: spacing.sm },
+  // Question answers start as one line beside the mic and send buttons and grow
+  // with the text; the buttons stay on the last line (2026-11-12 user request).
+  askAnswerComposer: {
+    width: '100%', minWidth: 0, flexDirection: 'row', alignItems: 'flex-end', gap: spacing.xs,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, borderRadius: radius.control,
+    backgroundColor: colors.surface, paddingVertical: spacing.xs, paddingLeft: spacing.sm, paddingRight: spacing.xs,
+  },
+  askAnswerInput: {
+    flex: 1, minWidth: 0, minHeight: 44, maxHeight: 148,
+    paddingHorizontal: spacing.xs, paddingTop: (44 - lineHeight.body) / 2, paddingBottom: (44 - lineHeight.body) / 2,
+    color: colors.textPrimary, fontSize: typeScale.body, lineHeight: lineHeight.body,
+    fontWeight: fontWeight.regular, textAlignVertical: 'top',
+  },
   answerComposerSend: { width: 44, height: 44, minWidth: 44, paddingHorizontal: 0, flexGrow: 0, flexShrink: 0 },
   customInputRow: {
     alignItems: 'center',

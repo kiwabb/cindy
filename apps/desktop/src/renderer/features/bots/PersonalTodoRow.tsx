@@ -237,7 +237,7 @@ export function PersonalTodoRow({
             <span
               title={todo.title}
               className={cn(
-                'block truncate text-13 leading-5',
+                'block truncate text-13 leading-[1.54]',
                 done
                   ? 'text-[var(--text-secondary)] line-through decoration-[var(--text-tertiary)]'
                   : 'text-[var(--text-primary)]',
@@ -246,7 +246,7 @@ export function PersonalTodoRow({
               {todo.title}
             </span>
             {progress || todo.notes ? (
-              <span className="flex min-w-0 items-center gap-2 text-12 leading-4 text-[var(--text-secondary)]">
+              <span className="flex min-w-0 items-center gap-2 text-12 leading-[1.333] text-[var(--text-secondary)]">
                 {progress ? (
                   <span className="inline-flex shrink-0 items-center gap-1 tabular-nums">
                     <ListChecks size={12} aria-hidden />

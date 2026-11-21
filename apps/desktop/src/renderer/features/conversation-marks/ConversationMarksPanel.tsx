@@ -68,7 +68,7 @@ function SyncLine({ status }: { status: ConversationMarkSyncStatus | null }) {
         : status.pending > 0
           ? t('conversationMarks.syncOfflinePending', { count: status.pending })
           : t('conversationMarks.syncOffline');
-  return <span className="shrink-0 whitespace-nowrap text-12 leading-4 text-[var(--text-tertiary)]">{text}</span>;
+  return <span className="shrink-0 whitespace-nowrap text-12 leading-[1.333] text-[var(--text-tertiary)]">{text}</span>;
 }
 
 function MarkRow({
@@ -146,13 +146,13 @@ function MarkRow({
         >
           <span
             className={cn(
-              'line-clamp-3 whitespace-pre-wrap break-words text-13 leading-5',
+              'line-clamp-3 whitespace-pre-wrap break-words text-13 leading-[1.54]',
               discussed ? 'text-[var(--text-tertiary)]' : 'text-[var(--text-primary)]',
             )}
           >
             {mark.quote}
           </span>
-          <span className="flex items-center gap-1.5 text-12 leading-4 text-[var(--text-tertiary)]">
+          <span className="flex items-center gap-1.5 text-12 leading-[1.333] text-[var(--text-tertiary)]">
             {who ? (
               <span className={discussed ? undefined : 'text-[var(--text-secondary)]'}>{who}</span>
             ) : null}
@@ -226,7 +226,7 @@ export function ConversationMarksPanel({ ctx, active, shellVisible }: TabKindBod
   if (!scope) return null;
   const firstLabel = open.length > 0 ? 'open' : discussed.length > 0 ? 'discussed' : null;
   const groupHeader = (label: 'open' | 'discussed', count: number) => (
-    <div className="flex items-center justify-between gap-2 px-2 pb-1.5 pt-3 text-12 leading-4 text-[var(--text-tertiary)]">
+    <div className="flex items-center justify-between gap-2 px-2 pb-1.5 pt-3 text-12 leading-[1.333] text-[var(--text-tertiary)]">
       <span>
         {t(label === 'open' ? 'conversationMarks.groupOpen' : 'conversationMarks.groupDiscussed')}{' '}
         <span className="tabular-nums">{count}</span>
@@ -251,7 +251,7 @@ export function ConversationMarksPanel({ ctx, active, shellVisible }: TabKindBod
             <span className="flex size-10 items-center justify-center rounded-full bg-[var(--surface-chip)] text-[var(--text-secondary)]">
               <Highlighter size={18} aria-hidden />
             </span>
-            <span className="text-13 leading-5 text-[var(--text-secondary)]">{t('conversationMarks.empty')}</span>
+            <span className="text-13 leading-[1.54] text-[var(--text-secondary)]">{t('conversationMarks.empty')}</span>
           </div>
         ) : null}
         {open.length > 0 ? (

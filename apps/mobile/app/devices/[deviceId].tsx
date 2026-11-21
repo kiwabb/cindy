@@ -1,3 +1,4 @@
+import { TaskSnoozeSheet } from '@/session/TaskSnoozeSheet';
 import { getMobileAuthOwner, isMobileAuthOwnerCurrent } from '@/auth/authOwnerGeneration';
 import { readTeammateTasks } from '@/session/readTeammateTasks';
 import { deviceDisplayName } from '@/device-link/deviceName';
@@ -95,6 +96,7 @@ import { SwipeableSessionRow, type SessionSwipeControls } from '@/session/Swipea
 import type { SessionSwipeAction } from '@/session/swipeRowRegistry';
 import { useSessionListActions } from '@/session/useSessionListActions';
 import { useMobileMakerTransport } from '@/device-link/useMobileMakerTransport';
+import { isPluginEngineSessionKind, prefetchPluginEngineIcons } from '@/session/pluginEngines';
 import {
   RemoteSessionStoreSubscriptionGate,
   remoteSessionStore,
@@ -212,6 +214,13 @@ function DeviceDetailScreenContent() {
     () => selectVisibleDeviceSessions(allSessions, deviceId, projectWorkingDir),
     [allSessions, deviceId, projectWorkingDir],
   );
+  const hasPluginTasks = sessions.some((session) => session.deviceLinkDeviceId === deviceId
+    && session.status === 'active' && isPluginEngineSessionKind(session.agentKind));
+  useEffect(() => {
+    if (hasPluginTasks && screenFocused && appStateActive && status === 'online') {
+      void prefetchPluginEngineIcons(deviceId, maker);
+    }
+  }, [hasPluginTasks, screenFocused, appStateActive, status, deviceId, maker]);
   const projectName = useMemo(() => resolveMobileProjectRouteTitle({
     deviceId,
     workingDir: projectWorkingDir,
@@ -309,6 +318,7 @@ function DeviceDetailScreenContent() {
   const runDisclosure = disclosure.run;
   const animateListChange = useCallback((apply: () => void) => runDisclosure(apply, { nested: true }), [runDisclosure]);
   const {
+    snoozeSessionTarget, confirmSnooze, closeSnooze, handleSnoozeClosed,
     actionSheetSession,
     closeRenameSession,
     confirmRenameSession,
@@ -493,7 +503,10 @@ function DeviceDetailScreenContent() {
     if (automationScopeKey || !shouldReplaceListWithSearchResults(searchQuery, indexedSearch.status)) {
       return sections;
     }
-    return [{ key: 'search', title: '', data: indexedSearch.results }];
+    // An empty section still contributes header/footer cells and hides ListEmptyComponent.
+    return indexedSearch.results.length > 0
+      ? [{ key: 'search', title: '', data: indexedSearch.results }]
+      : [];
   }, [automationScopeKey, indexedSearch.results, indexedSearch.status, searchQuery, sections]);
   const listContext = useMemo(
     () => buildRemoteSessionListContext({
@@ -746,6 +759,7 @@ function DeviceDetailScreenContent() {
         visible={searchFilterOpen}
       />
       <SessionListActionOverlays
+        snoozeSessionTarget={snoozeSessionTarget} confirmSnooze={confirmSnooze} closeSnooze={closeSnooze} handleSnoozeClosed={handleSnoozeClosed}
         actionSheetSession={actionSheetSession}
         closeRenameSession={closeRenameSession}
         confirmRenameSession={confirmRenameSession}
@@ -895,7 +909,7 @@ function DeviceDetailScreenContent() {
         />
         {/* 连接提示只是零高度锚点;iOS 内容区从屏幕顶开始,锚点挪到顶栏下沿。 */}
         {usesNativeStackHeader()
-          ? <View pointerEvents="box-none" style={[styles.projectConnectionAnchor, { top: headerHeight }]}>{connectionBanner}</View>
+          ? <View pointerEvents="box-none" style={[styles.projectConnectionAnchor, { top: headerHeight, left: insets.left, right: insets.right }]}>{connectionBanner}</View>
           : connectionBanner}
         <ListDisclosureScope controller={disclosure.controller}>
           <SectionList
@@ -1434,6 +1448,7 @@ function DeviceDetailSessionRow({
 }
 
 function SessionListActionOverlays({
+  snoozeSessionTarget, confirmSnooze, closeSnooze, handleSnoozeClosed,
   actionSheetSession,
   closeRenameSession,
   confirmRenameSession,
@@ -1444,6 +1459,10 @@ function SessionListActionOverlays({
   setActionSheetSession,
   setRenameSessionDraft,
 }: {
+  snoozeSessionTarget: RemoteSession | null;
+  confirmSnooze(until: string): void;
+  closeSnooze(): void;
+  handleSnoozeClosed(): void;
   actionSheetSession: RemoteSession | null;
   closeRenameSession(): void;
   confirmRenameSession(): void;
@@ -1456,6 +1475,8 @@ function SessionListActionOverlays({
 }) {
   return (
     <>
+      <TaskSnoozeSheet visible={snoozeSessionTarget !== null} onClose={closeSnooze}
+        onClosed={handleSnoozeClosed} onConfirm={confirmSnooze} />
       <SessionOptionsPresenter
         session={actionSheetSession}
         onAction={handleSessionSheetAction}

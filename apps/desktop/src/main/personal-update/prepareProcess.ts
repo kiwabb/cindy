@@ -6,6 +6,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { validatePersonalManifest, validatePersonalIdentity, type PersonalPolicy, type PersonalManifest } from './contract.mjs';
 import { validateUpdateZip, verifyExtractedTree, readWindowsUpdateZip } from './archive.js';
 import { readLocalSigningIdentity, signLocalMacApp, writeMacEntitlements, verifyAppleDevelopmentSignature, withLocalSigningCommandRunner, readLocalSigningIdentifier } from './signing-core.mjs';
+import { personalFailureCode, personalStage, personalStageAsync, PersonalStageError } from './failure.js';
 
 export function validPersonalSmokeReceipt(value: unknown): boolean {
   if (!value || typeof value !== 'object') return false;
@@ -75,7 +76,8 @@ export function prepareWindowsPersonalUpdate(request: PreparationRequest) {
   if (request.jobDirectory !== path.join(request.outputDirectory, path.basename(request.jobDirectory))
     || !/^job-[a-f0-9-]{36}$/.test(path.basename(request.jobDirectory))
     || fs.lstatSync(request.jobDirectory).isSymbolicLink()) throw new Error('PERSONAL_UPDATE_JOB_INVALID');
-  const metadata = readWindowsUpdateZip(request.archive) as { sourceCommit?: unknown; personalUpdate?: unknown };
+  const metadata = personalStage('PERSONAL_UPDATE_ARCHIVE_INVALID',
+    () => readWindowsUpdateZip(request.archive) as { sourceCommit?: unknown; personalUpdate?: unknown });
   const identity = validatePersonalIdentity(metadata?.personalUpdate, request.policy);
   if (!isDeepStrictEqual(identity, validatePersonalIdentity(manifest, request.policy)) || metadata.sourceCommit !== identity.sourceCommit) throw new Error('PERSONAL_UPDATE_SOURCE_MISMATCH');
   const output = path.join(request.outputDirectory, `personal-${manifest.revision}.zip`);
@@ -87,15 +89,15 @@ export async function preparePersonalUpdate(request: PreparationRequest) {
   if (process.platform === 'win32') return prepareWindowsPersonalUpdate(request);
   process.env.CINDY_UPDATE_SUPERVISOR_LEDGER = path.join(request.jobDirectory, 'supervisors');
   const helper = '/Applications/Cindy.app/Contents/Resources/tools/personal-update/swap-apps';
-  const signing = readLocalSigningIdentity();
+  const signing = personalStage('PERSONAL_UPDATE_SIGNING_IDENTITY_UNAVAILABLE', () => readLocalSigningIdentity());
   const teamId = signing.teamId;
-  if (signing.signingKind !== 'apple-development' || typeof teamId !== 'string') throw new Error('PERSONAL_UPDATE_REQUIRES_APPLE_DEVELOPMENT');
-  verifyAppleDevelopmentSignature('/Applications/Cindy.app', 'com.xd.cindy', teamId);
-  verifyAppleDevelopmentSignature(helper, readLocalSigningIdentifier(helper, '/Applications/Cindy.app'), teamId);
-  const manifest = validatePersonalManifest(request.manifest, request.policy);
+  if (signing.signingKind !== 'apple-development' || typeof teamId !== 'string') throw new PersonalStageError('PERSONAL_UPDATE_REQUIRES_APPLE_DEVELOPMENT');
+  personalStage('PERSONAL_UPDATE_INSTALLED_APP_SIGNATURE', () => verifyAppleDevelopmentSignature('/Applications/Cindy.app', 'com.xd.cindy', teamId));
+  personalStage('PERSONAL_UPDATE_HELPER_SIGNATURE', () => verifyAppleDevelopmentSignature(helper, readLocalSigningIdentifier(helper, '/Applications/Cindy.app'), teamId));
+  const manifest = personalStage('PERSONAL_UPDATE_ARCHIVE_INVALID', () => validatePersonalManifest(request.manifest, request.policy));
   if (manifest.storageIdentity !== request.storageIdentity) throw new Error('PERSONAL_UPDATE_STORAGE_INCOMPATIBLE');
   if (fs.statSync(request.archive).size !== manifest.asset.size || fileSha256(request.archive) !== manifest.asset.sha256) throw new Error('PERSONAL_UPDATE_ARCHIVE_HASH');
-  validateUpdateZip(request.archive);
+  personalStage('PERSONAL_UPDATE_ARCHIVE_INVALID', () => validateUpdateZip(request.archive));
   fs.mkdirSync(request.outputDirectory, { recursive: true, mode: 0o700 });
   if (request.jobDirectory !== path.join(request.outputDirectory, path.basename(request.jobDirectory))
     || !/^job-[a-f0-9-]{36}$/.test(path.basename(request.jobDirectory))
@@ -103,11 +105,14 @@ export async function preparePersonalUpdate(request: PreparationRequest) {
   const staging = path.join(request.jobDirectory, 'stage');
   fs.mkdirSync(staging, { mode: 0o700 });
   try {
-    command('/usr/bin/ditto', ['-x', '-k', request.archive, staging], helper);
     const appPath = path.join(staging, 'Cindy.app');
-    verifyExtractedTree(appPath);
-    const metadata = JSON.parse(fs.readFileSync(path.join(appPath, 'Contents', 'Resources', 'cindy-source.json'), 'utf8'));
-    const identity = validatePersonalIdentity(metadata.personalUpdate, request.policy);
+    personalStage('PERSONAL_UPDATE_EXTRACT_FAILED', () => {
+      command('/usr/bin/ditto', ['-x', '-k', request.archive, staging], helper);
+      verifyExtractedTree(appPath);
+    });
+    const metadata = personalStage('PERSONAL_UPDATE_SOURCE_MISMATCH',
+      () => JSON.parse(fs.readFileSync(path.join(appPath, 'Contents', 'Resources', 'cindy-source.json'), 'utf8')));
+    const identity = personalStage('PERSONAL_UPDATE_SOURCE_MISMATCH', () => validatePersonalIdentity(metadata.personalUpdate, request.policy));
     if (JSON.stringify(identity) !== JSON.stringify(validatePersonalIdentity(manifest, request.policy)) || metadata.sourceCommit !== identity.sourceCommit) throw new Error('PERSONAL_UPDATE_SOURCE_MISMATCH');
     const bundle = spawnSync(helper, ['--run', String(process.pid), '30', '/usr/libexec/PlistBuddy', '-c', 'Print :CFBundleIdentifier', path.join(appPath, 'Contents', 'Info.plist')], { encoding: 'utf8', timeout: 40_000 });
     if (bundle.status !== 0 || bundle.stdout.trim() !== manifest.bundleIdentifier) throw new Error('PERSONAL_UPDATE_BUNDLE');
@@ -117,23 +122,27 @@ export async function preparePersonalUpdate(request: PreparationRequest) {
     writeMacEntitlements(helperEntitlements);
     writeMacEntitlements(mainEntitlements, { appleEvents: true });
     const deadline = Date.now() + 25 * 60_000;
-    withLocalSigningCommandRunner((exe, args, options) => {
+    personalStage('PERSONAL_UPDATE_RESIGN_FAILED', () => withLocalSigningCommandRunner((exe, args, options) => {
       const seconds = Math.min(120, Math.floor((deadline - Date.now()) / 1000));
       if (seconds < 1) throw new Error('PERSONAL_UPDATE_SIGNING_TIMEOUT');
       return spawnSync(helper, ['--run', String(process.pid), String(seconds), exe, ...args],
         { ...options, timeout: (seconds + 10) * 1000, killSignal: 'SIGTERM', maxBuffer: 64 * 1024 * 1024 });
-    }, () => signLocalMacApp(appPath, helperEntitlements, mainEntitlements, signing));
-    await smoke(appPath, helper, request.jobDirectory);
+    }, () => signLocalMacApp(appPath, helperEntitlements, mainEntitlements, signing)));
+    await personalStageAsync('PERSONAL_UPDATE_SIGNED_SMOKE_FAILED', () => smoke(appPath, helper, request.jobDirectory));
     const output = path.join(request.outputDirectory, `personal-${manifest.revision}.zip`);
-    const temporary = path.join(staging, 'signed.zip');
-    command('/usr/bin/ditto', ['-c', '-k', '--keepParent', appPath, temporary], helper);
-    const sha256 = fileSha256(temporary), size = fs.statSync(temporary).size;
-    fs.renameSync(temporary, output);
-    return { path: output, sha256, size, identity, teamId };
+    return personalStage('PERSONAL_UPDATE_PACKAGE_FAILED', () => {
+      const temporary = path.join(staging, 'signed.zip');
+      command('/usr/bin/ditto', ['-c', '-k', '--keepParent', appPath, temporary], helper);
+      const sha256 = fileSha256(temporary), size = fs.statSync(temporary).size;
+      fs.renameSync(temporary, output);
+      return { path: output, sha256, size, identity, teamId };
+    });
   } finally { fs.rmSync(staging, { recursive: true, force: true }); }
 }
 
 const port = (process as unknown as { parentPort?: { once: (event: string, handler: (event: { data: PreparationRequest }) => void) => void; postMessage: (data: unknown) => void } }).parentPort;
 port?.once('message', event => {
-  void preparePersonalUpdate(event.data).then(result => { port.postMessage({ ok: true, result }); }, () => { port.postMessage({ ok: false, error: 'PERSONAL_UPDATE_PREPARATION_FAILED' }); });
+  // Only a fixed failure code crosses the process boundary; underlying messages can name paths and certificates.
+  void preparePersonalUpdate(event.data).then(result => { port.postMessage({ ok: true, result }); },
+    error => { port.postMessage({ ok: false, error: personalFailureCode(error instanceof Error ? error.message : undefined) }); });
 });

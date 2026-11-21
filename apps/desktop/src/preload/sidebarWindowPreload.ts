@@ -296,6 +296,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openExternal: (url: string): Promise<unknown> => ipcRenderer.invoke('shell:open-external', url),
   openFileInBrowser: (pathOrUrl: string): Promise<unknown> => ipcRenderer.invoke('shell:open-file-in-browser', pathOrUrl),
   openPath: (pathOrUrl: string) => invokeOpenPath(ipcRenderer.invoke.bind(ipcRenderer), pathOrUrl),
+  openSystemPreview: (filePath: string): Promise<boolean> =>
+    ipcRenderer.invoke('file:system-preview', filePath),
+  getFileThumbnail: (params: { path: string; size: number; revalidate?: boolean }): Promise<{
+    dataUrl: string | null; byteSize: number;
+  } | null> => ipcRenderer.invoke('file:thumbnail', params),
   showItemInFolder: (params: unknown): Promise<unknown> => ipcRenderer.invoke('shell:show-item-in-folder', params),
   copyPngToClipboard: (params: CopyPngToClipboardParams): Promise<void> =>
     ipcRenderer.invoke(COPY_PNG_TO_CLIPBOARD_CHANNEL, params),
@@ -480,6 +485,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 鈹€鈹€ RSB browser bridge(WebView 鎵胯浇) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
   rsbBrowserBridge: {
+    reportPreviewOpener: (input: import('../shared/rsbBrowserBridge').RsbFilePreviewReportPayload): Promise<unknown> =>
+      ipcRenderer.invoke('rsb-browser-bridge:report-file-preview-opener', input),
     report: (input: {
       sessionId: string;
       tabId: string;
@@ -636,6 +643,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     push: (params: unknown): Promise<unknown> => ipcRenderer.invoke('git-review:push', params),
   },
   maker: {
+    mcpApps: (sessionId: string | null, input: unknown): Promise<unknown> => ipcRenderer.invoke('maker:mcp-apps:v1', sessionId, input),
+    onPluginUiAction: (cb: (input: unknown) => void) => onPayload('plugin-ui:action', cb),
+    onPluginUiState: (cb: (input: { epoch: string; updates: import('../shared/pluginUi').PluginUiStateChange[] }) => void) => onPayload('plugin-ui:state', cb),
     // Read-only catalogs needed by the same model selector used in the main window.
     listProviders: () => ipcRenderer.invoke('maker:provider:list'),
     // The shared catalog reader needs the same owner lease even when legacy migration is deferred.

@@ -30,7 +30,7 @@ function ConversationMarksPillTitle({ t, sessionId }: { state: ConversationMarks
     <>
       {t('conversationMarks.title')}
       {open > 0 ? (
-        <span className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--surface-chip)] px-1 text-[10px] font-medium tabular-nums leading-none text-[var(--text-primary)]">
+        <span className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--surface-chip)] px-1 text-10 font-medium tabular-nums leading-none text-[var(--text-primary)]">
           {open}
         </span>
       ) : null}
