@@ -5181,6 +5181,21 @@ describe('repeatable environment notes are sent only when they change', () => {
     expect(sentAt(session, 1)).not.toContain('[UI language]');
   });
 
+  it('passes a proactive assistant row to the next engine turn and restores the note after a reset', async () => {
+    const note = '[Companion chat context] Scheduled fixture reply';
+    const { session, transaction, memory } = setup({
+      readCompanionOutreachNote: vi.fn(async () => note),
+    });
+    await transaction.sendToAgentAccepted('session-1', 'my answer');
+    await transaction.sendToAgentAccepted('session-1', 'another message');
+    expect(sentAt(session, 0)).toContain(note);
+    expect(sentAt(session, 0)).toContain('my answer');
+    expect(sentAt(session, 1)).not.toContain(note);
+    memory.reset('session-1');
+    await transaction.sendToAgentAccepted('session-1', 'after restart');
+    expect(sentAt(session, 2)).toContain(note);
+  });
+
   it('leaves slash-command turns alone without marking the notes as seen', async () => {
     const session = createSession({ agentKind: 'claude-code' });
     const { transaction } = setup({ getSession: vi.fn(() => session) });
@@ -5306,6 +5321,15 @@ describe('companion registered send assembly regression', () => {
         finishNativeFactMemoryTurn(live as any,generation,'completed');
         finishCompanionStateTurn(live as any,generation,'completed',`assistant-${generation}`);
       }
+      // A selected request controller can inspect or reroute the provider payload.
+      // This real send entry must leave private processing out of that turn.
+      deps.prepareRuntimeTurn = async () => ({ options: { [MODEL_REQUEST_CONTROL]: async () => ({}) } });
+      const controlled = 'fixture authored controlled turn';
+      await expect(tx.sendToAgentAccepted(live.id, controlled, undefined, {
+        persistUserMessage: { clientId: 'fixture-controlled', content: controlled },
+        [AUTO_REVIEW_SOURCE_CONTENT]: controlled,
+      })).resolves.toMatchObject({ accepted: true });
+      expect(prepare).toHaveBeenCalledTimes(2);
       expect(ensure).toHaveBeenCalledTimes(2);expect(finish).toHaveBeenCalledTimes(2);expect(drain).toHaveBeenCalledTimes(2);expect(completedState).toHaveBeenCalledTimes(2);
       expect(completedState.mock.calls[1][0]).toMatchObject({instanceId:'rebuilt-fixture-instance',generation:2,logicalTurnId:'fixture-client-2'});
     } finally {unbind();unbindState();}

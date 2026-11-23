@@ -1306,6 +1306,7 @@ import { buildCompletedPlanGuardNote, buildPlanReconcileNote } from './planRecon
 import { peekGoalInactiveNote } from '../goal-host/inactiveNote.js';
 import { readReplyQuoteNote, REPLY_QUOTE_SOURCE_CONTENT } from './chatReplyQuoteNote.js';
 import { readBotDmThreadContextNote } from './botDmThreadContext.js';
+import { readCompanionOutreachNote } from '../scheduler-host/companionOutreachHost.js';
 import { readTurnUsageResetAt } from '../goal-host/usageLimit.js';
 import { resolveSessionUsageReset } from './sessionUsageReset.js';
 import {
@@ -6038,24 +6039,40 @@ const memoryPreview = createCompanionMemoryPreview({
     const assertCurrent = () => { if (!owner || isAppSessionBoundaryPending() || getActiveAppSession().dataOwnerId !== owner || activeOwnerScopeKey() !== epoch || ownerScopedUserDataPath() !== root) throw Error('MEMORY_PREVIEW_OWNER_CHANGED'); };
     assertCurrent(); return { id:owner!, root, assertCurrent };
   },
-  target: async botId => {
+  target: async (botId, savedRoute) => {
     const ownerId = getActiveAppSession().dataOwnerId, epoch = activeOwnerScopeKey();
     const [bot] = await getDbClient().drizzle.select().from(botProfiles).where(eq(botProfiles.id, botId)).limit(1);
     if (!ownerId || !bot || bot.status !== 'active' || !bot.canonicalSessionId) throw Error('MEMORY_PREVIEW_BOT_REQUIRED');
+    if (!await readTeammateProjectMode(botId)) throw Error('MEMORY_PREVIEW_PRIVATE_SCOPE_UNAVAILABLE');
     const [row] = await getDbClient().drizzle.select().from(sessions).where(eq(sessions.id, bot.canonicalSessionId)).limit(1);
-    if (!row || row.agentKind !== 'codex' || row.remoteHostId || row.source !== 'bot' || !row.model || !row.providerId) throw Error('MEMORY_PREVIEW_LOCAL_CODEX_REQUIRED');
-    if(row.providerId!=='openai')throw Error('MEMORY_PREVIEW_OPENAI_SUBSCRIPTION_REQUIRED');
-    if(row.agentDeviceId) {
-      if(!/^[a-f0-9]{64}$/.test(row.agentDeviceId))throw Error('MEMORY_PREVIEW_OWN_DEVICE_REQUIRED');
-      await readRemoteProviderRoute({agentDeviceId:row.agentDeviceId,agentKind:'codex',model:row.model,providerId:'openai'});
+    if (!row || row.remoteHostId || row.source !== 'bot' || !row.model || !row.providerId
+      || (row.agentKind !== 'codex' && row.agentKind !== 'pi')
+      || (row.agentKind === 'pi' && row.agentDeviceId)) throw Error('MEMORY_PREVIEW_ENGINE_UNAVAILABLE');
+    const live = getMakerIfReady()?.getSession(row.id);
+    if (live?.supportsHostTurnContext === false) throw Error('MEMORY_PREVIEW_CONTEXT_UNAVAILABLE');
+    const route = savedRoute ?? {
+      providerId: 'openai', protocol: 'cindy-subscription' as const,
+      model: row.agentKind === 'codex' && row.providerId === 'openai' ? row.model : 'gpt-6.2-sol',
+      agentDeviceId: row.agentKind === 'codex' && row.providerId === 'openai' ? row.agentDeviceId ?? null : null,
+    };
+    if (route.protocol !== 'cindy-subscription' || route.providerId !== 'openai')
+      throw Error('MEMORY_PREVIEW_OPENAI_SUBSCRIPTION_REQUIRED');
+    if (route.agentDeviceId) {
+      // The legacy remote utility RPC is still tied to its exact Codex session.
+      if (!/^[a-f0-9]{64}$/.test(route.agentDeviceId) || row.agentKind !== 'codex' || row.agentDeviceId !== route.agentDeviceId
+        || row.providerId !== route.providerId || row.model !== route.model)
+        throw Error('MEMORY_PREVIEW_REMOTE_ROUTE_UNAVAILABLE');
+      await readRemoteProviderRoute({ agentDeviceId: route.agentDeviceId, agentKind: 'codex', model: route.model, providerId: 'openai' });
     } else {
-      const catalogProvider=getActiveCatalog().providers.find(p=>p.id==='openai');
-      const providers=await getDesktopProviderService().listProviders({allowSideEffects:false,catalog:getActiveCatalog()});
-      const provider=providers.find(p=>p.id==='openai');
-      if(catalogProvider?.access?.kind!=='subscription'||!provider?.connected||provider.suspended||!provider.models.codex?.some(model=>model.id===row.model))throw Error('MEMORY_PREVIEW_SUBSCRIPTION_UNAVAILABLE');
+      const catalog = getActiveCatalog();
+      const catalogProvider = catalog.providers.find(p => p.id === 'openai');
+      const providers = await getDesktopProviderService().listProviders({ allowSideEffects: false, catalog });
+      const provider = providers.find(p => p.id === 'openai');
+      if (catalogProvider?.access?.kind !== 'subscription' || !provider?.connected || provider.suspended
+        || !provider.models.codex?.some(model => model.id === route.model)) throw Error('MEMORY_PREVIEW_SUBSCRIPTION_UNAVAILABLE');
     }
     if (epoch !== activeOwnerScopeKey() || isAppSessionBoundaryPending()) throw Error('MEMORY_PREVIEW_OWNER_CHANGED');
-    return {ownerId,botId,sessionId:row.id,route:{providerId:'openai',model:row.model,protocol:'cindy-subscription',agentDeviceId:row.agentDeviceId??null}};
+    return { ownerId, botId, sessionId: row.id, route };
   },
   botForSession: async sessionId => {
     const [bot] = await getDbClient().drizzle.select({id:botProfiles.id}).from(botProfiles).where(eq(botProfiles.canonicalSessionId, sessionId)).limit(1);
@@ -11915,9 +11932,17 @@ export function registerMakerIpc(maker: Maker, options: RegisterMakerIpcOptions)
             { visibleText: source.persistedText ?? message },
           )
         : null;
-      const outgoingMessage: UserMessage = sourceNote
+      const sourced = sourceNote
         ? (prependNoteToWireUserMessage(withHandoff as HandoffWireMessage, sourceNote) as UserMessage)
         : withHandoff;
+      const followUp = shouldPrependMobileClientPromptNote(message, session.agentKind)
+        ? await readCompanionOutreachNote(session.id).catch(() => null) : null;
+      const notePlan = wireNoteMemory.plan(session.id, { 'companion-follow-up': followUp }, {
+        partial: true, force: !!pendingHandoff,
+      });
+      const outgoingMessage = notePlan.notes['companion-follow-up']
+        ? prependNoteToWireUserMessage(sourced as HandoffWireMessage, notePlan.notes['companion-follow-up']) as UserMessage
+        : sourced;
       // Idle direct sends never carry internal coordination (that is force-queued).
       const releaseTurnSource = noteChannelTurnSource(session.id, channelTurnSourceFor(source?.origin, false));
       try {
@@ -11954,6 +11979,7 @@ export function registerMakerIpc(maker: Maker, options: RegisterMakerIpcOptions)
           agentHandoffPending.consume(session.id);
         }
         if (sendResult.accepted) {
+          if (shouldPrependMobileClientPromptNote(message, session.agentKind)) notePlan.commit();
           void touchSessionActivityInDb(session.id);
         }
         return sendResult;
@@ -18146,6 +18172,7 @@ export function registerMakerIpc(maker: Maker, options: RegisterMakerIpcOptions)
     readReplyQuoteNote,
     // 私聊话题的 [话题说明]:按持久化的话题链接现读,不是话题时为 null。
     readBotThreadNote: readBotDmThreadContextNote,
+    readCompanionOutreachNote,
     readInputHandoffOwnerNote: (sessionId) =>
       getDeviceLinkInvokeContext()?.sharedTask ? null : (getInputHandoffService()?.ownerMessageNote(sessionId) ?? null),
     inputHandoffOwnerNoteDelivered: (sessionId) => getInputHandoffService()?.ownerMessageNoteDelivered(sessionId),

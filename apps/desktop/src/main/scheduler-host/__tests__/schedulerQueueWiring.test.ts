@@ -48,6 +48,11 @@ vi.mock('../../maker-ipc/register.js', () => ({
   isSchedulerTargetSessionBusy: vi.fn(), onSchedulerAutoResumeFailed: vi.fn(),
   removeQueuedSchedulerPrompt: vi.fn(),
 }));
+// The queue wiring below exercises ordinary schedules. The follow-up host has
+// its own SQLite integration test and is isolated here like the other services.
+vi.mock('../companionOutreachHost.js', () => ({
+  withCompanionFollowUps: (runner: unknown) => runner,
+}));
 vi.mock('../storage.desktop', () => ({ DrizzleScheduleStorage: class {
   async deleteOrphanRuns() { return 0; }
 } }));

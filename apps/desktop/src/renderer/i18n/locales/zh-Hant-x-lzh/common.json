@@ -11105,7 +11105,7 @@
       "sourcePrivate": "夥伴私憶",
       "previewLabel": "私憶預覽",
       "previewHint": "答畢，以此夥伴所選 OpenAI 訂閱模型（{{model}}）整理君之事實，另有一次模型請求。所選模型之電腦須在線且許存取。關閉後，舊憶仍可管理。",
-      "previewUnavailable": "請明確選用本機或同帳號他機之 OpenAI 訂閱與 Codex 模型。來源不可用則暫停整理，不轉公司或後備模型。改選後請關閉再啟。",
+      "previewUnavailable": "私憶須同伴用專案模式，且 Codex 或 Pi 支援之。整理尚須有可用之 OpenAI 訂閱模型。",
       "previewError": "設定未能儲存，或已變更。請重開此頁，讀取現選。",
       "privateHint": "此憶專屬此夥伴，專案他務不用。查看、修改不啟自動整理。",
       "privateDeleteBoundary": "所衍摘要與檢索條目亦清除，舊日對話仍存。",
@@ -12664,7 +12664,16 @@
       "failed": "自運讀取未成。",
       "toggle": "啟「{{name}}」",
       "manage": "於自運之頁管理",
-      "create": "往自運之頁新建"
+      "create": "往自運之頁新建",
+      "followUp": {
+        "cancelled": "已罷",
+        "title": "約言談續問一回",
+        "description": "至約時，就所定之事在主言談發一訊。依上海時 08:00–22:00，日不逾二訊，相隔至少三時。主言談方忙，或逾約一時，則略之。",
+        "topic": "所問之事",
+        "time": "約時（上海）",
+        "save": "定續問",
+        "entry": "言談續問 · {{topic}}"
+      }
     }
   },
   "common": {

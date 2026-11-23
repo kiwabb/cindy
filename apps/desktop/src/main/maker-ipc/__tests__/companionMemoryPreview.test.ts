@@ -45,6 +45,9 @@ function fixture() {
     changeOwner() {
       current = false;
     },
+    changeCanonicalSession(sessionId: string) {
+      target = { ...target, sessionId };
+    },
     changeRoute() {
       target = { ...target, route: { ...target.route, model: 'changed-model' } };
     },
@@ -202,4 +205,24 @@ it('memory failure does not swallow an owner change', async () => {
   const f=fixture(); await f.preview.set('bot-fixture', true, 'none');
   f.deps.activate.mockImplementation(async()=>{f.changeOwner();throw Error('STORE_FAILED');});
   await expect(f.preview.ensure('session-fixture')).rejects.toThrow('OWNER_CHANGED');
+});
+
+// A canonical session can be replaced on an engine switch. The owner/bot
+// preference remains authoritative and the old session cannot retain a binding.
+it('rebinds the same selected analysis route after the canonical session changes', async () => {
+  const f = fixture();
+  const enabled = await f.preview.set('bot-fixture', true, 'none');
+  await f.preview.ensure('session-fixture');
+  const oldSelection = f.deps.activate.mock.calls.length;
+  f.changeCanonicalSession('pi-session-fixture');
+  await f.preview.ensure('pi-session-fixture');
+  expect(f.deps.activate.mock.calls.length).toBe(oldSelection + 1);
+  expect(f.deps.activate).toHaveBeenLastCalledWith(expect.objectContaining({
+    sessionId: 'pi-session-fixture', route: expect.objectContaining({ model: enabled.model }),
+  }));
+  expect(f.deps.deactivate).toHaveBeenCalledWith('session-fixture');
+  await f.preview.ensure('session-fixture');
+  expect(f.deps.activate).toHaveBeenCalledTimes(2);
+  await f.preview.set('bot-fixture', false, enabled.revision);
+  expect(f.deps.deactivate).toHaveBeenCalledWith('pi-session-fixture');
 });

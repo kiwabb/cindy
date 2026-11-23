@@ -516,6 +516,7 @@ export interface MakerSendTransactionDeps {
    * 与 `[客户端说明]` 同层,只进 wire 消息。
    */
   readBotThreadNote?(sessionId: string): Promise<PrivateChatContext | null>;
+  readCompanionOutreachNote?(sessionId: string): Promise<string | null>;
   /** The owner's message closed a waiting 代输入 card: the agent hears it here, with no turn of its own. */
   readInputHandoffOwnerNote?(sessionId: string): string | null;
   inputHandoffOwnerNoteDelivered?(sessionId: string): void;
@@ -1638,6 +1639,9 @@ export function createMakerSendTransaction(deps: MakerSendTransactionDeps): Make
           ? SIDE_CHAT_CONTEXT : null,
         // Use both text and image identity to detect edits to a topic root.
         'bot-thread': botThreadNote ? JSON.stringify([botThreadNote.text, botThreadNote.imageUrls]) : null,
+        'companion-follow-up': allowsEnvironmentNotes
+          ? ((await deps.readCompanionOutreachNote?.(sessionId).catch(() => null)) ?? null)
+          : null,
         'client-environment': mobileClientNote,
         'cindy-make': cindyMakeNote,
       };
@@ -1660,6 +1664,9 @@ export function createMakerSendTransaction(deps: MakerSendTransactionDeps): Make
       }
       if (plannedNotes['bot-thread'] && botThreadNote) {
         outgoing = await prependPrivateChatContext(outgoing as HandoffWireMessage, botThreadNote, sessionId, deps.prepareSendUserMessage);
+      }
+      if (plannedNotes['companion-follow-up']) {
+        outgoing = prependNoteToWireUserMessage(outgoing as HandoffWireMessage, plannedNotes['companion-follow-up']);
       }
       // The note belongs to the message that closed the card. A native command (a slash input) keeps its
       // first characters, so it carries no note and the note is dropped rather than left for the next message.
@@ -1895,11 +1902,14 @@ export function createMakerSendTransaction(deps: MakerSendTransactionDeps): Make
         // another Cindy row. Keep later manual Retry attached to the active entry.
         const transcriptUserClientId = persistUserMessage?.clientId
           ?? (so[PI_CACHE_RECOVERY_EXPECTATION] ? so.retryUserClientId : undefined);
-        await deps.ensureCompanionMemory?.(sessionId);
-        const nativeFactUserSource = readNativeFactUserSource(mainOwnedSendContext, persistUserMessage, so.retryUserClientId,
-          { ordinary: isOrdinaryUserTurn, authoredText: so[AUTO_REVIEW_SOURCE_CONTENT], remote: so.fromMobileClient === true || so.fromDeviceLinkClient === true });
+        // A per-request controller can inspect or reroute the provider payload.
+        // Keep the private recall and post-reply processing on the owner's ordinary route.
+        const usesPrivateMemoryRoute = !so[MODEL_REQUEST_CONTROL];
+        if (usesPrivateMemoryRoute) await deps.ensureCompanionMemory?.(sessionId);
+        const nativeFactUserSource = usesPrivateMemoryRoute && isOrdinaryUserTurn ? readNativeFactUserSource(mainOwnedSendContext, persistUserMessage, so.retryUserClientId,
+          { ordinary: isOrdinaryUserTurn, authoredText: so[AUTO_REVIEW_SOURCE_CONTENT], remote: so.fromMobileClient === true || so.fromDeviceLinkClient === true }) : undefined;
         const prepareMemory = getNativeMemoryTurnPreparation(sess);
-        if (prepareMemory) {
+        if (usesPrivateMemoryRoute && prepareMemory && (nativeFactUserSource || so[MEMORY_RECOVERY])) {
           const requestId = so.retryUserClientId ?? persistUserMessage?.clientId ?? so.messageUuid;
           if (!requestId) throw new Error('MEMORY_TURN_REQUEST_ID_REQUIRED');
           const recovery = so[MEMORY_RECOVERY]

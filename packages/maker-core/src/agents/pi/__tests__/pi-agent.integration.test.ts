@@ -26,8 +26,10 @@ import {
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { zstdDecompressSync } from 'node:zlib';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
+import { HOST_TURN_CONTEXT } from '../../shared/host-turn-context.js';
 import { PiAgent } from '../index.js';
 import { ANSWER_DELIVERY_PROMPT, PI_ANSWER_DELIVERY_PROMPT } from '@cindy/maker-shared/rich-answer-guide';
 import { PiRpcProcess } from '../rpc-client.js';
@@ -358,9 +360,11 @@ describe.skipIf(!piAvailable)('PiAgent integration (real pi binary + fake gatewa
   beforeAll(async () => {
     agentHome = mkdtempSync(path.join(tmpdir(), 'pi-agent-int-'));
     server = createServer((req, res) => {
-      let body = '';
-      req.on('data', (c) => { body += c; });
+      const chunks: Buffer[] = [];
+      req.on('data', (chunk: Buffer) => { chunks.push(chunk); });
       req.on('end', () => {
+        const bytes = Buffer.concat(chunks);
+        const body = (req.headers['content-encoding'] === 'zstd' ? zstdDecompressSync(bytes) : bytes).toString();
         seenRequests.push({
           url: req.url ?? '',
           headers: req.headers,
@@ -448,6 +452,60 @@ describe.skipIf(!piAvailable)('PiAgent integration (real pi binary + fake gatewa
       resolvePiGatewayModelApi: () => 'anthropic-messages',
     };
   }
+
+  // Native Pi integration: the private payload must reach the provider system
+  // field, stay out of user history, and clear on the next input. A handle mock
+  // cannot detect regressions in Pi's hook or transcript handling.
+  it('adds private host context for one Pi input and clears it on the next', { timeout: 30_000 }, async () => {
+    const workingDir = mkdtempSync(path.join(tmpdir(), 'pi-host-context-'));
+    const fixtureFile = path.join(workingDir, 'fact-check.txt');
+    writeFileSync(fixtureFile, 'fixture');
+    let handle: AgentSessionHandle | undefined;
+    try {
+      handle = await new PiAgent(buildDeps()).startSession({
+        sessionId: 'private-host-context', workingDir, model: 'pi-test-model', permissionMode: 'bypassPermissions',
+        botProfilePrompt: 'Fixture owner-private identity',
+        [TASK_SYSTEM_PROMPT]: 'FIXTURE_STATIC_TASK_FRAGMENT',
+        readPiCompanionLifeSlot: async () => ({
+          date: '2026-11-20', timezone: 'UTC', start: '10:00', end: '11:00', activity: 'FIXTURE_SCHEDULE',
+        }),
+        botRuntimeProfile: {
+          botId: 'fixture', profileVersion: 1, projectContext: true, piOwnerPrivateChat: true,
+          skillPolicy: { mode: 'inherit', configured: [], catalog: [] },
+          mcpPolicy: { mode: 'inherit', configured: [], catalog: [] },
+          toolsetPolicy: { mode: 'inherit', configured: [], catalog: [] },
+        },
+      });
+      const send = async (text: string, memory?: string) => {
+        const current = handle!;
+        const settled = (async () => { for await (const e of current.events()) if (e.type === 'done') break; })();
+        await current.send({ type: 'user', content: text }, memory
+          ? { [HOST_TURN_CONTEXT]: { requestId: 'fixture', text: memory } } : undefined);
+        await settled;
+        return JSON.parse(seenRequests.at(-1)!.body);
+      };
+      await vi.waitFor(() => expect(handle!.supportsHostTurnContext).toBe(true));
+      const memory = 'PRIVATE_TURN_CANARY';
+      const firstRequest = seenRequests.length;
+      scriptedResponses.push(anthropicToolUseBody('read', { path: fixtureFile }), anthropicStreamBody('fixture reply'));
+      await send('first private turn', memory);
+      const requests = seenRequests.slice(firstRequest).map(request => JSON.parse(request.body));
+      expect(requests).toHaveLength(2);
+      for (const request of requests) {
+        expect(JSON.stringify(request.system)).toContain(memory);
+        expect(JSON.stringify(request.system)).toContain('FIXTURE_SCHEDULE');
+        expect(JSON.stringify(request.system)).toContain('FIXTURE_STATIC_TASK_FRAGMENT');
+        expect(JSON.stringify(request.messages)).not.toContain(memory);
+      }
+      const next = await send('next turn without context');
+      expect(JSON.stringify(next.system)).toContain('FIXTURE_SCHEDULE');
+      expect(JSON.stringify(next)).not.toContain(memory);
+    } finally {
+      await handle?.close();
+      scriptedResponses.length = 0;
+      rmSync(workingDir, { recursive: true, force: true });
+    }
+  });
 
   // #9043: unlike the RPC fake, this exercises generated models.json through
   // native Google serialization. The loopback always returns synthetic success;
@@ -1334,6 +1392,108 @@ describe.skipIf(!piAvailable)('PiAgent integration (real pi binary + fake gatewa
     },
   );
 
+  it.each(['anthropic-messages', 'openai-responses'] as const)(
+    'replaces only the native identity on an existing owner chat with %s',
+    { timeout: 45_000 },
+    async api => {
+      const workingDir = mkdtempSync(path.join(tmpdir(), 'pi-companion-identity-'));
+      writeFileSync(path.join(workingDir, 'AGENTS.md'), 'Project context verification marker.');
+      const deps = buildDeps();
+      deps.resolvePiGatewayModelApi = () => api;
+      const agent = new PiAgent(deps);
+      let slotReads = 0;
+      let available = true;
+      const opts = {
+        readPiCompanionLifeSlot: async () => {
+          slotReads += 1;
+          return available ? {
+            date: '2026-11-20', timezone: 'Asia/Shanghai', start: '09:00', end: '10:00',
+            activity: 'Illustration slot marker <plan>',
+          } : undefined;
+        },
+        sessionId: 'companion-identity', workingDir, model: 'pi-test-model', providerId: 'xd',
+        botProfilePrompt: 'You are the fictional companion Mira.',
+        botRuntimeProfile: {
+          botId: 'fixture', profileVersion: 1, projectContext: true,
+          skillPolicy: { mode: 'inherit' as const, configured: [], catalog: [] },
+          mcpPolicy: { mode: 'inherit' as const, configured: [], catalog: [] },
+          toolsetPolicy: { mode: 'inherit' as const, configured: [], catalog: [] },
+        },
+      };
+      let handle: AgentSessionHandle | undefined;
+      try {
+        const send = async (text: string, kind: 'user' | 'scheduler' = 'user') => {
+          const current = handle!;
+          const settled = (async () => { for await (const event of current.events()) if (event.type === 'done') break; })();
+          await current.send({ type: 'user', content: text }, { origin: { kind } });
+          await settled;
+          return JSON.parse(seenRequests.at(-1)!.body);
+        };
+        const system = (body: {
+          system?: Array<{ text: string }>;
+          instructions?: string;
+          input?: Array<{ role?: string; content?: string | Array<{ text?: string }> }>;
+        }) => body.instructions ?? body.system?.map(block => block.text).join('\n')
+          ?? body.input?.filter(item => item.role === 'system' || item.role === 'developer')
+            .map(item => typeof item.content === 'string' ? item.content : item.content?.map(part => part.text).join(''))
+            .join('\n') ?? '';
+        handle = await agent.startSession(opts);
+        const legacy = await send('first turn in existing history');
+        expect(system(legacy)).toMatch(/^You are (an expert|a) coding assistant/);
+        expect(slotReads).toBe(0);
+        expect(system(legacy)).not.toContain('<companion_life_plan>');
+        const resumeSessionId = handle.id;
+        await handle.close();
+        handle = await agent.startSession({
+          ...opts, resumeSessionId,
+          botProfilePrompt: 'You are the fictional companion Mira, updated profile.',
+          botRuntimeProfile: { ...opts.botRuntimeProfile, profileVersion: 2, piOwnerPrivateChat: true },
+        });
+        const before = seenRequests.length;
+        if (api === 'anthropic-messages') {
+          scriptedResponses.push(anthropicToolUseBody('read', { path: path.join(workingDir, 'AGENTS.md') }));
+        }
+        const resumed = await send('inspect a file for me');
+        const turnRequests = seenRequests.slice(before).map(request => JSON.parse(request.body));
+        expect(turnRequests).toHaveLength(api === 'anthropic-messages' ? 2 : 1);
+        expect(slotReads).toBe(1);
+        for (const body of turnRequests) {
+          expect(system(body)).toContain('<companion_life_plan>');
+          expect(system(body)).toContain('not a completed action');
+          expect(system(body)).toContain('Illustration slot marker');
+          expect(system(body)).not.toContain('<plan>');
+        }
+        expect(handle.id).toBe(resumeSessionId);
+        expect(system(resumed)).toMatch(/^You are the companion described/);
+        expect(system(resumed)).not.toMatch(/You are (an expert|a) coding assistant/);
+        expect(system(resumed)).toContain('updated profile');
+        for (const section of ['tools', 'rules', 'docs']) {
+          expect(system(resumed).match(new RegExp('<' + section + '>[\\s\\S]*?</' + section + '>'))?.[0])
+            .toBe(system(legacy).match(new RegExp('<' + section + '>[\\s\\S]*?</' + section + '>'))?.[0]);
+          expect(system(resumed)).toContain('<' + section + '>');
+        }
+        expect(resumed.tools).toEqual(legacy.tools);
+        expect(system(resumed)).toContain('Project context verification marker.');
+        const wire = JSON.stringify(resumed);
+        expect(wire).toContain('first turn in existing history');
+        expect(wire).not.toMatch(/You are (an expert|a) coding assistant/);
+        const automation = await send('scheduled work in the same task', 'scheduler');
+        expect(system(automation)).toMatch(/^You are (an expert|a) coding assistant/);
+        expect(system(automation)).not.toContain('You are the companion described');
+        expect(system(automation)).not.toContain('<companion_life_plan>');
+        expect(slotReads).toBe(1);
+        available = false;
+        const next = await send('back to owner chat');
+        expect(slotReads).toBe(2);
+        expect(system(next)).toMatch(/^You are the companion described/);
+        expect(JSON.stringify(next)).not.toContain('Illustration slot marker');
+      } finally {
+        await handle?.close();
+        rmSync(workingDir, { recursive: true, force: true });
+      }
+    },
+  );
+
   // Real Pi request comparison: shortening host instructions must leave native
   // tools/project rules intact, and getContextUsage must inspect the same runtime.
   it('keeps native capabilities with on-demand answer instructions and exposes context sources', { timeout: 30_000 }, async () => {
@@ -1530,10 +1690,10 @@ describe.skipIf(!piAvailable)('PiAgent integration (real pi binary + fake gatewa
     },
   );
 
-  it(
-    'uses the bundled openai-codex adapter for a host subscription model',
+  it.each([false, true])(
+    'uses the bundled openai-codex subscription adapter (owner private: %s)',
     { timeout: 60_000 },
-    async () => {
+    async ownerPrivate => {
       const deps = buildDeps();
       deps.capabilityAdditions = {
         ...deps.capabilityAdditions,
@@ -1588,6 +1748,15 @@ describe.skipIf(!piAvailable)('PiAgent integration (real pi binary + fake gatewa
           model: 'chatgpt/gpt-cindy-daily-test',
           providerId: 'openai',
           effort: 'high',
+          ...(ownerPrivate ? {
+            botProfilePrompt: 'You are the fictional companion Mira.',
+            botRuntimeProfile: {
+              botId: 'fixture', profileVersion: 1, piOwnerPrivateChat: true as const,
+              skillPolicy: { mode: 'inherit' as const, configured: [], catalog: [] },
+              mcpPolicy: { mode: 'inherit' as const, configured: [], catalog: [] },
+              toolsetPolicy: { mode: 'inherit' as const, configured: [], catalog: [] },
+            },
+          } : {}),
         });
         const events: AgentEvent[] = [];
         const collected = (async () => {
@@ -1601,7 +1770,16 @@ describe.skipIf(!piAvailable)('PiAgent integration (real pi binary + fake gatewa
         await collected;
 
         const nativeRequests = seenRequests.slice(requestsBefore);
-        expect(nativeRequests.some((request) => request.url === '/codex/responses')).toBe(true);
+        const request = nativeRequests.find(item => item.url === '/codex/responses');
+        expect(request).toBeDefined();
+        if (ownerPrivate) {
+          const body = JSON.parse(request!.body);
+          expect(body.instructions).toMatch(/^You are the companion described/);
+          expect(body.instructions).toContain('fictional companion Mira');
+          expect(body.instructions).toContain('<rules>');
+          expect(body.instructions).toContain('<docs>');
+          expect(body.tools.length).toBeGreaterThan(0);
+        }
         expect(nativeRequests.some((request) => request.url === '/v1/messages')).toBe(false);
         expect(events.some((event) =>
           event.type === 'text'

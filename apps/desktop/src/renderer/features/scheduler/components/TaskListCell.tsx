@@ -104,9 +104,10 @@ export function TaskListCell({
   const isPausedSch = s.status === 'paused';
   const isExpiredSch = s.status === 'expired';
   const isProjectSchedule = s.source === 'project';
-  const canRename = !!onRename && !isProjectSchedule;
+  const isFollowUp = s.companionFollowUpAt !== undefined;
+  const canRename = !!onRename && !isProjectSchedule && !isFollowUp;
   const canDelete = !!onDelete && !isProjectSchedule;
-  const canPromote = !!onPromoteToProject && !isProjectSchedule;
+  const canPromote = !!onPromoteToProject && !isProjectSchedule && !isFollowUp;
   const canEditProject = !!onEditProjectSchedule && isProjectSchedule;
   const canCloneToUser = !!onCloneToUser && isProjectSchedule;
   const canRemoveProject = !!onRemoveProjectSchedule && isProjectSchedule;
@@ -277,7 +278,7 @@ export function TaskListCell({
     >
       {/* 悬浮/选中时露出的「立即运行」按钮:runNow 是 force-fire,paused/expired 也可用,不做 status 门控;
           键盘可达(button 天然 focusable),focus 时同样保持可见。 */}
-      {onRunNow && !isEditing && (
+      {onRunNow && !isEditing && !isFollowUp && (
         <button
           type="button"
           onClick={(e) => void handleRunNowClick(e)}
@@ -442,7 +443,7 @@ export function TaskListCell({
           {onTogglePause && (
             <DropdownMenuItem
               onSelect={() => void onTogglePause(s)}
-              disabled={isExpiredSch}
+              disabled={isExpiredSch || (isFollowUp && isPausedSch)}
             >
               {isPausedSch ? (
                 <Play size={13} strokeWidth={2} className="mr-2" />

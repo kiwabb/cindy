@@ -5,7 +5,7 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 import type { FactMemoryQueue } from '@cindy/maker-core';
-import { bindNativeFactMemory, withNativeFactMemoryTurn, finishNativeFactMemoryTurn } from '../nativeFactMemory.js';
+import { bindNativeFactMemory, withNativeFactMemoryTurn, finishNativeFactMemoryTurn, settleNativeFactReply } from '../nativeFactMemory.js';
 const source = { logicalTurnId: 'turn-fixture', userMessageId: 'message-fixture', userText: 'fixture only', origin: 'user' as const };
 function setup() {
   const session = { id: 'fixture-session', instanceId: 'fixture-instance', remoteHostId: null };
@@ -23,16 +23,32 @@ describe('native fact binding, fixture queue', () => {
     finishNativeFactMemoryTurn(replacement, 1, 'completed');
     finishNativeFactMemoryTurn(session, 2, 'completed');
     expect(queue.finish).not.toHaveBeenCalled();
-    finishNativeFactMemoryTurn(session, 1, 'completed');
-    finishNativeFactMemoryTurn(session, 1, 'completed');
+    finishNativeFactMemoryTurn(session, 1, 'completed', 'fixture assistant reply');
+    finishNativeFactMemoryTurn(session, 1, 'completed', 'duplicate callback');
     expect(queue.finish).toHaveBeenCalledTimes(1);
+    expect(queue.finish).toHaveBeenCalledWith({ generation: 1 }, 'completed', 1, 'fixture assistant reply');
     expect(queue.drain).toHaveBeenCalledTimes(1);
     dispose(); expect(queue.dispose).toHaveBeenCalledOnce();
+  });
+  // Pi command acknowledgements can carry visible text but are not model replies.
+  it.each(['pi/extension_command', 'pi/managed_package_receipt'])('settles %s without scheduling analysis', async kind => {
+    const { session, queue, dispose } = setup();
+    try {
+      await withNativeFactMemoryTurn(session, source, async reserved => {
+        reserved?.(1);
+        return { accepted: true };
+      });
+      settleNativeFactReply(session, 1, 'fixture Pi acknowledgement', kind);
+      expect(queue.finish).toHaveBeenCalledWith({ generation: 1 }, 'failed', 1, 'fixture Pi acknowledgement');
+      expect(queue.drain).not.toHaveBeenCalled();
+    } finally {
+      dispose();
+    }
   });
   it('discards undispatched and failed turns without draining analysis', async () => {
     const { session, queue, dispose } = setup();
     await withNativeFactMemoryTurn(session, source, async reserved => { reserved?.(1); return { accepted: false, reason: 'cancelled-before-dispatch' }; });
-    expect(queue.finish).toHaveBeenCalledWith({ generation: 1 }, 'failed', 1);
+    expect(queue.finish).toHaveBeenCalledWith({ generation: 1 }, 'failed', 1, undefined);
     expect(queue.drain).not.toHaveBeenCalled(); dispose();
   });
   it('does not turn fact preparation failure into a broken native send', async () => {

@@ -103,6 +103,7 @@ import { normalizeAutoTitle } from '@cindy/maker-shared/session-title';
 import { parseToolLoopErrorDetails } from '@cindy/maker-shared/tool-loop-error';
 import type { ToolLoopErrorDetails } from '@cindy/maker-core';
 import type { AgentMeta, MessageRole, Message, MessageAutomationOrigin } from '@/lib/ccAgent.types';
+import { COMPANION_FOLLOW_UP_CLIENT_PREFIX } from '../../shared/companionFollowUpMessage';
 import { toMessageAutomationOrigin } from '@/lib/messageAutomationOrigin';
 import { cancelPendingGhostCardTaskAutoArchive } from '@/cindy-brain/ghostCardTaskArchive';
 import {
@@ -20600,12 +20601,15 @@ function mapServerMessages(serverMsgs: Message[]): ChatMessage[] {
           : (persistedTurnMoney?.amount ?? 0) > 0 || turnUsageDetails !== undefined
             ? true
             : undefined;
+    const followUpOrigin = m.role === 'assistant' && m.clientId.startsWith(COMPANION_FOLLOW_UP_CLIENT_PREFIX)
+      ? toMessageAutomationOrigin(m.agentMeta?.origin) : undefined;
     const botStarterOptions = m.role === 'assistant' ? readBotStarterOptions(m.agentMeta?.botStarterOptions) : [];
     return {
       clientId: m.clientId,
       role: m.role,
       content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content),
       ...(m.role === 'assistant' ? { sourceGroup: readMessageSourceGroup(m.agentMeta) } : {}),
+      ...(followUpOrigin?.kind === 'scheduler' ? { automationOrigin: followUpOrigin } : {}),
       ...(m.role === 'assistant' && typeof m.agentMeta?.assistantPhase === 'string' ? { assistantPhase: m.agentMeta.assistantPhase } : {}),
       ...(m.role === 'assistant' && m.agentMeta?.failedSamplingAttempt ? { failedSamplingAttempt: true } : {}),
       // 与主进程 canonicalReplyVisibility 同源的 pending 判据:运行时关闭后遗留的

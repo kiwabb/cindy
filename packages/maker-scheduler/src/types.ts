@@ -276,6 +276,8 @@ export interface Schedule {
   jobConfig?: string;
   source?: 'user' | 'project' | 'bot';
   projectConfigId?: string;
+  /** Local owner-authorized companion follow-up target time (epoch milliseconds). */
+  companionFollowUpAt?: number;
   kind: ScheduleKind;
   cronExpr: string;
   timezone: string;

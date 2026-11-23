@@ -1,6 +1,7 @@
 import { applyProjectDirectoriesForTurn } from '../projectDirectoryRuntime.js';
 import { createOneShotUsageRecorder } from '../usage/auxiliaryUsage.js';
 import { attachmentPreservation, attachmentStorageRoots } from './oversized-attachment-recovery.js';
+import { createCompanionLifeScheduleReader } from '../maker-ipc/companionLifeSchedule.js';
 import { createCodexLocalModelSink } from './codexLocalModelSink.js';
 import { createCodexSpawnConfig, createCodexRoutingSignature } from './codexSpawnConfigCore.js';
 import { refreshCodexGatewayRuntime } from './codexGatewayRefresh.js';
@@ -2480,12 +2481,19 @@ export function getMaker(): Maker {
       // 伙伴的家在哪(本机 userData),外加用户维护的 prompt overlay。身份与用户画像不走
       // 这里 —— 它们已经由对账收进冻结快照,运行时认快照。
       readProfileFolder: async ({ botId }) => {
+        const owner = activeOwnerScopeKey();
         const ownerRoot = ownerScopedUserDataPath();
+        const homeDir = botProfileDir(ownerRoot, botId);
         const legacyUserDataDir = app.getPath('userData');
         await migrateLegacyBotProfileFolder(ownerRoot, legacyUserDataDir, botId);
         const folder = await readBotProfileFolder(ownerRoot, botId);
         return {
-          homeDir: botProfileDir(ownerRoot, botId),
+          homeDir,
+          readLifeSchedule: createCompanionLifeScheduleReader({
+            ownerRoot,
+            botHome: homeDir,
+            isCurrent: () => !isAppSessionBoundaryPending() && activeOwnerScopeKey() === owner,
+          }),
           contentWritableDirs: await ensureBotContentDirs(ownerRoot, botId, legacyUserDataDir),
           systemPromptOverride: folder.systemPromptOverride,
         };

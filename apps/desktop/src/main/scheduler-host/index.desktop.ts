@@ -52,6 +52,7 @@ import { SchedulerScriptCapabilityBroker } from './script-capability-broker.desk
 import { DesktopNotifier } from './notifier.desktop';
 import { sendFeishuSessionNotification } from '../im/feishu/notificationOrigin';
 import { wecomGroupNotificationService } from '../wecomGroupNotification';
+import { withCompanionFollowUps } from './companionOutreachHost.js';
 import { withTeammateHomeGuard } from './teammateHomeGuard.js';
 import { withQuietRunArchive } from './quietRunArchive.js';
 import { archiveQuietScheduledTarget, readScheduledTargetStatus } from './quietRunArchive.desktop.js';
@@ -163,8 +164,8 @@ const desktop = createSchedulerHost<StartSchedulerDeps>({
   // A teammate's project automations run only on its main computer (handed away: skipped here).
   captureFireContext: captureScheduledOwnerGuard,
   // Quiet rounds return an archived target to archived (archive-pauses-automations.md).
-  wrapRunner: (runner): ScheduleRunner => withQuietRunArchive(
-    withTeammateHomeGuard(runner, () => companionHomes.snapshot().demotedBotIds, ownTeammateProjectState),
+  wrapRunner: (runner, storage): ScheduleRunner => withQuietRunArchive(
+    withTeammateHomeGuard(withCompanionFollowUps(runner, id => storage.get(id)), () => companionHomes.snapshot().demotedBotIds, ownTeammateProjectState),
     {
       targetStatus: readScheduledTargetStatus,
       isRunSilenced: (runId): boolean => getSchedulerIfInitialized()?.isRunSilenced(runId) ?? false,
