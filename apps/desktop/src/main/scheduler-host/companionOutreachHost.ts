@@ -39,7 +39,11 @@ import { runCompanionOutreach } from './companionOutreachRun.js';
 
 const HOUR = 3_600_000;
 const log = createLogger('companion-follow-up');
-const generating = new Set<string>();
+const generating = new Map<string, {
+  kind?: 'greeting' | 'sharing';
+  controller?: AbortController;
+  done: Promise<void>;
+}>();
 
 function supportsFollowUpRoute(route: UtilityTextDispatchRoute) {
   return buildTextOneshotPinOptions(
@@ -202,8 +206,19 @@ async function fireCompanionOutreach(botId: string, request: OutreachRequest, ct
   const route: UtilityTextDispatchRoute = { agentKind: agentKind === 'cc' ? 'claude-code' : agentKind, providerId, model };
   if (!supportsFollowUpRoute(route)) return skip('The main chat route cannot generate a text-only follow-up');
   const generationKey = JSON.stringify([ownerRoot, botId]);
-  if (generating.has(generationKey)) return skip('Another follow-up is in flight');
-  generating.add(generationKey);
+  const running = generating.get(generationKey);
+  if (running?.controller && !request.kind) {
+    running.controller.abort();
+    await running.done;
+  }
+  if (ctx.signal.aborted || !isDataOwnerBroadcastScopeCurrent(scope) || generating.has(generationKey)) {
+    return skip('Another follow-up is in flight or the owner changed');
+  }
+  const controller = request.kind ? new AbortController() : undefined;
+  const signal = controller ? AbortSignal.any([ctx.signal, controller.signal]) : ctx.signal;
+  let finish!: () => void;
+  const done = new Promise<void>(resolve => { finish = resolve; });
+  generating.set(generationKey, { controller, done, kind: request.kind });
   try {
     const ledger = new CompanionOutreachLedger(ownerRoot, botId);
     const clientId = ledger.clientId(scheduleId);
@@ -222,7 +237,7 @@ async function fireCompanionOutreach(botId: string, request: OutreachRequest, ct
         live.model === model && !live.remoteHostId && !live.agentDeviceId && !live.scheduledModelBaseline;
       const lastAction = getSessionLastUserActionAt(target.id);
       return {
-        enabled: allowed && sameChat && !ctx.signal.aborted &&
+        enabled: allowed && sameChat && !signal.aborted &&
           (ctx.canDispatch?.() ?? true) && isDataOwnerBroadcastScopeCurrent(scope),
         isHome: isHome(botId),
         busy: !restored || isSchedulerTargetSessionBusy(target.id) ||
@@ -254,7 +269,7 @@ async function fireCompanionOutreach(botId: string, request: OutreachRequest, ct
         const result = await requestExplicitUtilityText(
           untrustedJsonBlock(request.kind ? { kind: request.kind, fictionalPlan: request.topic || undefined } : { agreedTopic: request.topic, recentChat }),
           {
-            ...route, signal: ctx.signal, timeoutMs: 25_000, maxTokens: request.kind ? 100 : 350,
+            ...route, signal, timeoutMs: 25_000, maxTokens: request.kind ? 100 : 350,
             systemPrompt: [
               request.identity ?? profile.identitySource,
               request.kind ? undefined : profile.userContextSource,
@@ -278,7 +293,7 @@ async function fireCompanionOutreach(botId: string, request: OutreachRequest, ct
           },
         );
         if (!result.ok) {
-          if (ctx.signal.aborted) throw new DOMException('Follow-up aborted', 'AbortError');
+          if (signal.aborted) throw new DOMException('Follow-up aborted', 'AbortError');
           throw new Error(`Companion follow-up generation failed: ${result.reason}`);
         }
         if (result.providerId !== providerId || result.model !== model) {
@@ -294,7 +309,7 @@ async function fireCompanionOutreach(botId: string, request: OutreachRequest, ct
             scheduleName: request.label, runId: ctx.runId } },
         }, {
           broadcastOwnerScope: scope,
-          shouldBroadcast: () => !ctx.signal.aborted && isDataOwnerBroadcastScopeCurrent(scope) && isHome(botId),
+          shouldBroadcast: () => !signal.aborted && isDataOwnerBroadcastScopeCurrent(scope) && isHome(botId),
           beforePublish: async () => {
             const admission = await readAdmission();
             if (admission.conversationEpoch !== conversationEpoch || decideCompanionOutreach({
@@ -315,6 +330,7 @@ async function fireCompanionOutreach(botId: string, request: OutreachRequest, ct
       : skip('reason' in outcome ? outcome.reason ?? outcome.status : outcome.status);
   } finally {
     generating.delete(generationKey);
+    finish();
   }
 }
 
@@ -401,6 +417,10 @@ export async function companionAutonomousSettings(
         home: unconfirmed && disabling ? current.home : home,
       };
       await writeAutonomousSettings(root, botId, settings);
+      const inFlight = generating.get(key);
+      if (inFlight?.kind && (settings.paused || !settings[inFlight.kind] || unconfirmed)) {
+        inFlight.controller?.abort();
+      }
       if (home !== 'local' && !(unconfirmed && disabling)) confirmedCloudHomes.set(key, home);
     }
     const history = await autonomousHistory(root, botId);

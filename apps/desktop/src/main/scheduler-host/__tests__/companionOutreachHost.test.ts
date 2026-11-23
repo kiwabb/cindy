@@ -168,6 +168,19 @@ it.skipIf(process.platform !== 'darwin' && process.platform !== 'win32')('uses t
         content: 'Hello', createdAt: Date.now() + 2,
       }).run();
       expect(await companionAutonomousSettings(botId)).toMatchObject({ paused: false });
+
+      // An owner change to settings during generation wins against delivery.
+      vi.setSystemTime(evening + 72 * 3_600_000);
+      h.generate.mockImplementationOnce(async (_prompt, request) => {
+        await companionAutonomousSettings(botId, { greeting: false });
+        expect(request.signal.aborted).toBe(true);
+        return { ok: true, providerId: 'fixture-provider', model: 'fixture-model', text: '晚上好呀。' };
+      });
+      await engine.tick();
+      expect(h.publish).toHaveBeenCalledTimes(3);
+      await companionAutonomousSettings(botId, { greeting: true });
+      await engine.tick();
+      expect(h.publish).toHaveBeenCalledTimes(3);
     } finally {
       engine.stop();
     }
