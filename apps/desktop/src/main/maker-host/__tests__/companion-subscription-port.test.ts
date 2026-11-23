@@ -13,6 +13,7 @@ function fixture(remote = true) {
     agentDeviceId: remote ? device : null,
   };
   const session: any = {
+    agentKind: 'codex',
     model,
     agentDeviceId: route.agentDeviceId,
     requestCompanionText: vi.fn(async () => ({ providerId: 'openai', model, text: '[]' })),
@@ -74,6 +75,8 @@ it('cancellation and changed device reject late facts', async () => {
 });
 it('local path pins the selected subscription and rejects an unexpected result model', async () => {
   const f = fixture(false);
+  f.session.agentKind = 'pi';
+  f.session.model = 'different-chat-model';
   local.mockResolvedValue({ providerId: 'openai', model: 'other', text: '[]' });
   await expect(
     f.port.analyze({

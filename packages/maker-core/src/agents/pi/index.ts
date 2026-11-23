@@ -1,5 +1,12 @@
 import { piToolMarkupProjection } from './tool-markup-projection.js';
+import { HOST_TURN_CONTEXT, HOST_TURN_CONTEXT_TEXT_LIMIT, validateHostTurnContext } from '../shared/host-turn-context.js';
 import { estimatePiContext, type PiPromptSource } from './context-estimate.js';
+import {
+  CINDY_PI_COMPANION_IDENTITY_EXTENSION,
+  CINDY_PI_COMPANION_IDENTITY_MODE,
+  CINDY_PI_COMPANION_CONTEXT_READY, CINDY_PI_COMPANION_CONTEXT_CLOSED, type PiCompanionTurnContext,
+  CINDY_PI_COMPANION_IDENTITY_SOURCE,
+} from './companion-identity-source.js';
 import { NATIVE_SUBSCRIPTION_ACCOUNT } from '../../interfaces/auth-adapter.js';
 import { getPiExtensionUiCapability } from './extension-ui-capabilities.js';
 import { createPiCacheInputTracker } from './cache-input.js';
@@ -3481,6 +3488,18 @@ export class PiAgent extends BaseAgent {
     // 会导致 bridge/subagent 静默失效)。
     const bridgeExtensionPath = joinRemotePosixPath(extensionsDir, CINDY_BRIDGE_EXTENSION_FILENAME);
     await writeFile(bridgeExtensionPath, CINDY_BRIDGE_EXTENSION_SOURCE);
+    const companionIdentityExtensionPath =
+      !reviewMode && !hostedGuest && !opts[LOCAL_AGENT_CLIENT]?.hostToolsOnly
+      && opts.botRuntimeProfile?.piOwnerPrivateChat === true && opts.botProfilePrompt?.trim()
+        ? joinRemotePosixPath(extensionsDir, CINDY_PI_COMPANION_IDENTITY_EXTENSION)
+        : undefined;
+    const companionIdentityModePath = companionIdentityExtensionPath
+      ? joinRemotePosixPath(extensionsDir, CINDY_PI_COMPANION_IDENTITY_MODE)
+      : undefined;
+    if (companionIdentityExtensionPath && companionIdentityModePath) {
+      await writeFile(companionIdentityExtensionPath, CINDY_PI_COMPANION_IDENTITY_SOURCE);
+      await writeFile(companionIdentityModePath, JSON.stringify({ companion: false }));
+    }
     // cindy-subagent extension:与 bridge 并列的独立扩展(职责分离 —— bridge 管权限门与
     // MCP 桥,这个只管子代理)。子进程继承 PI_CODING_AGENT_DIR,因此同样加载 bridge,
     // 权限门对子代理照样生效;递归由扩展内的 depth env 自己截断。
@@ -3634,6 +3653,7 @@ export class PiAgent extends BaseAgent {
     let activeToolsDisabled = false;
     let activeModelRequestControl: ModelRequestControl | undefined;
     let textOnlyPolicyReady = false;
+    let companionContextReady = false;
     let providerRequestSequence = 0;
     let providerRequestObservedAt: number | undefined;
     let providerTurnObservedAt: number | undefined;
@@ -4262,6 +4282,7 @@ export class PiAgent extends BaseAgent {
         ...(guestContextExtensionPath ? ['--extension', guestContextExtensionPath] : []),
         '--extension',
         bridgeExtensionPath,
+        ...(companionIdentityExtensionPath ? ['--extension', companionIdentityExtensionPath] : []),
         ...(localSubagentSupported ? ['--extension', subagentExtensionPath] : []),
         ...(!reviewMode && !opts[LOCAL_AGENT_CLIENT]?.hostToolsOnly && planModeExtAvailable ? ['--extension', planModeExtPath] : []),
         ...(loadProjectResourcesInPlace ? projectResourceArgs : []),
@@ -5902,6 +5923,7 @@ export class PiAgent extends BaseAgent {
           .update(CINDY_BRIDGE_EXTENSION_SOURCE)
           .update('\n')
           .update(CINDY_SUBAGENT_EXTENSION_SOURCE)
+          .update(companionIdentityExtensionPath ? CINDY_PI_COMPANION_IDENTITY_SOURCE : '')
           .digest('hex')
           .slice(0, 16);
         // 追加提示词本体在文件里，命令行不再带它；指纹进 env 才让提示词变化
@@ -6038,6 +6060,14 @@ export class PiAgent extends BaseAgent {
             piAgentLifecycleSequence += 1;
           }
           if (!remote && event.type === 'extension_ui_request' && event.method === 'notify') {
+            if (event.message === `${CINDY_PI_COMPANION_CONTEXT_READY}${runtimeInstanceId}`) {
+              companionContextReady = true;
+              return;
+            }
+            if (event.message === `${CINDY_PI_COMPANION_CONTEXT_CLOSED}${runtimeInstanceId}`) {
+              companionContextReady = false;
+              return;
+            }
             if (event.message === `${CINDY_PI_TEXT_ONLY_READY_PREFIX}${runtimeInstanceId}`) {
               textOnlyPolicyReady = true;
               return;
@@ -8055,6 +8085,7 @@ export class PiAgent extends BaseAgent {
         return receipt.toolCatalog;
       },
       disabledSkillPaths: disabledSkillSnapshot,
+      get supportsHostTurnContext() { return Boolean(companionIdentityModePath && !hosted && !remote && companionContextReady); },
       hasProjectResourceDrift() {
         return projectResourceLaunchSnapshot !== null
           && piProjectResourcesDrifted(projectResourceLaunchSnapshot);
@@ -8080,6 +8111,11 @@ export class PiAgent extends BaseAgent {
       validateSendOptions(sendOpts: SendOptions) {
         if (sendOpts[MODEL_REQUEST_CONTROL] && (remote || hosted)) {
           throw new Error('Per-request model control is supported only by local Pi.');
+        }
+        const hostContext = sendOpts[HOST_TURN_CONTEXT];
+        if (hostContext) {
+          if (!handle.supportsHostTurnContext) throw new Error('HOST_TURN_CONTEXT_UNSUPPORTED');
+          validateHostTurnContext(hostContext);
         }
         if (sendOpts.toolsDisabled && remote) {
           throw new Error('Host text-only Pi turns require a local runtime, not a shared remote daemon.');
@@ -8285,6 +8321,33 @@ export class PiAgent extends BaseAgent {
                 await applyRequestedPlanMode();
                 rejectIfCancelled(sendOpts, 'send');
               }
+              if (companionIdentityModePath) {
+                if (ctx.isStreaming || ctx.pendingHostTurnStartToken) {
+                  throw new TurnDispatchRejectedError('Pi turn is active before identity selection.');
+                }
+                const origin = sendOpts?.origin;
+                const companion = (!origin || origin.kind === 'user') && origin?.surface !== 'im';
+                const memory = companion && handle.supportsHostTurnContext && !promptText.trimStart().startsWith('/')
+                  && !managedPackageRoute.accepted ? sendOpts?.[HOST_TURN_CONTEXT] : undefined;
+                let schedule = companion && !remote && !hosted
+                  ? await opts.readPiCompanionLifeSlot?.().catch(() => undefined)
+                  : undefined;
+                if (schedule && (memory?.text.length ?? 0) + JSON.stringify(schedule).length > HOST_TURN_CONTEXT_TEXT_LIMIT) {
+                  schedule = undefined;
+                }
+                const context: PiCompanionTurnContext = { companion, schedule, ...(memory ? {
+                  privateMemory: {
+                    promptHash: createHash('sha256').update(escapeLeadingSlashCommand(promptText, runtimeCapabilityManifest).trim()).digest('hex'),
+                    context: memory,
+                  },
+                } : {}) };
+                if (!managedPackageRoute.accepted) rejectIfCancelled(sendOpts, 'send');
+                await writeFile(companionIdentityModePath, JSON.stringify(context));
+                if (!managedPackageRoute.accepted && sendOpts?.signal?.aborted) {
+                  if (memory) await writeFile(companionIdentityModePath, JSON.stringify({ companion: false }));
+                  rejectIfCancelled(sendOpts, 'send');
+                }
+              }
               const pendingTurnStartToken = markPiHostTurnStartPending(ctx);
               promptRequestStarted = true;
               const firstPromptRpcStartedAt = firstPromptRpcLogged ? undefined : Date.now();
@@ -8302,11 +8365,17 @@ export class PiAgent extends BaseAgent {
                 // preflight, so a healthy long compaction is not killed at 10m.
                 refreshTimeoutOnEvent: (event) =>
                   PI_PROMPT_ACCEPTANCE_PROGRESS_EVENTS.has(event.type),
-              }).then(response => {
+              }).then(async response => {
                 logPromptResponse(response.success);
+                if (!response.success && companionIdentityModePath && sendOpts?.[HOST_TURN_CONTEXT]) {
+                  await writeFile(companionIdentityModePath, JSON.stringify({ companion: false })).catch(() => {});
+                }
                 return response;
-              }, error => {
+              }, async error => {
                 logPromptResponse(false);
+                if (companionIdentityModePath && sendOpts?.[HOST_TURN_CONTEXT]) {
+                  await writeFile(companionIdentityModePath, JSON.stringify({ companion: false })).catch(() => {});
+                }
                 throw error;
               });
               // Only consume the one-shot choice after acceptance. A confirmed

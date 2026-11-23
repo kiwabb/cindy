@@ -1896,10 +1896,10 @@ export function createMakerSendTransaction(deps: MakerSendTransactionDeps): Make
         const transcriptUserClientId = persistUserMessage?.clientId
           ?? (so[PI_CACHE_RECOVERY_EXPECTATION] ? so.retryUserClientId : undefined);
         await deps.ensureCompanionMemory?.(sessionId);
-        const nativeFactUserSource = readNativeFactUserSource(mainOwnedSendContext, persistUserMessage, so.retryUserClientId,
-          { ordinary: isOrdinaryUserTurn, authoredText: so[AUTO_REVIEW_SOURCE_CONTENT], remote: so.fromMobileClient === true || so.fromDeviceLinkClient === true });
+        const nativeFactUserSource = isOrdinaryUserTurn ? readNativeFactUserSource(mainOwnedSendContext, persistUserMessage, so.retryUserClientId,
+          { ordinary: isOrdinaryUserTurn, authoredText: so[AUTO_REVIEW_SOURCE_CONTENT], remote: so.fromMobileClient === true || so.fromDeviceLinkClient === true }) : undefined;
         const prepareMemory = getNativeMemoryTurnPreparation(sess);
-        if (prepareMemory) {
+        if (prepareMemory && (nativeFactUserSource || so[MEMORY_RECOVERY])) {
           const requestId = so.retryUserClientId ?? persistUserMessage?.clientId ?? so.messageUuid;
           if (!requestId) throw new Error('MEMORY_TURN_REQUEST_ID_REQUIRED');
           const recovery = so[MEMORY_RECOVERY]

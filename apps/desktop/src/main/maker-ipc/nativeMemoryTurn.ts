@@ -55,7 +55,7 @@ export function bindNativeMemoryTurn(params: {
   };
   // Include session: request IDs and completion generations belong to a conversation.
   const scope = JSON.stringify([params.ownerId, params.botId, params.session.id]);
-  const controller = new MemoryTurnContext({ scope, hostTerminals: true, memory: params.memory, assertCurrent, contribute: params.contribute,
+  const controller = new MemoryTurnContext({ scope, hostTerminals: true, verifyPersistedRecall: true, memory: params.memory, assertCurrent, contribute: params.contribute,
     receipts: new FileMemoryTurnReceipts(path.join(params.directory, 'completed'), assertCurrent),
     snapshots: new FileMemoryTurnSnapshots(path.join(params.directory, 'prepared'), assertCurrent),
   });

@@ -14,8 +14,8 @@ export function createCompanionSubscriptionPort(
   const current = () => {
     assertCurrent();
     if (
-      session.model !== route.model ||
-      (session.agentDeviceId ?? null) !== (route.agentDeviceId ?? null)
+      route.agentDeviceId && (session.agentKind !== 'codex' || session.model !== route.model ||
+        session.agentDeviceId !== route.agentDeviceId)
     )
       throw Error('COMPANION_SUBSCRIPTION_ROUTE_CHANGED');
   };

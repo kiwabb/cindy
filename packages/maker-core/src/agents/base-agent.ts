@@ -1826,6 +1826,8 @@ export interface BotRuntimeProfile {
    * are added. Without it the classic, isolated teammate runtime applies.
    */
   projectContext?: boolean;
+  /** Set by host hydration from an owner-private Bot Session link. */
+  piOwnerPrivateChat?: true;
 }
 
 /** The profile when the classic isolated teammate runtime applies; undefined for V2 and ordinary tasks. */
@@ -2123,6 +2125,10 @@ export interface StartSessionOptions {
    * it must never be converted into natural-language capability claims.
    */
   botRuntimeProfile?: BotRuntimeProfile;
+  /** Host-only current-slot reader for local Pi owner chat. Never accepts a renderer path. */
+  readPiCompanionLifeSlot?: () => Promise<{
+    date: string; timezone: string; start: string; end: string; activity: string;
+  } | undefined>;
   /**
    * Host-owned Skills mounted for this session only, such as Cindy's 「群协作」 Skill for the task of a
    * group's Cindy. Each is a versioned directory Cindy manages (`path` holds `SKILL.md`, `pluginRoot`

@@ -2,13 +2,13 @@ import { it, expect, vi } from 'vitest';
 import { MemoryTurnContext, resolveMemoryRecovery, type MemoryTurnSnapshot } from './turn-context.js';
 import { HOST_TURN_CONTEXT } from '../agents/shared/host-turn-context.js';
 const scope = JSON.stringify(['unit-owner', 'unit-bot', 'unit-session']);
-function fixture(hostTerminals = false, contribute?: ConstructorParameters<typeof MemoryTurnContext>[0]["contribute"]) {
+function fixture(hostTerminals = false, contribute?: ConstructorParameters<typeof MemoryTurnContext>[0]["contribute"], verifyPersistedRecall = false) {
   const rows = new Map<string, MemoryTurnSnapshot>();
   const snapshots = { get: vi.fn(async (s: string, id: string) => s === scope ? structuredClone(rows.get(id) ?? null) : null),
     prepareOnce: vi.fn(async (v: MemoryTurnSnapshot) => { if (!rows.has(v.requestId)) rows.set(v.requestId, structuredClone(v)); return structuredClone(rows.get(v.requestId)!); }) };
   const memory = { search: vi.fn(async () => [{ filename: 'unit.md', title: 'unit', snippet: '', score: 1, type: 'reference' as const }]), read: vi.fn(async () => ({ body: 'frozen fact' })) };
   const committed: any[] = [];
-  const controller = new MemoryTurnContext({ scope, snapshots, memory, hostTerminals, contribute, receipts: { get: async () => null, commitOnce: async r => { committed.push(structuredClone(r)); } }, assertCurrent() {} });
+  const controller = new MemoryTurnContext({ scope, snapshots, memory, hostTerminals, contribute, verifyPersistedRecall, receipts: { get: async () => null, commitOnce: async r => { committed.push(structuredClone(r)); } }, assertCurrent() {} });
   let listener: (event: any) => void = () => {};
   const session = { onEvent: (cb: typeof listener) => { listener = cb; return () => {}; }, onStatusChange: () => () => {} };
   return { rows, snapshots, memory, controller, session, committed, emit: (event: any) => listener(event) };
@@ -157,4 +157,15 @@ it('rejects oversized contribution before snapshot persistence and aborts a pend
   const work = waiting.controller.prepare(waiting.session, 'cancel-capture', { identity: 'cancel-capture', query: 'fixture' }, { signal: abort.signal });
   await started; abort.abort(new Error('CANCELLED_FIXTURE')); release();
   await expect(work).rejects.toThrow('CANCELLED_FIXTURE'); expect(waiting.rows.size).toBe(0);
+});
+
+// A correction must take effect even if automatic recovery restores a frozen
+// snapshot created before the correction. The lineage itself stays verifiable.
+it('does not inject a superseded persisted recall on the recovery attempt', async () => {
+  const f = fixture(false, undefined, true);
+  (await prepare(f, 'original')).cancel();
+  f.memory.read.mockResolvedValue({ body: 'corrected fixture fact' });
+  const recovered = await prepare(f, 'retry', 'original');
+  expect(JSON.parse(recovered.augment({})[HOST_TURN_CONTEXT]!.text).memories).toEqual([]);
+  recovered.cancel();
 });

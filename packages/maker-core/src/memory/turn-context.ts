@@ -43,6 +43,7 @@ export interface MemoryTurnContextDeps {
   memory: Pick<MakerMemoryStore, 'search'> & { read(filename: string): Promise<{ body: string }> };
   receipts: MemoryTurnReceiptStore;
   snapshots?: MemoryTurnSnapshotStore;
+  verifyPersistedRecall?: boolean;
   preparationTimeoutMs?: number;
   hostTerminals?: boolean;
   completionTimeoutMs?: number;
@@ -203,6 +204,7 @@ export class MemoryTurnContext {
       if (this.prepared?.requestId !== requestId && inherited) {
         this.prepared = { version: 1, scope: this.deps.scope, requestId, inputHash, ...inherited };
       }
+      const needsRecall = this.prepared?.requestId !== requestId;
       if (this.prepared?.requestId !== requestId) {
         const hits = input.query.trim()
           ? await bounded(() => searchTurnMemories(this.deps.memory, input.query, preparation.signal), preparation.signal) : [];
@@ -230,7 +232,17 @@ export class MemoryTurnContext {
       }
       if (inherited && JSON.stringify(this.prepared.contribution) !== JSON.stringify(inherited.contribution))
         throw new Error('MEMORY_RECOVERY_LINEAGE_CHANGED');
-      const recalled = this.prepared.recalled;
+      let recalled = this.prepared.recalled;
+      if (!needsRecall && this.deps.verifyPersistedRecall) {
+        const checked: typeof recalled = [];
+        for (const entry of recalled) {
+          const live = await bounded(() => this.deps.memory.read(entry.file), preparation.signal)
+            .catch(() => undefined);
+          current();
+          if (live?.body.slice(0, 500) === entry.excerpt) checked.push(entry);
+        }
+        recalled = checked;
+      }
       const contribution = this.prepared.contribution ? structuredClone(this.prepared.contribution) : undefined;
       const completion = new AbortController();
       let generation: number | undefined;

@@ -1,4 +1,5 @@
 import { groupLaneUsesChatWorkspace } from '../../shared/botGroupChat.js';
+import type { CompanionLifeScheduleSlot } from './companionLifeSchedule.js';
 import { buildTeammateGuide as buildBotCapabilityContextPrompt } from './teammateGuide.js';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { buildBotMemoryScopeKey, resolveMemoryScopeKey } from '@cindy/maker-core';
@@ -174,6 +175,7 @@ export interface BotProfileRuntimeDeps {
     homeDir: string;
     contentWritableDirs?: string[];
     systemPromptOverride: string;
+    readLifeSchedule?: (soul: string) => Promise<CompanionLifeScheduleSlot | undefined>;
   }>;
   /** Project mode: this computer's linked project directories (other computers' links are only references). */
   listLinkedProjectDirs?: (input: { botId: string }) => Promise<string[]>;
@@ -599,6 +601,7 @@ export async function hydrateBotProfileRuntime(
     homeDir: string;
     contentWritableDirs?: string[];
     systemPromptOverride: string;
+    readLifeSchedule?: (soul: string) => Promise<CompanionLifeScheduleSlot | undefined>;
   } | null = null;
   // Local userData paths are meaningless on a remote harness. Do not promise or
   // mount a Home there until the host provisions an actual remote-owned path.
@@ -1079,9 +1082,15 @@ export async function hydrateBotProfileRuntime(
     buildBotContextTier(promptInput),
     buildBotVolatileTier(promptInput),
   ].filter(Boolean).join('\n\n');
+  const piOwnerPrivateChat = opts.agentKind === 'pi' && (row.role === 'canonical' || row.role === 'thread');
+  const readLifeSchedule = folderPrompt?.readLifeSchedule;
+  if (piOwnerPrivateChat && readLifeSchedule) {
+    opts.readPiCompanionLifeSlot = () => readLifeSchedule(identity);
+  }
   opts.botRuntimeProfile = {
     botId: row.botId,
     profileVersion: row.profileVersion,
+    ...(piOwnerPrivateChat ? { piOwnerPrivateChat: true as const } : {}),
     skillPolicy: {
       mode: runtimeSkillMode,
       configured: runtimeConfiguredSkills,
@@ -1162,6 +1171,7 @@ export async function hydrateBotProfileRuntime(
   const runtimeEpochSha256 = createHash('sha256').update(JSON.stringify({
     profileVersion: row.profileVersion,
     profilePrompt: opts.botProfilePrompt ?? '',
+    ...(opts.botRuntimeProfile.piOwnerPrivateChat ? { piOwnerPrivateChat: true } : {}),
     contextPrompt: opts.botProfileContextPrompt ?? '',
     userProfilePrompt: opts.botUserProfilePrompt ?? '',
     // All live chats compare this epoch before their next input. Shared learning

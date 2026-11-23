@@ -265,6 +265,7 @@ export function finishSessionTerminalEvent(
     // 所以决策未定时也一并压住(isAutoResumeDeferred),由 coordinator 在三个「最终没接管」
     // 的出口回调 onResumableTurnErrorDiscarded 让它补落。
     const workerTerminalDoneData = event.data as {
+      type?: unknown;
       result?: unknown;
       message?: unknown;
       sdkError?: unknown;
@@ -617,7 +618,11 @@ export function finishSessionTerminalEvent(
     ) {
       if (terminalOwner?.instanceId === session.instanceId) {
         settleNativeMemoryTurn(session, event);
-        finishNativeFactMemoryTurn(session, terminalOwner.generation, 'completed');
+        const syntheticPiResult = workerTerminalDoneData?.type === 'pi/extension_command'
+          || workerTerminalDoneData?.type === 'pi/managed_package_receipt';
+        finishNativeFactMemoryTurn(session, terminalOwner.generation,
+          workerTerminalFinalText.trim() && !syntheticPiResult ? 'completed' : 'failed',
+          workerTerminalFinalText);
         finishCompanionStateTurn(session, terminalOwner.generation, 'completed', turnAssistantPersistId);
       }
       const callback = deps.onSuccessfulProductTurn;

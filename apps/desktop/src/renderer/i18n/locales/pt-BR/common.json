@@ -11234,7 +11234,7 @@
       "sourcePrivate": "Memórias privadas do companheiro",
       "previewLabel": "Prévia de memórias privadas",
       "previewHint": "Após uma resposta completa, organiza seus fatos com o modelo da assinatura OpenAI escolhido para este companheiro ({{model}}). Isso gera uma solicitação adicional ao modelo. O computador selecionado deve estar online e permitir acesso. As memórias existentes continuam disponíveis para gerenciamento quando desativado.",
-      "previewUnavailable": "Selecione uma assinatura OpenAI explícita e um modelo Codex neste computador ou em outro da sua conta. Se a origem estiver indisponível, a análise pausa sem usar modelos corporativos ou alternativos. Desative e reative após mudar a seleção.",
+      "previewUnavailable": "A memória privada requer um amigo em modo de projeto e uma conversa compatível no Codex ou Pi. Para organizá-la, é necessário um modelo disponível da assinatura OpenAI.",
       "previewError": "Não foi possível salvar as configurações ou elas mudaram. Reabra esta página para carregar a seleção atual.",
       "privateHint": "Estas memórias pertencem a este companheiro. Outras tarefas do projeto não as usam. Visualizar ou editar não ativa a análise automática.",
       "privateDeleteBoundary": "Resumos atribuíveis e entradas de busca também são removidos. O histórico de conversa é mantido.",
