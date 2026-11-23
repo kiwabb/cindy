@@ -12659,14 +12659,14 @@
     },
     "automations": {
       "autonomous": {
-        "title": "Proactive chat",
-        "description": "At most once daily in Shanghai time, 12:30–13:00 or 19:00–19:30. Greetings and fictional plans are optional. For two unanswered messages, outreach pauses until you reach out or resume.",
-        "greeting": "Occasional greetings",
-        "sharing": "Share fictional plans",
-        "pause": "Pause",
-        "resume": "Resume",
-        "homeChanged": "The home changed. Resume from the current home to reconnect after a quiet day.",
-        "error": "Could not load or save these settings."
+        "title": "相棒からのメッセージ",
+        "description": "上海時間の 12:30–13:00 または 19:00–19:30 に、1 日に最大 1 回届きます。 返信がなければ 48 時間待ちます。2 回続けて返信がなければ一時停止します。",
+        "greeting": "ときどきあいさつ",
+        "sharing": "架空の予定を共有",
+        "pause": "一時停止",
+        "resume": "再開",
+        "homeChanged": "相棒のメイン端末を確認してください。その端末で再開すると、1 日の休止後に再開します。",
+        "error": "設定を読み込むか保存できませんでした。"
       },
       "title": "自動化",
       "description": "{{name}} のプロジェクトの自動化です。ここでオン／オフを切り替え、編集は自動化ページで行います。",

@@ -12805,14 +12805,14 @@
     },
     "automations": {
       "autonomous": {
-        "title": "Proactive chat",
-        "description": "At most once daily in Shanghai time, 12:30–13:00 or 19:00–19:30. Greetings and fictional plans are optional. For two unanswered messages, outreach pauses until you reach out or resume.",
-        "greeting": "Occasional greetings",
-        "sharing": "Share fictional plans",
-        "pause": "Pause",
-        "resume": "Resume",
-        "homeChanged": "The home changed. Resume from the current home to reconnect after a quiet day.",
-        "error": "Could not load or save these settings."
+        "title": "Discussion proactive",
+        "description": "Au plus une fois par jour, de 12 h 30 à 13 h ou de 19 h à 19 h 30 (heure de Shanghai). Sans réponse, le compagnon attend 48 heures. Après deux messages sans réponse, il se met en pause.",
+        "greeting": "Saluer de temps en temps",
+        "sharing": "Partager des projets fictifs",
+        "pause": "Mettre en pause",
+        "resume": "Reprendre",
+        "homeChanged": "Confirmez l’ordinateur principal du compagnon. Choisissez Reprendre sur cet ordinateur, puis attendez une journée.",
+        "error": "Impossible de lire ou d’enregistrer ces réglages."
       },
       "title": "Automatisations",
       "description": "Automatisations du projet de {{name}}. Activez-les ou désactivez-les ici ; modifiez-les dans Automatisations.",
