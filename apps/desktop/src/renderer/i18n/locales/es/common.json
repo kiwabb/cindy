@@ -12810,7 +12810,16 @@
       "failed": "No se pudieron cargar las automatizaciones.",
       "toggle": "Activar “{{name}}”",
       "manage": "Gestionar en Automatizaciones",
-      "create": "Crear en Automatizaciones"
+      "create": "Crear en Automatizaciones",
+      "followUp": {
+        "cancelled": "Cancelado",
+        "title": "Programar un seguimiento en la conversación",
+        "description": "Envía un mensaje en la conversación principal sobre el tema elegido. Disponible de 08:00 a 22:00 (hora de Shanghái), hasta dos veces al día y con al menos tres horas de intervalo. Se omite si la conversación está ocupada o ha pasado más de una hora.",
+        "topic": "Tema",
+        "time": "Hora (Shanghái)",
+        "save": "Programar seguimiento",
+        "entry": "Seguimiento de conversación · {{topic}}"
+      }
     }
   },
   "common": {

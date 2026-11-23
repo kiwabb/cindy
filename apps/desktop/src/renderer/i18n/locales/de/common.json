@@ -12714,7 +12714,16 @@
       "failed": "Automatisierungen konnten nicht geladen werden.",
       "toggle": "„{{name}}“ einschalten",
       "manage": "Unter Automatisierungen verwalten",
-      "create": "Unter Automatisierungen erstellen"
+      "create": "Unter Automatisierungen erstellen",
+      "followUp": {
+        "cancelled": "Abgebrochen",
+        "title": "Einmalige Nachfrage im Chat planen",
+        "description": "Sende zum gewählten Thema eine Nachricht im Hauptchat. Verfügbar von 08:00 bis 22:00 Uhr (Shanghai), höchstens zweimal täglich und mit mindestens drei Stunden Abstand. Bei aktivem Chat oder über einer Stunde Verspätung wird sie übersprungen.",
+        "topic": "Thema",
+        "time": "Zeit (Shanghai)",
+        "save": "Nachfrage planen",
+        "entry": "Chat-Nachfrage · {{topic}}"
+      }
     }
   },
   "common": {

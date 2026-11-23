@@ -12810,7 +12810,16 @@
       "failed": "Não foi possível carregar as automatizações.",
       "toggle": "Ativar «{{name}}»",
       "manage": "Gerir em Automatizações",
-      "create": "Criar em Automatizações"
+      "create": "Criar em Automatizações",
+      "followUp": {
+        "cancelled": "Cancelado",
+        "title": "Agendar um seguimento na conversa",
+        "description": "Envia uma mensagem na conversa principal sobre o tema escolhido. Disponível das 08:00 às 22:00 (hora de Xangai), até duas vezes por dia e com pelo menos três horas de intervalo. O envio é ignorado se a conversa estiver ocupada ou se o atraso exceder uma hora.",
+        "topic": "Tema",
+        "time": "Hora (Xangai)",
+        "save": "Agendar seguimento",
+        "entry": "Seguimento da conversa · {{topic}}"
+      }
     }
   },
   "common": {

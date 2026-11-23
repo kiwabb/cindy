@@ -12810,7 +12810,16 @@
       "failed": "Impossible de charger les automatisations.",
       "toggle": "Activer « {{name}} »",
       "manage": "Gérer dans Automatisations",
-      "create": "Créer dans Automatisations"
+      "create": "Créer dans Automatisations",
+      "followUp": {
+        "cancelled": "Annulé",
+        "title": "Planifier un suivi dans la conversation",
+        "description": "Envoie un message sur le sujet choisi dans la conversation principale. De 08:00 à 22:00 (heure de Shanghai), deux fois par jour au maximum, à au moins trois heures d’intervalle. Le suivi est ignoré si la conversation est occupée ou si le retard dépasse une heure.",
+        "topic": "Sujet",
+        "time": "Heure (Shanghai)",
+        "save": "Planifier le suivi",
+        "entry": "Suivi de conversation · {{topic}}"
+      }
     }
   },
   "common": {
