@@ -41,7 +41,7 @@ export function LearningView() {
 
 function SectionLabel({ label, value }: { label: string; value?: string }) {
   return (
-    <h2 className="flex items-center justify-between px-2 pb-1.5 pt-5 text-12 font-normal leading-4 text-[var(--text-tertiary)]">
+    <h2 className="flex items-center justify-between px-2 pb-1.5 pt-5 text-12 font-normal leading-[1.333] text-[var(--text-tertiary)]">
       <span>{label}</span>
       {value ? <span className="tabular-nums">{value}</span> : null}
     </h2>
@@ -76,7 +76,7 @@ function TodayCard({ goal }: { goal: LearningGoal }) {
     >
       <div className="flex flex-wrap items-start gap-x-4 gap-y-3">
         <div className="flex min-w-0 flex-[1_1_320px] flex-col gap-1">
-          <p className="flex flex-wrap items-center gap-1.5 text-12 leading-4 text-[var(--text-secondary)]">
+          <p className="flex flex-wrap items-center gap-1.5 text-12 leading-[1.333] text-[var(--text-secondary)]">
             <strong className="font-medium text-[var(--text-primary)]">{goal.name}</strong>
             {module ? (
               <span>
@@ -84,7 +84,7 @@ function TodayCard({ goal }: { goal: LearningGoal }) {
               </span>
             ) : null}
           </p>
-          <p className="text-14 leading-5 text-[var(--text-primary)]">
+          <p className="text-14 leading-[1.43] text-[var(--text-primary)]">
             {point?.name ?? t('learning.allCleared')}
           </p>
         </div>
@@ -152,16 +152,16 @@ function GoalCard({ goal, defaultOpen }: { goal: LearningGoal; defaultOpen: bool
             className={cn('shrink-0 text-[var(--text-secondary)] transition-transform', expanded && 'rotate-90')}
           />
           <span className="flex min-w-0 flex-col gap-0.5">
-            <span className="text-16 font-medium leading-6 text-[var(--text-primary)]">{goal.name}</span>
+            <span className="text-16 font-medium leading-[1.5] text-[var(--text-primary)]">{goal.name}</span>
             {goal.quote ? (
-              <span className="text-13 leading-5 text-[var(--text-secondary)]">
+              <span className="text-13 leading-[1.54] text-[var(--text-secondary)]">
                 {t('learning.goalQuote', { quote: goal.quote })}
               </span>
             ) : null}
           </span>
         </button>
         {goal.outlineAgreed ? null : (
-          <span className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap text-12 leading-4 text-[var(--text-secondary)]">
+          <span className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap text-12 leading-[1.333] text-[var(--text-secondary)]">
             {t('learning.outlineDraft')}
             <Button variant="secondary" size="xs" compact onClick={() => void open(goalConversation(goal))}>
               {t('learning.finalizeOutline')}
@@ -169,7 +169,7 @@ function GoalCard({ goal, defaultOpen }: { goal: LearningGoal; defaultOpen: bool
           </span>
         )}
         <span className="flex min-w-[180px] flex-[0_1_260px] flex-col gap-1.5">
-          <span className="flex justify-between gap-3 text-12 leading-4 tabular-nums text-[var(--text-secondary)]">
+          <span className="flex justify-between gap-3 text-12 leading-[1.333] tabular-nums text-[var(--text-secondary)]">
             <span>
               {t('learning.masteredLabel')}{' '}
               <strong className="font-medium text-[var(--text-primary)]">{goal.masteredCount}</strong> /{' '}
@@ -188,7 +188,7 @@ function GoalCard({ goal, defaultOpen }: { goal: LearningGoal; defaultOpen: bool
       </div>
       {expanded ? (
         <div id={detailId} className="border-t border-[var(--border-default)] px-4 pb-4 pt-1">
-          <h3 className="flex items-center gap-1.5 pb-1.5 pt-3.5 text-13 font-medium leading-5 text-[var(--text-secondary)]">
+          <h3 className="flex items-center gap-1.5 pb-1.5 pt-3.5 text-13 font-medium leading-[1.54] text-[var(--text-secondary)]">
             {t('learning.outline')}
             <span className="ml-auto text-12 font-normal text-[var(--text-tertiary)]">
               {t('learning.outlineSize', { modules: goal.modules.length, points: goal.totalCount })}
@@ -197,11 +197,11 @@ function GoalCard({ goal, defaultOpen }: { goal: LearningGoal; defaultOpen: bool
           {goal.totalCount ? (
             <GoalOutline goal={goal} />
           ) : (
-            <p className="px-2 py-1 text-13 leading-5 text-[var(--text-secondary)]">{t('learning.noOutlineYet')}</p>
+            <p className="px-2 py-1 text-13 leading-[1.54] text-[var(--text-secondary)]">{t('learning.noOutlineYet')}</p>
           )}
           <div className="grid grid-cols-[repeat(auto-fit,minmax(16rem,1fr))] gap-x-8">
             <div>
-              <h3 className="flex items-center gap-1.5 pb-1.5 pt-3.5 text-13 font-medium leading-5 text-[var(--text-secondary)]">
+              <h3 className="flex items-center gap-1.5 pb-1.5 pt-3.5 text-13 font-medium leading-[1.54] text-[var(--text-secondary)]">
                 {t('learning.aboutYou')}
                 <span className="ml-auto inline-flex items-center gap-1 text-12 font-normal text-[var(--text-tertiary)]">
                   <Lock size={12} aria-hidden />
@@ -209,7 +209,7 @@ function GoalCard({ goal, defaultOpen }: { goal: LearningGoal; defaultOpen: bool
                 </span>
               </h3>
               {profile.length ? (
-                <dl className="grid grid-cols-[5em_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-13 leading-5">
+                <dl className="grid grid-cols-[5em_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-13 leading-[1.54]">
                   {profile.map(([key, value]) => (
                     <div key={key} className="contents">
                       <dt className="text-[var(--text-secondary)]">{t(`learning.profile.${key}`)}</dt>
@@ -218,10 +218,10 @@ function GoalCard({ goal, defaultOpen }: { goal: LearningGoal; defaultOpen: bool
                   ))}
                 </dl>
               ) : null}
-              <p className="pt-2.5 text-12 leading-4 text-[var(--text-tertiary)]">{t('learning.profileNote', { name: tutor })}</p>
+              <p className="pt-2.5 text-12 leading-[1.333] text-[var(--text-tertiary)]">{t('learning.profileNote', { name: tutor })}</p>
             </div>
             <div>
-              <h3 className="flex items-center gap-1.5 pb-1.5 pt-3.5 text-13 font-medium leading-5 text-[var(--text-secondary)]">
+              <h3 className="flex items-center gap-1.5 pb-1.5 pt-3.5 text-13 font-medium leading-[1.54] text-[var(--text-secondary)]">
                 {t('learning.reviews')}
                 <span className="ml-auto text-12 font-normal tabular-nums text-[var(--text-tertiary)]">
                   {goal.reviews.length}
@@ -230,7 +230,7 @@ function GoalCard({ goal, defaultOpen }: { goal: LearningGoal; defaultOpen: bool
               {goal.reviews.length ? (
                 <ul>
                   {goal.reviews.map((review) => (
-                    <li key={review.pointId} className="flex items-start gap-3 py-1 text-13 leading-5">
+                    <li key={review.pointId} className="flex items-start gap-3 py-1 text-13 leading-[1.54]">
                       <span className="w-[7.5em] shrink-0 tabular-nums text-[var(--text-primary)]">
                         {formatDay(review.dueAt, i18n.language)}
                       </span>
@@ -242,7 +242,7 @@ function GoalCard({ goal, defaultOpen }: { goal: LearningGoal; defaultOpen: bool
                   ))}
                 </ul>
               ) : (
-                <p className="text-13 leading-5 text-[var(--text-secondary)]">{t('learning.noReviews')}</p>
+                <p className="text-13 leading-[1.54] text-[var(--text-secondary)]">{t('learning.noReviews')}</p>
               )}
             </div>
           </div>
@@ -269,7 +269,7 @@ function ArchivedGoals({ goals }: { goals: LearningGoal[] }) {
         aria-expanded={open}
         aria-controls="learning-archived"
         onClick={() => setOpen((value) => !value)}
-        className="-mx-2 flex min-h-8 w-[calc(100%+16px)] items-center gap-2 rounded-lg px-2 py-1 text-left text-13 leading-5 text-[var(--text-secondary)] outline-none transition-colors hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
+        className="-mx-2 flex min-h-8 w-[calc(100%+16px)] items-center gap-2 rounded-lg px-2 py-1 text-left text-13 leading-[1.54] text-[var(--text-secondary)] outline-none transition-colors hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
       >
         <ChevronRight size={12} aria-hidden className={cn('shrink-0 transition-transform', open && 'rotate-90')} />
         <span className="min-w-0 flex-1">{t('learning.archived')}</span>
@@ -280,7 +280,7 @@ function ArchivedGoals({ goals }: { goals: LearningGoal[] }) {
           {goals.map((goal) => (
             <li
               key={goal.id}
-              className="flex min-h-9 flex-wrap items-center gap-x-3 gap-y-1.5 py-1.5 pl-5 pr-2 text-13 leading-5"
+              className="flex min-h-9 flex-wrap items-center gap-x-3 gap-y-1.5 py-1.5 pl-5 pr-2 text-13 leading-[1.54]"
             >
               <span className="min-w-0 flex-[1_1_160px] text-[var(--text-secondary-mid)]">{goal.name}</span>
               <span className="inline-flex items-center gap-1 text-12 text-[var(--text-tertiary)]">
@@ -337,8 +337,8 @@ function LearningPage() {
               <span className="mb-1 flex size-10 items-center justify-center rounded-full bg-[var(--surface-chip)] text-[var(--text-secondary)]">
                 <GraduationCap size={20} strokeWidth={1.6} aria-hidden />
               </span>
-              <p className="text-14 font-medium leading-5 text-[var(--text-primary)]">{t('learning.empty.title')}</p>
-              <p className="max-w-[28em] pb-2 text-13 leading-5 text-[var(--text-secondary)]">{t('learning.empty.body', { name: tutor })}</p>
+              <p className="text-14 font-medium leading-[1.43] text-[var(--text-primary)]">{t('learning.empty.title')}</p>
+              <p className="max-w-[28em] pb-2 text-13 leading-[1.54] text-[var(--text-secondary)]">{t('learning.empty.body', { name: tutor })}</p>
               <Button variant="cta" onClick={() => void open({ botId: tutorBotId(snapshot) })}>
                 {t('learning.empty.action', { name: tutor })}
               </Button>

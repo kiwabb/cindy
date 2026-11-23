@@ -1,3 +1,4 @@
+import { hasA2uiAnswer, a2uiReadableText } from '@cindy/maker-shared/a2ui-message';
 import { BotChatReplyTarget } from '@/features/bots/BotChatQuoteViews';
 import { BotStartedTasksFooter, type BotStartedTask } from './BotStartedTasks';
 import { useBotChatQuote } from '@/features/bots/botChatQuoteContext';
@@ -61,6 +62,7 @@ import type { KnownLocalFileRef } from '@/lib/localPathResolver';
 import type { AgentKind as RendererAgentKind } from '@/lib/ccAgent.types';
 import type { TurnUsageDetails } from '../../../shared/turnUsageDetails';
 import type { RegionalMoney } from '../../../shared/regionalMoney';
+import { isPluginEngineKind } from '../../../shared/pluginEngines';
 import { useAgentCapabilities, type AgentKind as MakerAgentKind } from '@/hooks/useAgentCapabilities';
 import { useSessionFileOrigin } from './ChatSessionFileContext';
 import { originDeviceId } from '@/lib/sessionFileOrigin';
@@ -70,6 +72,7 @@ import { insertSessionLinkIntoComposer } from '@/lib/composerActionsBus';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { handleAssistantCopy } from '@/lib/assistantSelectionCopy';
 import { MessageActionBar } from './MessageActionBar';
+import { PluginUiSlot, renderPluginUiBody, type PluginUiMessageCandidates } from '@/cindy-brain/PluginUiContributions';
 import { shareSelectionStore } from './shareSelectionStore';
 import { useForkAtMessage } from './useForkAtMessage';
 import { useDeleteMessage } from './useDeleteMessage';
@@ -169,6 +172,7 @@ const StreamingBody = memo(function StreamingBody({
 });
 
 interface AssistantMessageProps {
+  pluginUi: PluginUiMessageCandidates;
   /** F1 transit: pass through to MarkdownRenderer for local-path resolution
    *  in markdown links. Stable per-session; doesn't trigger extra renders. */
   workingDir: string;
@@ -238,6 +242,7 @@ interface AssistantMessageProps {
 }
 
 export const AssistantMessage = memo(function AssistantMessage({
+  pluginUi,
   workingDir,
   allowPrivilegedLinks = true,
   localFileRefs,
@@ -286,17 +291,19 @@ export const AssistantMessage = memo(function AssistantMessage({
   // 到新会话（语义在 main 侧 forkSessionAtMessage 按 role 分支）。capability /
   // remote gate 与 UserMessage 同款；assistant 分叉无可预填文本 → 不传 draftText。
   const makerKind: MakerAgentKind = agentKind === 'codex' || agentKind === 'pi' ? agentKind : 'claude-code';
+  // 插件引擎任务(agent_kind = 'acp')不支持分叉，也不读内置 Harness 的能力(docs/plans/acp-plugin-bridge.md)。
+  const pluginEngineTask = isPluginEngineKind(agentKind);
   // device-link 远程会话:fork 能力按被控端读(本机会话 deviceId undefined,行为不变)。
   // deviceId 取自 ChatSessionFileContext(MessageStream 顶层订阅式构造,见该文件注释)。
   const sessionFileOrigin = useSessionFileOrigin();
   const { capabilities } = useAgentCapabilities(
-    makerKind,
+    pluginEngineTask ? null : makerKind,
     currentSessionId ? originDeviceId(sessionFileOrigin) : undefined,
   );
   const isRemote = Boolean(remoteHostId);
   const sharedGuest = isSharedTaskPeer(originDeviceId(sessionFileOrigin) ?? '');
   const forkSupported =
-    !isRemote && (!agentKind || (capabilities?.fork?.supported ?? true));
+    !isRemote && !pluginEngineTask && (!agentKind || (capabilities?.fork?.supported ?? true));
   const handleFork = useForkAtMessage({
     sessionId: currentSessionId,
     messageClientId,
@@ -357,10 +364,11 @@ export const AssistantMessage = memo(function AssistantMessage({
 
   const actionBar = !isStreaming && showActionBar ? (
     <MessageActionBar
+      pluginUi={pluginUi}
       sessionId={currentSessionId}
       clientId={messageClientId}
       createdAt={createdAt}
-      copyText={richAnswerText(content)}
+      copyText={richAnswerText(a2uiReadableText(content))}
       copyLinkText={messageDeepLink}
       align="left"
       hovered={hovered}
@@ -392,15 +400,17 @@ export const AssistantMessage = memo(function AssistantMessage({
   return (
     <div
       data-selection-quote-scope=""
-      className={cn('flex w-full flex-col items-start gap-1.5', botBubble && 'group/message')}
+      className={cn('flex w-full flex-col items-start gap-1.5', botBubble && 'group/message chat-bubble-layout')}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onCopy={handleAssistantCopy}
     >
       <ChatBubble
+        data-plugin-appearance-region
+        data-plugin-appearance-speaker="assistant"
         bare={!botBubble}
         {...(botBubble ? { 'data-bot-reply-bubble': '' } : {})}
-        className={botBubble ? cn(CHAT_BUBBLE_COLUMN_CLASS, hasRichAnswer(content) ? 'w-full' : 'w-fit') : undefined}
+        className={botBubble ? cn(CHAT_BUBBLE_COLUMN_CLASS, (hasRichAnswer(content) || hasA2uiAnswer(content)) ? 'w-full' : 'w-fit') : undefined}
       >
         {botBubble && botQuote && messageClientId ? (
           <BotChatReplyTarget message={{ clientId: messageClientId, replyToClientId }} context={botQuote} />
@@ -411,7 +421,10 @@ export const AssistantMessage = memo(function AssistantMessage({
           </div>
         )}
         <div data-selection-quote-body="" className="contents">
-          {ghostRenderCard && messageClientId && !showOriginal ? (
+          {renderPluginUiBody(pluginUi.messageBody ? { position: 'message.body', role: 'assistant', sessionId: currentSessionId,
+            disabled: !!ghostRenderCard || !!remoteHostId,
+            context: () => ({ message: { clientId: messageClientId, role: 'assistant', content, isStreaming } }) } : undefined,
+          ghostRenderCard && messageClientId && !showOriginal ? (
             // 出口钩子自绘:意识卡片替换气泡(净化后的静态 HTML,沙箱 iframe)。
             // 复用 GhostToolCard(自带主机身份头 + 主题注入 + 沙箱),turn 级无
             // 工具名/参数,running 恒 false(turn 已结束)。
@@ -425,7 +438,7 @@ export const AssistantMessage = memo(function AssistantMessage({
               running={false}
               sessionId={currentSessionId}
             />
-          ) : isStreaming && USE_LINE_COMMIT_STREAMING && !hasRichAnswer(content) ? (
+          ) : isStreaming && USE_LINE_COMMIT_STREAMING && !(hasRichAnswer(content) || hasA2uiAnswer(content)) ? (
             <StreamingBody
               workingDir={workingDir}
               content={displayContent}
@@ -450,8 +463,9 @@ export const AssistantMessage = memo(function AssistantMessage({
               currentSessionTitle={currentSessionTitle}
               allowPrivilegedLinks={allowPrivilegedLinks}
             />
-          )}
+          ))}
         </div>
+        {pluginUi.turnFooter && !isStreaming && showActionBar && <PluginUiSlot position="turn.footer" sessionId={currentSessionId} clientId={messageClientId} role="assistant" />}
         {/* 自绘卡在场:提供原文 ↔ 意识卡片切换(信任边界,主机绘制,始终可切回原文)。 */}
         {ghostRenderCard && (
           <button

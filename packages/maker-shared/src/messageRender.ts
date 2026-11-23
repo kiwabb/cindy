@@ -1,3 +1,4 @@
+import { hasA2uiAnswer } from './a2uiMessage';
 import { hasRichAnswer, richAnswerMediaSources } from './richAnswer';
 import { groupWorkRuns } from './workRunGrouping.js';
 import { isContinuationMessage } from './syntheticTrigger.js';
@@ -316,6 +317,7 @@ function buildLinearItems<
     inlineMediaByMessage.set(message, inlineMedia);
     if (message.kind === 'assistant' && !message.isStreaming && !message.failedSamplingAttempt) {
       for (const url of richAnswerMediaSources(message.body)) inlineMedia.add(url);
+      // A2UI is deduplicated only by the desktop renderer: mobile and IM still show its source.
     }
   }
   const todoInsertAt = findMessageTodoInsertions(sourceMessages);
@@ -1677,7 +1679,7 @@ const HTML_IMAGE_RE = /<img(?=[\s/>])[^<>]*\ssrc\s*=\s*["']?[^\s"'<>]+[^<>]*>/i;
 export function isDeliveryProseText(text: string): boolean {
   const trimmed = text.trim();
   if (trimmed.length === 0) return false;
-  if (hasRichAnswer(trimmed)) return true;
+  if (hasRichAnswer(trimmed) || hasA2uiAnswer(trimmed)) return true;
   if (trimmed.length >= DELIVERY_PROSE_MIN_LENGTH) return true;
   if (MARKDOWN_HEADING_RE.test(trimmed)) return true;
   if (MARKDOWN_TABLE_DIVIDER_RE.test(trimmed)) return true;

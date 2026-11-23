@@ -1,5 +1,6 @@
-import { createCanvas, loadImage } from '@napi-rs/canvas';
-import { describe, expect, it, vi } from 'vitest';
+import { fileURLToPath } from 'node:url';
+import { createCanvas, GlobalFonts, loadImage } from '@napi-rs/canvas';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 const { addRepresentation, icon } = vi.hoisted(() => {
   const addRepresentation = vi.fn();
@@ -10,6 +11,21 @@ vi.mock('electron', () => ({ nativeImage: { createEmpty: () => icon } }));
 import { createWindowsBadgeIcon, renderWindowsBadgePng } from '../windowsBadgeIcon';
 
 describe('Windows numeric taskbar badge', () => {
+  let fixtureFont: ReturnType<typeof GlobalFonts.registerFromPath> = null;
+  beforeAll(() => {
+    // Keep the PNG assertions independent of the runner's system-font fallback.
+    // This checks real badge rendering, not the Windows Segoe UI glyph shapes.
+    fixtureFont = GlobalFonts.registerFromPath(
+      fileURLToPath(new URL('../../../native/menubar/BarlowCondensed-SemiBold.ttf', import.meta.url)),
+      'Segoe UI',
+    );
+    expect(fixtureFont).not.toBeNull();
+  });
+  afterAll(() => {
+    // The native font collection is process-wide, including Vitest threads.
+    if (fixtureFont) GlobalFonts.remove(fixtureFont);
+  });
+
   it.each([1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 8])(
     'renders exact physical dimensions at %s scale for the native Shell bridge',
     (scale) => {
@@ -41,21 +57,26 @@ describe('Windows numeric taskbar badge', () => {
     expect(renderWindowsBadgePng(100, 2).equals(renderWindowsBadgePng(12345, 2))).toBe(true);
   });
 
-  it('contains red fill, white digits and transparent corners in the actual PNG', async () => {
-    const canvas = createCanvas(32, 32);
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(await loadImage(renderWindowsBadgePng(3, 2)), 0, 0);
-    const { data } = ctx.getImageData(0, 0, 32, 32);
-    expect(data[3]).toBe(0);
-    let redPixels = 0;
-    let whitePixels = 0;
-    for (let i = 0; i < data.length; i += 4) {
-      if (data[i] === 217 && data[i + 1] === 31 && data[i + 2] === 55 && data[i + 3] === 255)
-        redPixels++;
-      if (data[i] === 255 && data[i + 1] === 255 && data[i + 2] === 255 && data[i + 3] === 255)
-        whitePixels++;
-    }
-    expect(redPixels).toBeGreaterThan(100);
-    expect(whitePixels).toBeGreaterThan(10);
-  });
+  // 角标只用于 Windows 任务栏，数字字形取自 Segoe UI。Linux CI 没有该字体，
+  // 回退字体下数字没有纯白像素（实测为 0），像素断言因此只在 Windows 上跑。
+  it.runIf(process.platform === 'win32')(
+    'contains red fill, white digits and transparent corners in the actual PNG',
+    async () => {
+      const canvas = createCanvas(32, 32);
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(await loadImage(renderWindowsBadgePng(3, 2)), 0, 0);
+      const { data } = ctx.getImageData(0, 0, 32, 32);
+      expect(data[3]).toBe(0);
+      let redPixels = 0;
+      let whitePixels = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        if (data[i] === 217 && data[i + 1] === 31 && data[i + 2] === 55 && data[i + 3] === 255)
+          redPixels++;
+        if (data[i] === 255 && data[i + 1] === 255 && data[i + 2] === 255 && data[i + 3] === 255)
+          whitePixels++;
+      }
+      expect(redPixels).toBeGreaterThan(100);
+      expect(whitePixels).toBeGreaterThan(10);
+    },
+  );
 });

@@ -23,6 +23,7 @@ import {
 } from '../../../shared/botMemory';
 import { useBotTranslation } from './botPronounContext';
 import { useBotSettingsTarget } from './useBotSettingsTarget';
+import { BotProfileSourceField } from './BotProfileSourceField';
 
 const SEARCH_DEBOUNCE_MS = 200;
 const SAVE_DEBOUNCE_MS = 800;
@@ -304,7 +305,8 @@ function MemoryList({
         <h3 className="px-1 pb-2 text-12 font-medium text-[var(--text-secondary)]">
           {t('bots.memory.aboutMe')}
         </h3>
-        <Textarea
+        <BotProfileSourceField
+          label={t('bots.memory.aboutMe')}
           aria-label={t('bots.memory.aboutMe')}
           readOnly={aboutMe.readOnly}
           value={aboutMe.value}
@@ -312,7 +314,7 @@ function MemoryList({
           onBlur={aboutMe.onBlur}
           {...aboutMe.composition}
           rows={4}
-          className="min-h-24 resize-none p-3 leading-6 [field-sizing:content]"
+          className="min-h-24 max-h-96 resize-none overflow-y-auto p-3 leading-6 [field-sizing:content]"
         />
       </section>
       </> : null}
@@ -446,7 +448,6 @@ function MemoryDetail({
   const remove = async () => {
     if (!detail || busy) return;
     const ok = await confirm({
-      presentation: 'standard',
       title: t('bots.memory.deleteTitle'),
       description: t('bots.memory.deleteDescription', { name: botName, title: detail.title }) + (scope.privateSource ? ' ' + t('bots.memory.privateDeleteBoundary') : ''),
       confirmText: t('bots.memory.delete'),
@@ -635,7 +636,6 @@ function MemoryEditor({
   const settle = useCallback(async (): Promise<boolean> => {
     if (await save()) return true;
     return confirm({
-      presentation: 'standard',
       title: t('bots.memory.unsavedTitle'),
       description: t('bots.memory.unsavedDescription'),
       confirmText: t('bots.memory.discard'),

@@ -67,7 +67,7 @@ describe('Windows personal update feed check', () => {
     asset: { url: `https://github.com/kiwabb/cindy/releases/download/personal-windows-x64-r${revision}/app.zip`, sha256: 'c'.repeat(64), size: 100 } });
   const serve = (text: string) => fixture.fetch.mockResolvedValueOnce({ ok: true, text: async () => text });
 
-  it('offers a manual install for a newer release with another storage identity, and nothing for an older or failed one', async () => {
+  it('offers a manual install for a newer release with another storage identity, and nothing for an older one', async () => {
     fs.writeFileSync(optIn(), '{"enabled":true}');
     serve(feed(43, identity.storageIdentity));
     await expect(checkPersonalManifest()).resolves.toMatchObject({ kind: 'install', manifest: { revision: 43 } });
@@ -78,9 +78,23 @@ describe('Windows personal update feed check', () => {
     await expect(checkPersonalManifest()).resolves.toBeNull();
     serve(feed(41, 'd'.repeat(64)));
     await expect(checkPersonalManifest()).resolves.toBeNull();
-    touch('failed-43.json');
-    serve(feed(43, 'd'.repeat(64)));
-    await expect(checkPersonalManifest()).resolves.toBeNull();
+  });
+
+  // Regression: a revision with a failure marker used to come back as "no update", so the user saw nothing.
+  // It is still never retried (kind 'skipped', not 'install'), but now carries a reason. Markers written by
+  // older clients have no `reason`, and the macOS transaction copies its whole journal into the marker.
+  it.each([
+    ['a marker with a known reason', { revision: 43, phase: 'preparation-failed', reason: 'PERSONAL_UPDATE_HELPER_SIGNATURE' }, 'PERSONAL_UPDATE_HELPER_SIGNATURE'],
+    ['an older preparation marker', { revision: 43, phase: 'preparation-failed' }, 'PERSONAL_UPDATE_PREPARATION_FAILED'],
+    ['an older Windows apply marker', { revision: 43, phase: 'windows-apply-failed' }, 'PERSONAL_UPDATE_APPLY_FAILED'],
+    ['a copied macOS transaction journal', { phase: 'failed', failureReason: 'old_bundle_exit_timeout', zip: '/x/personal-43.zip' }, 'PERSONAL_UPDATE_APPLY_FAILED'],
+    ['an unknown reason, which is not echoed', { revision: 43, reason: 'codesign failed: /Users/someone/Cindy.app' }, 'PERSONAL_UPDATE_PREPARATION_FAILED'],
+    ['an unreadable marker', 'not json', 'PERSONAL_UPDATE_PREPARATION_FAILED'],
+  ] as const)('reports a failed newer revision as skipped with a reason (%s)', async (_label, marker, reason) => {
+    fs.writeFileSync(optIn(), '{"enabled":true}');
+    touch('failed-43.json', typeof marker === 'string' ? marker : JSON.stringify(marker));
+    serve(feed(43, identity.storageIdentity));
+    await expect(checkPersonalManifest()).resolves.toEqual(expect.objectContaining({ kind: 'skipped', reason, manifest: expect.objectContaining({ revision: 43 }) }));
   });
 });
 

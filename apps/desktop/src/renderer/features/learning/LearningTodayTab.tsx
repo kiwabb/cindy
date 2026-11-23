@@ -27,7 +27,7 @@ export function useBoundGoal(sessionId: string): LearningGoal | null {
 function Section({ label, value, children }: { label: string; value?: string; children: React.ReactNode }) {
   return (
     <div className="py-3 [&+&]:border-t [&+&]:border-[var(--border-default)]">
-      <h3 className="flex items-center justify-between pb-1.5 text-12 font-normal leading-4 text-[var(--text-tertiary)]">
+      <h3 className="flex items-center justify-between pb-1.5 text-12 font-normal leading-[1.333] text-[var(--text-tertiary)]">
         <span>{label}</span>
         {value ? <span>{value}</span> : null}
       </h3>
@@ -66,15 +66,15 @@ function TodayBody({ goal, sessionId }: { goal: LearningGoal; sessionId: string 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-1">
         <Section label={t('learning.tab.currentPoint')} value={point ? pointStateLabel(t, point.state) : undefined}>
           {module ? (
-            <p className="text-12 leading-4 text-[var(--text-secondary)]">
+            <p className="text-12 leading-[1.333] text-[var(--text-secondary)]">
               {t('learning.moduleNumber', { number: moduleIndex + 1 })} · {module.name}
             </p>
           ) : null}
-          <p className="text-13 leading-5 text-[var(--text-primary)]">{point?.name ?? t(goal.totalCount ? 'learning.allCleared' : 'learning.noOutlineYet')}</p>
+          <p className="text-13 leading-[1.54] text-[var(--text-primary)]">{point?.name ?? t(goal.totalCount ? 'learning.allCleared' : 'learning.noOutlineYet')}</p>
         </Section>
         <Section label={t('learning.tab.waiting')} value={goal.openQuestion ? '1' : '0'}>
           {goal.openQuestion ? (
-            <div className="rounded-lg bg-[var(--surface-chip)] px-3 py-2.5 text-13 leading-5 text-[var(--text-primary)]">
+            <div className="rounded-lg bg-[var(--surface-chip)] px-3 py-2.5 text-13 leading-[1.54] text-[var(--text-primary)]">
               <p className="whitespace-pre-line">{goal.openQuestion.prompt}</p>
               {goal.openQuestion.options.length ? (
                 <ul className="mt-1.5 flex flex-col gap-0.5">
@@ -88,12 +88,12 @@ function TodayBody({ goal, sessionId }: { goal: LearningGoal; sessionId: string 
               ) : null}
             </div>
           ) : (
-            <p className="text-13 leading-5 text-[var(--text-secondary)]">{t('learning.noOpenQuestion')}</p>
+            <p className="text-13 leading-[1.54] text-[var(--text-secondary)]">{t('learning.noOpenQuestion')}</p>
           )}
         </Section>
         <Section label={t('learning.tab.doneToday')}>
           {passed ? (
-            <p className="flex items-start gap-2 py-0.5 text-13 leading-5">
+            <p className="flex items-start gap-2 py-0.5 text-13 leading-[1.54]">
               <CircleCheck size={14} aria-hidden className="mt-[3px] shrink-0 text-[var(--text-primary)]" />
               <span className="min-w-0">
                 {passed.length
@@ -105,14 +105,14 @@ function TodayBody({ goal, sessionId }: { goal: LearningGoal; sessionId: string 
               <span className="ml-auto shrink-0 tabular-nums text-[var(--text-secondary)]">{passed.length}</span>
             </p>
           ) : null}
-          <p className="flex items-start gap-2 py-0.5 text-13 leading-5">
+          <p className="flex items-start gap-2 py-0.5 text-13 leading-[1.54]">
             <MessageCircleQuestion size={14} aria-hidden className="mt-[3px] shrink-0 text-[var(--text-primary)]" />
             <span className="min-w-0">{t('learning.tab.answered')}</span>
             <span className="ml-auto shrink-0 tabular-nums text-[var(--text-secondary)]">{goal.today.attempts}</span>
           </p>
           {passed ? null : (
             // Until the tutor records pass times, correct answers stand in for passes.
-            <p className="flex items-start gap-2 py-0.5 text-13 leading-5">
+            <p className="flex items-start gap-2 py-0.5 text-13 leading-[1.54]">
               <CircleCheck size={14} aria-hidden className="mt-[3px] shrink-0 text-[var(--text-primary)]" />
               <span className="min-w-0">{t('learning.tab.correct')}</span>
               <span className="ml-auto shrink-0 tabular-nums text-[var(--text-secondary)]">{goal.today.correct}</span>
@@ -123,7 +123,7 @@ function TodayBody({ goal, sessionId }: { goal: LearningGoal; sessionId: string 
           {goal.totalCount ? (
             <MiniOutline goal={goal} />
           ) : (
-            <p className="text-13 leading-5 text-[var(--text-secondary)]">{t('learning.noOutlineYet')}</p>
+            <p className="text-13 leading-[1.54] text-[var(--text-secondary)]">{t('learning.noOutlineYet')}</p>
           )}
         </Section>
       </div>
@@ -164,7 +164,7 @@ function TodayBody({ goal, sessionId }: { goal: LearningGoal; sessionId: string 
           {t('learning.tab.anotherQuestion')}
         </Button>
         {sendFailed ? (
-          <p role="status" className="w-full text-12 leading-4 text-[var(--text-secondary)]">
+          <p role="status" className="w-full text-12 leading-[1.333] text-[var(--text-secondary)]">
             {t('learning.tab.sendFailed')}
           </p>
         ) : null}
@@ -179,8 +179,8 @@ export function LearningTodayTabBody({ ctx }: TabKindBodyProps<Record<never, nev
   // Unknown owner (undefined) shows nothing; a remote conversation's goals live on that computer.
   if (ctx.deviceLinkDeviceId === undefined) return null;
   if (ctx.remoteHostId || ctx.deviceLinkDeviceId !== null)
-    return <p className="px-4 py-6 text-13 leading-5 text-[var(--text-secondary)]">{t('learning.tab.localOnly')}</p>;
+    return <p className="px-4 py-6 text-13 leading-[1.54] text-[var(--text-secondary)]">{t('learning.tab.localOnly')}</p>;
   if (!goal || goal.status !== 'active')
-    return <p className="px-4 py-6 text-13 leading-5 text-[var(--text-secondary)]">{t('learning.tab.unbound')}</p>;
+    return <p className="px-4 py-6 text-13 leading-[1.54] text-[var(--text-secondary)]">{t('learning.tab.unbound')}</p>;
   return <TodayBody goal={goal} sessionId={ctx.sessionId} />;
 }

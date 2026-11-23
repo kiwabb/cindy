@@ -87,7 +87,7 @@ describe('capabilities data source', () => {
   it('computer-use 说明未开启时的判断方法、设置入口深链与开启后的接续', () => {
     const entry = findCapability('computer-use');
     expect(entry).toBeDefined();
-    expect(entry!.detail).toContain('cindy://settings/builtin-tools');
+    expect(entry!.detail).toContain('get_settings_link');
     expect(entry!.detail).toContain('mcp__cindy_computer__');
     expect(entry!.detail).toContain('osascript');
     expect(entry!.detail).toContain('新建任务');
@@ -127,6 +127,18 @@ describe('capabilities data source', () => {
 });
 
 describe('get_capabilities tool', () => {
+  it('discovers the on-demand desktop A2UI format through the existing public tool', async () => {
+    const h = await connect(createXdtHelperMcpServer({ logger: makeLogger() }, sessionCtx));
+    try {
+      const payload = parsePayload(await h.client.callTool({ name: 'call_tool', arguments: {
+        name: 'get_capabilities', args: { key: 'a2ui-messages' },
+      } }));
+      expect(payload).toMatchObject({ ok: true, capability: {
+        key: 'a2ui-messages', detail: expect.stringContaining('cindy.sendMessage'),
+      } });
+      expect(listCapabilityIndex().some(entry => entry.key === 'a2ui-messages')).toBe(true);
+    } finally { await h.cleanup(); }
+  });
   // Pi uses this route for advanced syntax beyond its resident basic protocol.
   // Verify the real public envelope returns the complete protocol.
   it('serves the complete rich answer protocol through call_tool for Pi', async () => {
