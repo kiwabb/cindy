@@ -1,6 +1,6 @@
 import { finishCompanionStateTurn } from '../companion-state/nativeTurns.js';
 import { settleNativeMemoryTurn } from './nativeMemoryTurn.js';
-import { finishNativeFactMemoryTurn } from './nativeFactMemory.js';
+import { finishNativeFactMemoryTurn, settleNativeFactReply } from './nativeFactMemory.js';
 import { claimContextRecoveryTerminal, deferContextRecoveryTerminal, settleContextRecoveryTerminal, type ContextRecoveryTerminalPorts } from './contextRecoveryTerminal.js';
 import { botLearningTracker } from './botLearningTracker.js';
 import { learningTurnIdentity } from './botLearningFeedback.js';
@@ -618,11 +618,7 @@ export function finishSessionTerminalEvent(
     ) {
       if (terminalOwner?.instanceId === session.instanceId) {
         settleNativeMemoryTurn(session, event);
-        const syntheticPiResult = workerTerminalDoneData?.type === 'pi/extension_command'
-          || workerTerminalDoneData?.type === 'pi/managed_package_receipt';
-        finishNativeFactMemoryTurn(session, terminalOwner.generation,
-          workerTerminalFinalText.trim() && !syntheticPiResult ? 'completed' : 'failed',
-          workerTerminalFinalText);
+        settleNativeFactReply(session, terminalOwner.generation, workerTerminalFinalText, workerTerminalDoneData?.type);
         finishCompanionStateTurn(session, terminalOwner.generation, 'completed', turnAssistantPersistId);
       }
       const callback = deps.onSuccessfulProductTurn;

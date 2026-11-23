@@ -17,7 +17,7 @@ function fixture() {
  const createFactMemory = vi.fn(async () => ({dispose:vi.fn()}));
  const session:any = {id:'fixture-session',instanceId:'fixture-instance',workDir:path.join(root,'bots',botId,'workspace'),remoteHostId:null,agentKind:'codex',model:'fixture-model',getStatus:()=> 'active',onStatusChange:()=>()=>{}};
  const runtime = new CompanionMemoryRuntime({owner:()=>({id:'fixture-owner',epoch:'fixture-epoch',root}),session:()=>session,
- readBot:async()=>({canonicalSessionId:session.id,deleting:false,projectMode:false}),
+ readBot:async()=>({canonicalSessionId:session.id,deleting:false,projectMode:true}),
  store:async()=>({getStorageIdentity:()=>identity,createFactMemory}as any),provider:()=> 'fixture-provider',analysis:()=>({}as any),refresh:async()=>{},reportFailure:vi.fn()});
  const selection={ownerId:'fixture-owner',botId,sessionId:session.id,route:{providerId:'fixture-provider',model:session.model,protocol:'openai-responses' as const,baseUrl:'http://127.0.0.1:1/v1'}};
  return {root,botId,identity,createFactMemory,runtime,selection};

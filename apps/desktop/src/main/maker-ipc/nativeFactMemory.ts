@@ -49,6 +49,14 @@ export async function withNativeFactMemoryTurn(
   }
 }
 
+/** A successful transport receipt can still lack a user-facing assistant reply. */
+export function settleNativeFactReply(
+  session: NativeFactSession, generation: number, reply: string, resultKind: unknown,
+): void {
+  const synthetic = resultKind === 'pi/extension_command' || resultKind === 'pi/managed_package_receipt';
+  finishNativeFactMemoryTurn(session, generation, reply.trim() && !synthetic ? 'completed' : 'failed', reply);
+}
+
 /** Called by the existing product-terminal classifier, never directly by a vendor done event. */
 export function finishNativeFactMemoryTurn(session: NativeFactSession, generation: number,
   outcome: 'completed' | 'failed', assistantReply?: string): void {
