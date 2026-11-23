@@ -12708,6 +12708,15 @@
       }
     },
     "automations": {
+      "followUp": {
+        "cancelled": "Cancelled",
+        "title": "Schedule a chat follow-up",
+        "description": "Send one main-chat message about a topic you choose. Available 08:00–22:00 Shanghai time, at most twice daily and at least three hours apart. A busy chat or a delay of one hour skips the follow-up.",
+        "topic": "Topic to follow up on",
+        "time": "Follow-up time (Shanghai)",
+        "save": "Schedule follow-up",
+        "entry": "Chat follow-up · {{topic}}"
+      },
       "title": "Automations",
       "description": "Automations in {{name}}’s project. Turn them on or off here; edit them in Automations.",
       "empty": "{{name}} has no automations yet.",

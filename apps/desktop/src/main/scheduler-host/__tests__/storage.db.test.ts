@@ -173,7 +173,8 @@ const SCHEDULER_DDL = [
       last_fired_at INTEGER,
       last_finished_at INTEGER,
       next_fire_at INTEGER,
-      expire_at INTEGER
+      expire_at INTEGER,
+      companion_follow_up_at INTEGER
     )
   `,
   'CREATE INDEX idx_schedules_active_next ON schedules(status, next_fire_at)',

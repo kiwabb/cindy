@@ -858,6 +858,7 @@ export function scheduleToCamel(row: ScheduleRow): Schedule {
     lastFinishedAt: row.lastFinishedAt ?? undefined,
     nextFireAt: row.nextFireAt ?? undefined,
     expireAt: row.expireAt ?? undefined,
+    ...(row.companionFollowUpAt == null ? {} : { companionFollowUpAt: row.companionFollowUpAt }),
   };
 }
 
@@ -910,6 +911,7 @@ export function scheduleCreateToRow(s: Schedule): ScheduleInsert {
     lastFinishedAt: s.lastFinishedAt ?? null,
     nextFireAt: s.nextFireAt ?? null,
     expireAt: s.expireAt ?? null,
+    companionFollowUpAt: s.companionFollowUpAt ?? null,
   };
 }
 

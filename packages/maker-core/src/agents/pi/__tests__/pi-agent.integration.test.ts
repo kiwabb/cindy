@@ -465,6 +465,7 @@ describe.skipIf(!piAvailable)('PiAgent integration (real pi binary + fake gatewa
       handle = await new PiAgent(buildDeps()).startSession({
         sessionId: 'private-host-context', workingDir, model: 'pi-test-model', permissionMode: 'bypassPermissions',
         botProfilePrompt: 'Fixture owner-private identity',
+        [TASK_SYSTEM_PROMPT]: 'FIXTURE_STATIC_TASK_FRAGMENT',
         readPiCompanionLifeSlot: async () => ({
           date: '2026-11-20', timezone: 'UTC', start: '10:00', end: '11:00', activity: 'FIXTURE_SCHEDULE',
         }),
@@ -493,6 +494,7 @@ describe.skipIf(!piAvailable)('PiAgent integration (real pi binary + fake gatewa
       for (const request of requests) {
         expect(JSON.stringify(request.system)).toContain(memory);
         expect(JSON.stringify(request.system)).toContain('FIXTURE_SCHEDULE');
+        expect(JSON.stringify(request.system)).toContain('FIXTURE_STATIC_TASK_FRAGMENT');
         expect(JSON.stringify(request.messages)).not.toContain(memory);
       }
       const next = await send('next turn without context');

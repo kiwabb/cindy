@@ -1606,6 +1606,7 @@ export const schedules = sqliteTable(
     lastFinishedAt: integer('last_finished_at'),
     nextFireAt: integer('next_fire_at'),
     expireAt: integer('expire_at'),
+    companionFollowUpAt: integer('companion_follow_up_at'),
   },
   (t) => ({
     idxActiveNext: index('idx_schedules_active_next').on(t.status, t.nextFireAt),

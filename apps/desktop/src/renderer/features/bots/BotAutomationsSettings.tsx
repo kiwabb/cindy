@@ -6,6 +6,8 @@ import type { Schedule } from '@cindy/maker-scheduler';
 import { teammateFolderName, teammateFolderOfProjectPath } from '@cindy/maker-shared/teammate-project';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog-provider';
+import { Input } from '@/components/ui/input';
+import { FormField } from '@/components/ui/form-field';
 import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
 import { toast } from '@/components/ui/toast';
@@ -36,6 +38,10 @@ export function BotAutomationsSettings({ bot, beforeLeave }: {
   const { confirm } = useConfirmDialog();
   const { schedules, loading, error, refresh } = useSchedules();
   const [pending, setPending] = useState<string | null>(null);
+  const [showFollowUp, setShowFollowUp] = useState(false);
+  const [creatingFollowUp, setCreatingFollowUp] = useState(false);
+  const [topic, setTopic] = useState('');
+  const [followUpTime, setFollowUpTime] = useState('');
   const items = useMemo(() => teammateProjectSchedules(schedules, bot.id)
     .sort((a, b) => a.name.localeCompare(b.name)), [schedules, bot.id]);
   const workspace = items[0]?.workingDir ?? (bot.homeDir ? `${bot.homeDir.replace(/[\\/]+$/, '')}/workspace` : null);
@@ -67,6 +73,26 @@ export function BotAutomationsSettings({ bot, beforeLeave }: {
       setPending(null);
     }
   };
+  const createFollowUp = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (creatingFollowUp || !topic.trim() || !followUpTime) return;
+    setCreatingFollowUp(true);
+    try {
+      if (beforeLeave && !(await beforeLeave())) return;
+      await window.electronAPI.maker.schedule.createCompanionFollowUp({
+        botId: bot.id, topic, dueAt: Date.parse(`${followUpTime}:00+08:00`),
+      });
+      setShowFollowUp(false);
+      setTopic('');
+      setFollowUpTime('');
+      void refresh();
+    } catch (error) {
+      toast.error(tr('scheduler.toast.actionFailed', { error: error instanceof Error ? error.message : String(error) }));
+    } finally {
+      setCreatingFollowUp(false);
+    }
+  };
+
   const timing = (schedule: Schedule) => {
     const frequency = schedule.manual
       ? tr(schedule.webhookTrigger ? 'scheduler.webhook.title' : 'scheduler.cell.subtitleManual')
@@ -75,13 +101,33 @@ export function BotAutomationsSettings({ bot, beforeLeave }: {
         : tr('scheduler.cell.subtitleOnce');
     const last = formatLastRun(schedule.lastFiredAt, Date.now(), tr);
     const next = schedule.status === 'active' && !schedule.manual ? formatNextRun(schedule.nextFireAt, Date.now(), tr) : null;
-    const when = schedule.status === 'paused' ? tr('scheduler.cell.subtitlePaused')
+    const when = schedule.status === 'paused'
+      ? tr(schedule.companionFollowUpAt === undefined ? 'scheduler.cell.subtitlePaused' : 'bots.automations.followUp.cancelled')
       : [last, next].filter(Boolean).join(' · ');
     return { frequency, when };
   };
 
   return <div className="space-y-4 py-3">
     <p className="text-13 leading-6 text-[var(--text-secondary)]">{t('bots.automations.description', { name: bot.name })}</p>
+    <section className="space-y-3 rounded-xl border border-[var(--border-default)] p-4">
+      <Button type="button" variant="secondary" aria-expanded={showFollowUp}
+        onClick={() => setShowFollowUp(open => !open)}>
+        <Plus size={16} />{t('bots.automations.followUp.title')}
+      </Button>
+      {showFollowUp ? <form onSubmit={event => void createFollowUp(event)} className="space-y-3">
+        <p className="text-13 text-[var(--text-secondary)]">{t('bots.automations.followUp.description')}</p>
+        <fieldset disabled={creatingFollowUp} className="space-y-3">
+          <FormField required label={t('bots.automations.followUp.topic')}>
+            {control => <Input {...control} required maxLength={500} value={topic} onChange={setTopic} />}
+          </FormField>
+          <FormField required label={t('bots.automations.followUp.time')}>
+            {control => <Input {...control} type="datetime-local" required value={followUpTime}
+              onChange={setFollowUpTime} />}
+          </FormField>
+          <Button type="submit" disabled={!topic.trim() || !followUpTime}>{t('bots.automations.followUp.save')}</Button>
+        </fieldset>
+      </form> : null}
+    </section>
     {error ? <div role="alert" className="flex items-center justify-between gap-3 text-13 text-[var(--text-danger)]">
       <span>{t('bots.automations.failed')}</span>
       <Button variant="secondary" compact onClick={() => void refresh()}>{t('bots.memory.useLatest')}</Button>
@@ -95,14 +141,14 @@ export function BotAutomationsSettings({ bot, beforeLeave }: {
           <button type="button" onClick={() => void open(`/cc-agent/scheduled?focus=${encodeURIComponent(schedule.id)}`)}
             className="flex min-h-14 min-w-0 flex-1 items-center gap-2 py-3 pl-4 text-left outline-none hover:bg-[var(--surface-hover)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--focus-ring)]">
             <span className="min-w-0 flex-1">
-              <span className={`block truncate text-14 ${schedule.status === 'active' ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>{schedule.name}</span>
+              <span className={`block truncate text-14 ${schedule.status === 'active' ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>{schedule.companionFollowUpAt === undefined ? schedule.name : t('bots.automations.followUp.entry', { topic: schedule.prompt })}</span>
               <span className="mt-0.5 block truncate text-12 text-[var(--text-secondary)]">{frequency}</span>
               {when ? <span className="mt-0.5 block truncate text-12 tabular-nums text-[var(--text-tertiary)]">{when}</span> : null}
             </span>
             <ChevronRight size={14} className="shrink-0 text-[var(--text-tertiary)]" aria-hidden="true" />
           </button>
           <Switch aria-label={t('bots.automations.toggle', { name: schedule.name })} checked={schedule.status === 'active'}
-            disabled={expired || pending !== null} onCheckedChange={(value) => void toggle(schedule, value === true)} />
+            disabled={expired || pending !== null || (schedule.companionFollowUpAt !== undefined && schedule.status === 'paused')} onCheckedChange={(value) => void toggle(schedule, value === true)} />
         </li>;
       })}
     </ul> : !loading && !error ? <p className="py-3 text-13 text-[var(--text-tertiary)]">{t('bots.automations.empty', { name: bot.name })}</p> : null}

@@ -1306,6 +1306,7 @@ import { buildCompletedPlanGuardNote, buildPlanReconcileNote } from './planRecon
 import { peekGoalInactiveNote } from '../goal-host/inactiveNote.js';
 import { readReplyQuoteNote, REPLY_QUOTE_SOURCE_CONTENT } from './chatReplyQuoteNote.js';
 import { readBotDmThreadContextNote } from './botDmThreadContext.js';
+import { readCompanionOutreachNote } from '../scheduler-host/companionOutreachHost.js';
 import { readTurnUsageResetAt } from '../goal-host/usageLimit.js';
 import { resolveSessionUsageReset } from './sessionUsageReset.js';
 import {
@@ -11931,9 +11932,17 @@ export function registerMakerIpc(maker: Maker, options: RegisterMakerIpcOptions)
             { visibleText: source.persistedText ?? message },
           )
         : null;
-      const outgoingMessage: UserMessage = sourceNote
+      const sourced = sourceNote
         ? (prependNoteToWireUserMessage(withHandoff as HandoffWireMessage, sourceNote) as UserMessage)
         : withHandoff;
+      const followUp = shouldPrependMobileClientPromptNote(message, session.agentKind)
+        ? await readCompanionOutreachNote(session.id).catch(() => null) : null;
+      const notePlan = wireNoteMemory.plan(session.id, { 'companion-follow-up': followUp }, {
+        partial: true, force: !!pendingHandoff,
+      });
+      const outgoingMessage = notePlan.notes['companion-follow-up']
+        ? prependNoteToWireUserMessage(sourced as HandoffWireMessage, notePlan.notes['companion-follow-up']) as UserMessage
+        : sourced;
       // Idle direct sends never carry internal coordination (that is force-queued).
       const releaseTurnSource = noteChannelTurnSource(session.id, channelTurnSourceFor(source?.origin, false));
       try {
@@ -11970,6 +11979,7 @@ export function registerMakerIpc(maker: Maker, options: RegisterMakerIpcOptions)
           agentHandoffPending.consume(session.id);
         }
         if (sendResult.accepted) {
+          if (shouldPrependMobileClientPromptNote(message, session.agentKind)) notePlan.commit();
           void touchSessionActivityInDb(session.id);
         }
         return sendResult;
@@ -18162,6 +18172,7 @@ export function registerMakerIpc(maker: Maker, options: RegisterMakerIpcOptions)
     readReplyQuoteNote,
     // 私聊话题的 [话题说明]:按持久化的话题链接现读,不是话题时为 null。
     readBotThreadNote: readBotDmThreadContextNote,
+    readCompanionOutreachNote,
     readInputHandoffOwnerNote: (sessionId) =>
       getDeviceLinkInvokeContext()?.sharedTask ? null : (getInputHandoffService()?.ownerMessageNote(sessionId) ?? null),
     inputHandoffOwnerNoteDelivered: (sessionId) => getInputHandoffService()?.ownerMessageNoteDelivered(sessionId),
