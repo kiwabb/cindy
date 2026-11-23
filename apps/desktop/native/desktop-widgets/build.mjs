@@ -197,7 +197,8 @@ export function installDesktopWidgetsExtension(appPath, arch = process.arch) {
     swiftc(arch, [
       '-parse-as-library', '-application-extension', '-whole-module-optimization',
       '-emit-const-values-path', constValues,
-      '-const-gather-protocols-list', protocols,
+      // The frontend option Xcode itself passes; Swift 6.3 (Xcode 26.6) rejects -const-gather-protocols-list.
+      '-Xfrontend', '-const-gather-protocols-file', '-Xfrontend', protocols,
       ...sources,
       '-Xlinker', '-e', '-Xlinker', '_NSExtensionMain',
       '-o', path.join(appex, 'Contents/MacOS', EXTENSION_NAME),
