@@ -22,7 +22,7 @@ import { hasOneshotProviderCredential } from '../utility-model/oneshotProviderUs
 import { readBotProfileFolder, botProfileDir } from '../maker-ipc/botProfileFolder.js';
 import { createCompanionLifeScheduleReader } from '../maker-ipc/companionLifeSchedule.js';
 import {
-  autonomousEligible, autonomousPause, autonomousWindow, shareableActivity,
+  autonomousEligible, autonomousPause, autonomousWindow, shareableActivity, shanghaiDay,
 } from './companionAutonomousPolicy.js';
 import { listAutonomousSettings, readAutonomousSettings, writeAutonomousSettings } from './companionAutonomousSettings.js';
 import { withBotProfileLocks } from '../maker-ipc/botProfileLock.js';
@@ -388,7 +388,9 @@ export async function companionAutonomousSettings(
       (home !== 'local' && confirmedCloudHomes.get(key) !== home));
     if (update) {
       if (!home || !isDataOwnerBroadcastScopeCurrent(scope)) throw new Error('Companion home is unavailable');
-      if (unconfirmed && !update.resume) throw new Error('Resume on the current home to rebind');
+      const disabling = !update.resume && !update.greeting && !update.sharing &&
+      (update.greeting === false || update.sharing === false || update.paused === true);
+      if (unconfirmed && !update.resume && !disabling) throw new Error('Resume on the current home to rebind');
       settings = {
         greeting: update.greeting ?? current.greeting,
         sharing: update.sharing ?? current.sharing,
@@ -396,24 +398,28 @@ export async function companionAutonomousSettings(
         resumedAt: update.resume ? now : current.resumedAt,
         eligibleAt: unconfirmed || (!previous && home !== 'local')
           ? now + 24 * HOUR : current.eligibleAt,
-        home,
+        home: unconfirmed && disabling ? current.home : home,
       };
       await writeAutonomousSettings(root, botId, settings);
-      if (home !== 'local') confirmedCloudHomes.set(key, home);
+      if (home !== 'local' && !(unconfirmed && disabling)) confirmedCloudHomes.set(key, home);
     }
     const history = await autonomousHistory(root, botId);
     return {
       greeting: settings.greeting, sharing: settings.sharing,
       paused: autonomousPause(settings, history?.published ?? [], history?.lastContact ?? 0).paused,
-      homeChanged: !update && unconfirmed, canEdit: !!home,
+      homeChanged: !!settings.home && (settings.home !== home ||
+        home !== 'local' && confirmedCloudHomes.get(key) !== home), canEdit: !!home,
     };
   });
 }
 
 function followUpHasPriority(schedules: readonly Schedule[], workingDir: string, now: number) {
-  return schedules.some(schedule => schedule.status === 'active' && schedule.workingDir === workingDir &&
-    schedule.companionFollowUpAt != null && schedule.companionFollowUpAt <= now + 30 * 60_000 &&
-    (schedule.expireAt ?? schedule.companionFollowUpAt + HOUR) > now);
+  return schedules.some(schedule => {
+    const at = schedule.companionFollowUpAt;
+    return schedule.status === 'active' && schedule.workingDir === workingDir && at != null &&
+      (schedule.expireAt ?? at + HOUR) > now &&
+      (shanghaiDay(at) === shanghaiDay(now) || at < now + 3 * HOUR);
+  });
 }
 
 export function startCompanionAutonomous(listSchedules: () => Promise<Schedule[]>) {

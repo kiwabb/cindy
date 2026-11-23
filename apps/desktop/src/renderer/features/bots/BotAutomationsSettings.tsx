@@ -43,7 +43,7 @@ function CompanionAutonomousSettings({ botId }: { botId: string }) {
     }
   };
   if (!api) return null;
-  const editable = !!settings?.canEdit && !settings.homeChanged && !busy;
+  const editable = !!settings?.canEdit && !busy;
   const prefix = 'bots.automations.autonomous';
   return <section className="space-y-3 rounded-xl border border-[var(--border-default)] p-4">
     <h3 className="text-14 font-medium">{t(prefix + '.title')}</h3>
@@ -52,12 +52,12 @@ function CompanionAutonomousSettings({ botId }: { botId: string }) {
     {settings && <>
       <label className="flex items-center justify-between gap-2 text-13">
         {t(prefix + '.greeting')}
-        <Switch checked={settings.greeting} disabled={!editable}
+        <Switch checked={settings.greeting} disabled={!editable || (settings.homeChanged && !settings.greeting)}
           onCheckedChange={greeting => void save({ greeting })} />
       </label>
       <label className="flex items-center justify-between gap-2 text-13">
         {t(prefix + '.sharing')}
-        <Switch checked={settings.sharing} disabled={!editable}
+        <Switch checked={settings.sharing} disabled={!editable || (settings.homeChanged && !settings.sharing)}
           onCheckedChange={sharing => void save({ sharing })} />
       </label>
       {settings.homeChanged && <p className="text-13">{t(prefix + '.homeChanged')}</p>}
