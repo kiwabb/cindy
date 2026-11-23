@@ -14,12 +14,12 @@ import { createLogger } from '../logger.js';
 import { getDbClient } from '../localDb/client/current.js';
 import { readBotSettingsProfile } from '../localDb/ipc/bots.js';
 import { createMessage } from '../localDb/ipc/messages.js';
-import { botProfiles, botSessionLinks, messages, sessions } from '../localDb/schema.js';
+import { botProfiles, botProfileVersions, botSessionLinks, messages, sessions } from '../localDb/schema.js';
 import { getActiveCatalog } from '../maker-host/active-catalog.js';
 import { readModelDisableOverrides } from '../maker-host/model-disable-store.js';
 import { buildTextOneshotPinOptions } from '../utility-model/textOneshotPinOptions.js';
 import { hasOneshotProviderCredential } from '../utility-model/oneshotProviderUsability.js';
-import { readBotProfileFolder, botProfileDir } from '../maker-ipc/botProfileFolder.js';
+import { botProfileDir } from '../maker-ipc/botProfileFolder.js';
 import { createCompanionLifeScheduleReader } from '../maker-ipc/companionLifeSchedule.js';
 import {
   autonomousEligible, autonomousPause, autonomousWindow, shareableActivity, shanghaiDay, validAutonomousText,
@@ -116,10 +116,13 @@ async function readTarget(botId: string) {
     agentKind: sessions.agentKind, model: sessions.model, providerId: sessions.providerId,
     agentDeviceId: sessions.agentDeviceId, remoteHostId: sessions.remoteHostId,
     scheduledModelBaseline: sessions.scheduledModelBaseline,
-    version: botProfiles.currentVersion,
+    version: botProfiles.currentVersion, profileVersion: botSessionLinks.profileVersion,
+    activeIdentity: botProfileVersions.identitySource,
   }).from(botSessionLinks)
     .innerJoin(sessions, eq(sessions.id, botSessionLinks.sessionId))
     .innerJoin(botProfiles, eq(botProfiles.id, botSessionLinks.botId))
+    .leftJoin(botProfileVersions, and(eq(botProfileVersions.botId, botSessionLinks.botId),
+      eq(botProfileVersions.version, botSessionLinks.profileVersion)))
     .where(and(eq(botProfiles.id, botId), eq(botProfiles.status, 'active'),
       eq(botSessionLinks.role, 'canonical'), isNull(botSessionLinks.archivedAt),
       eq(sessions.status, 'active'), eq(sessions.source, 'bot'))).limit(1);
@@ -232,6 +235,7 @@ async function fireCompanionOutreach(botId: string, request: OutreachRequest, ct
       const publications = new Map(await ledger.readPublications(floor));
       for (const row of rows) publications.set(row.clientId, row.createdAt);
       const sameChat = !!live && live.id === target.id && live.version === target.version &&
+        (!request.kind || live.profileVersion === target.profileVersion) &&
         live.clearedAt === target.clearedAt && live.userSendAt === target.userSendAt &&
         live.agentKind === target.agentKind && live.providerId === providerId &&
         live.model === model && !live.remoteHostId && !live.agentDeviceId && !live.scheduledModelBaseline;
@@ -496,7 +500,10 @@ export function startCompanionAutonomous(listSchedules: () => Promise<Schedule[]
           lastContact: history.lastContact, now }) && now - history.lastActivity >= 12 * HOUR;
     };
     if (!await eligible()) return;
-    const identity = (await readBotProfileFolder(root, botId, { strict: true })).identitySource.trim();
+    // Match the canonical chat runtime, which uses the accepted profile snapshot.
+    const activeProfile = await readTarget(botId);
+    if (!activeProfile || activeProfile.profileVersion !== activeProfile.version) return;
+    const identity = activeProfile.activeIdentity?.trim();
     if (!identity) return;
     const slot = initial.sharing ? await planReader(identity) : undefined;
     const share = slot?.timezone === 'Asia/Shanghai' && shareableActivity(slot.activity) ? slot : undefined;
@@ -514,10 +521,11 @@ export function startCompanionAutonomous(listSchedules: () => Promise<Schedule[]
       kind, identity, topic: share?.activity ?? '',
       async authorized() {
         if (homeChanged || !await eligible()) return false;
-        const live = (await readBotProfileFolder(root, botId, { strict: true })).identitySource.trim();
-        if (live !== identity) return false;
+        const live = await readTarget(botId);
+        if (!live || live.id !== activeProfile.id || live.profileVersion !== activeProfile.profileVersion ||
+            live.profileVersion !== live.version || live.activeIdentity?.trim() !== identity) return false;
         if (!share) return true;
-        const active = await planReader(live);
+        const active = await planReader(identity);
         return !!active && active.date === share.date && active.start === share.start &&
           active.end === share.end && active.activity === share.activity;
       },

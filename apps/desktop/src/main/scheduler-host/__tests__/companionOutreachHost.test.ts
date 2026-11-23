@@ -10,7 +10,7 @@ import type { CreateScheduleInput, Schedule } from '@cindy/maker-scheduler';
 import { EMPTY_COMPANION_CLOUD_SNAPSHOT } from '../../../shared/companionCloud.js';
 import { companionHomes } from '../../companion-cloud/homes.js';
 import { runMigrationReplay } from '../../localDb/migrationRunner.js';
-import { botProfiles, botSessionLinks, messages, sessions } from '../../localDb/schema.js';
+import { botProfiles, botProfileVersions, botSessionLinks, messages, sessions } from '../../localDb/schema.js';
 import {
   companionAutonomousSettings, startCompanionAutonomous, createCompanionFollowUp, readCompanionOutreachNote, withCompanionFollowUps,
 } from '../companionOutreachHost.js';
@@ -39,7 +39,6 @@ vi.mock('../../maker-ipc/botProjectMemory.js', () => ({
   teammateWorkspaceDir: (root: string, id: string) => join(root, 'bots', id, 'workspace'),
 }));
 vi.mock('../../maker-ipc/botProfileFolder.js', () => ({
-  readBotProfileFolder: async () => ({ identitySource: 'Fixture companion' }),
   botProfileDir: (root: string, id: string) => join(root, 'bots', id),
 }));
 vi.mock('../../maker-ipc/companionLifeSchedule.js', () => ({
@@ -81,6 +80,9 @@ it.skipIf(process.platform !== 'darwin' && process.platform !== 'win32')('uses t
     }).run();
     db.insert(botProfiles).values({
       id: botId, displayName: 'Fixture', canonicalSessionId: sessionId, createdAt, updatedAt: createdAt,
+    }).run();
+    db.insert(botProfileVersions).values({
+      id: 'profile-fixture', botId, version: 1, identitySource: 'Active companion snapshot', createdAt,
     }).run();
     db.insert(botSessionLinks).values({
       id: 'link-fixture', botId, sessionId, role: 'canonical', createdAt,
@@ -187,7 +189,15 @@ it.skipIf(process.platform !== 'darwin' && process.platform !== 'win32')('uses t
       h.plan.mockResolvedValue({
         date: '2026-11-27', timezone: 'Asia/Shanghai', start: '19:00', end: '19:30', activity: '读书',
       });
+      h.plan.mockClear();
+      db.update(botProfiles).set({ currentVersion: 2 }).run();
+      await engine.tick();
+      expect(h.plan).not.toHaveBeenCalled();
+      expect(h.publish).toHaveBeenCalledTimes(3);
+      db.update(botProfiles).set({ currentVersion: 1 }).run();
       h.generate.mockImplementationOnce(async (prompt, request) => {
+        expect(h.plan).toHaveBeenLastCalledWith('Active companion snapshot');
+        expect(request.systemPrompt).toContain('Active companion snapshot');
         expect(prompt).toContain('读书');
         expect(prompt).not.toContain('Hello');
         expect(request.validateResponse('我打算读书。')).toBe(true);
