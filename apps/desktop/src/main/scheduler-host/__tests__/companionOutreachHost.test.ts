@@ -12,7 +12,7 @@ import { companionHomes } from '../../companion-cloud/homes.js';
 import { runMigrationReplay } from '../../localDb/migrationRunner.js';
 import { botProfiles, botSessionLinks, messages, sessions } from '../../localDb/schema.js';
 import {
-  createCompanionFollowUp, readCompanionOutreachNote, withCompanionFollowUps,
+  companionAutonomousSettings, startCompanionAutonomous, createCompanionFollowUp, readCompanionOutreachNote, withCompanionFollowUps,
 } from '../companionOutreachHost.js';
 
 const h = vi.hoisted(() => ({
@@ -37,6 +37,13 @@ vi.mock('../../utility-model/oneshotProviderUsability.js', () => ({ hasOneshotPr
 vi.mock('../../utility-model/oneShotCandidates.js', () => ({ requestExplicitUtilityText: h.generate }));
 vi.mock('../../maker-ipc/botProjectMemory.js', () => ({
   teammateWorkspaceDir: (root: string, id: string) => join(root, 'bots', id, 'workspace'),
+}));
+vi.mock('../../maker-ipc/botProfileFolder.js', () => ({
+  readBotProfileFolder: async () => ({ identitySource: 'Fixture companion' }),
+  botProfileDir: (root: string, id: string) => join(root, 'bots', id),
+}));
+vi.mock('../../maker-ipc/companionLifeSchedule.js', () => ({
+  createCompanionLifeScheduleReader: () => async () => undefined,
 }));
 vi.mock('../../maker-ipc/register.js', () => ({
   ensureSchedulerQueueRestored: async () => true,
@@ -110,11 +117,11 @@ it.skipIf(process.platform !== 'darwin' && process.platform !== 'win32')('uses t
     h.publish.mockImplementation(async (id, body, options) => {
       await options.beforePublish();
       db.insert(messages).values({
-        id: 'reply-fixture', sessionId: id, role: body.role, clientId: body.clientId,
+        id: body.clientId, sessionId: id, role: body.role, clientId: body.clientId,
         content: body.content, agentMeta: JSON.stringify(body.agentMeta), createdAt: body.createdAt,
       }).run();
       await options.beforePublish();
-      return { id: 'reply-fixture', createdAt: new Date(body.createdAt).toISOString() };
+      return { id: body.clientId, createdAt: new Date(body.createdAt).toISOString() };
     });
     expect(await runner.fire(schedule, ctx)).toMatchObject({ sessionId });
     expect(await runner.fire(schedule, { ...ctx, runId: 'retry-fixture' })).toMatchObject({ skipped: true });
@@ -127,6 +134,43 @@ it.skipIf(process.platform !== 'darwin' && process.platform !== 'win32')('uses t
     expect(h.generate).toHaveBeenCalledOnce();
     expect(h.publish).toHaveBeenCalledOnce();
     expect(fallbackRunner.fire).not.toHaveBeenCalled();
+
+    const evening = Date.parse('2026-11-23T19:00:00+08:00');
+    vi.setSystemTime(evening);
+    const engine = startCompanionAutonomous(async () => []);
+    try {
+      // No configuration and sharing-only without a validated plan stay silent.
+      await engine.tick();
+      await companionAutonomousSettings(botId, { sharing: true });
+      await engine.tick();
+      expect(h.publish).toHaveBeenCalledOnce();
+      await companionAutonomousSettings(botId, { greeting: true });
+      await engine.tick();
+      await engine.tick();
+      expect(h.publish).toHaveBeenCalledTimes(2);
+      expect(await readCompanionOutreachNote(sessionId)).toContain('How did your reading go?');
+
+      vi.setSystemTime(evening + 24 * 3_600_000);
+      await engine.tick();
+      expect(h.publish).toHaveBeenCalledTimes(2);
+      vi.setSystemTime(evening + 48 * 3_600_000);
+      await engine.tick();
+      expect(h.publish).toHaveBeenCalledTimes(3);
+      expect(await companionAutonomousSettings(botId)).toMatchObject({ paused: true });
+
+      db.insert(messages).values({
+        id: 'synthetic', clientId: 'synthetic', sessionId, role: 'user',
+        content: '[UI_ACTION_TRIGGER]', createdAt: Date.now() + 1,
+      }).run();
+      expect(await companionAutonomousSettings(botId)).toMatchObject({ paused: true });
+      db.insert(messages).values({
+        id: 'human', clientId: 'human', sessionId, role: 'user',
+        content: 'Hello', createdAt: Date.now() + 2,
+      }).run();
+      expect(await companionAutonomousSettings(botId)).toMatchObject({ paused: false });
+    } finally {
+      engine.stop();
+    }
   } finally {
     sqlite.close();
     await rm(root, { recursive: true, force: true });

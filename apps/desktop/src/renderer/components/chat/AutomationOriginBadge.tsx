@@ -226,8 +226,13 @@ export function AutomationOriginBadge({
         }
       : null;
   } else {
-    const scheduleId = automationOrigin.scheduleId?.trim();
-    label = automationOrigin.scheduleName
+    const rawScheduleId = automationOrigin.scheduleId?.trim();
+    const autonomous = rawScheduleId?.startsWith('autonomous:');
+    const scheduleId = autonomous ? undefined : rawScheduleId;
+    label = autonomous
+      ? t(automationOrigin.scheduleName === 'sharing'
+        ? 'bots.automations.autonomous.sharing' : 'bots.automations.autonomous.greeting')
+      : automationOrigin.scheduleName
       ? t('chat.userMessage.automationSentNamed', { name: automationOrigin.scheduleName })
       : t('chat.userMessage.automationSent');
     viewTitle = t('chat.userMessage.automationViewTask');

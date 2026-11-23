@@ -22,7 +22,7 @@ export class CompanionOutreachLedger {
 
   clientId(eventKey: string): string {
     if (!eventKey.trim()) throw new Error('Missing companion event key');
-    return `${COMPANION_FOLLOW_UP_CLIENT_PREFIX}${createHash('sha256').update(this.botId)
+    return `${COMPANION_FOLLOW_UP_CLIENT_PREFIX}${eventKey.startsWith('autonomous:') ? 'auto-' : ''}${createHash('sha256').update(this.botId)
       .update('\0').update(eventKey).digest('hex')}`;
   }
 
@@ -32,7 +32,7 @@ export class CompanionOutreachLedger {
       throw error;
     });
     return entries.flatMap(filename => {
-      const match = /^([a-f0-9]{64})\.(\d+)\.sent$/.exec(filename);
+      const match = /^((?:auto-)?[a-f0-9]{64})\.(\d+)\.sent$/.exec(filename);
       if (!match || Number(match[2]) < after) return [];
       return [[COMPANION_FOLLOW_UP_CLIENT_PREFIX + match[1], Number(match[2])] as const];
     });

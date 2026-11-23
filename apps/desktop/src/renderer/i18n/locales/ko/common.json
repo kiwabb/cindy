@@ -12658,6 +12658,16 @@
       }
     },
     "automations": {
+      "autonomous": {
+        "title": "Proactive chat",
+        "description": "At most once daily in Shanghai time, 12:30–13:00 or 19:00–19:30. Greetings and fictional plans are optional. For two unanswered messages, outreach pauses until you reach out or resume.",
+        "greeting": "Occasional greetings",
+        "sharing": "Share fictional plans",
+        "pause": "Pause",
+        "resume": "Resume",
+        "homeChanged": "The home changed. Resume from the current home to reconnect after a quiet day.",
+        "error": "Could not load or save these settings."
+      },
       "title": "자동화",
       "description": "{{name}} 프로젝트의 자동화입니다. 여기서 켜고 끄며, 편집은 자동화 페이지에서 합니다.",
       "empty": "{{name}}에게 아직 자동화가 없습니다.",

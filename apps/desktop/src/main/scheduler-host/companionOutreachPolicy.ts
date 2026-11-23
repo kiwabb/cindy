@@ -22,6 +22,7 @@ function localClock(at: number) {
 export type CompanionOutreachEvent = {
   key: string;
   occurredAt: number;
+  expiresAt?: number;
 };
 
 export type CompanionOutreachDecision = 'allow' | 'disabled' | 'not-home' | 'busy'
@@ -43,7 +44,8 @@ export function decideCompanionOutreach(input: {
   if (input.busy) return 'busy';
   const { event, now } = input;
   if (!event?.key || !Number.isFinite(now) || !Number.isFinite(event.occurredAt)
-    || event.occurredAt > now || now - event.occurredAt >= MAX_EVENT_AGE_MS) {
+    || event.occurredAt > now || now - event.occurredAt >= MAX_EVENT_AGE_MS ||
+      (event.expiresAt !== undefined && now >= event.expiresAt)) {
     return 'no-fresh-event';
   }
   if (input.eventAlreadyClaimed) return 'duplicate';

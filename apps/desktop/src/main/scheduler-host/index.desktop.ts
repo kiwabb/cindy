@@ -52,7 +52,7 @@ import { SchedulerScriptCapabilityBroker } from './script-capability-broker.desk
 import { DesktopNotifier } from './notifier.desktop';
 import { sendFeishuSessionNotification } from '../im/feishu/notificationOrigin';
 import { wecomGroupNotificationService } from '../wecomGroupNotification';
-import { withCompanionFollowUps } from './companionOutreachHost.js';
+import { startCompanionAutonomous, withCompanionFollowUps } from './companionOutreachHost.js';
 import { withTeammateHomeGuard } from './teammateHomeGuard.js';
 import { withQuietRunArchive } from './quietRunArchive.js';
 import { archiveQuietScheduledTarget, readScheduledTargetStatus } from './quietRunArchive.desktop.js';
@@ -70,6 +70,8 @@ export interface StartSchedulerDeps extends SchedulerHostStartDeps {
 }
 
 const quietRunLog = createLogger('scheduler-host');
+
+let stopAutonomous: (() => void) | undefined;
 
 const desktop = createSchedulerHost<StartSchedulerDeps>({
   createStorage: getDb => new DrizzleScheduleStorage(getDb),
@@ -177,11 +179,15 @@ const desktop = createSchedulerHost<StartSchedulerDeps>({
   isPassive: () => !app.isPackaged && process.env.XDT_SCHEDULER_PASSIVE === '1',
   dialogueWorkspaceRoots: () => dialogueWorkspaceRoots(),
   onStarted(scheduler, deps, passive) {
+    stopAutonomous?.();
+    stopAutonomous = passive ? undefined : startCompanionAutonomous(() => scheduler.list()).stop;
     startRewoundSchedulerPromptCleanup({ logger: deps.logger });
     if (!passive) void startScheduleWebhooks(scheduler, deps.logger).catch(error =>
       deps.logger.warn?.(`[scheduler-host] schedule webhooks failed to start (non-fatal): ${String(error)}`));
   },
   async beforeReset() {
+    stopAutonomous?.();
+    stopAutonomous = undefined;
     stopRewoundSchedulerPromptCleanup();
     await stopScheduleWebhooks();
   },
