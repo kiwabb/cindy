@@ -46,3 +46,19 @@ export function shareableActivity(activity: string) {
   return /^[\p{L}\p{N} ，、。]{1,32}$/u.test(activity) &&
     /^(泡(一)?杯茶|泡茶|喝茶|读书|看书|阅读|翻[几两]页书|散步|画画|听音乐|整理书桌)[。]?$/u.test(activity);
 }
+
+/** Limit automatic wording to a greeting or an explicit intention. */
+export function validAutonomousText(kind: 'greeting' | 'sharing', text: string, activity: string) {
+  const value = text.trim();
+  if (kind === 'greeting') {
+    return /^(?:(?:中午好|午安|下午好|晚上好|嗨|哈喽)(?:呀|哦|哟|啊)?[，。！～~ ]*|(?:亲爱的|宝贝)[， ]*){0,2}(?:(?:突然)?想(?:来)?(?:跟|和)你打(?:个|声)招呼)?[。！～~]*$/u.test(value) &&
+      /(?:好|安|嗨|哈喽|招呼)/u.test(value);
+  }
+  if (!shareableActivity(activity)) return false;
+  const task = activity.replace(/。$/, '');
+  const expectation = new RegExp(
+    '^(?:(?:亲爱的|宝贝)[， ]*)?我(?:今天|这会儿|待会儿|一会儿|傍晚|晚上|中午)?' +
+    '(?:打算|准备|计划|想要|想)(?:先|去)?' + task + '(?:呀|哦|呢|啦)?[。！～~]*$', 'u',
+  );
+  return expectation.test(value);
+}

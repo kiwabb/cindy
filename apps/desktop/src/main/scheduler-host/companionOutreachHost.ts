@@ -22,7 +22,7 @@ import { hasOneshotProviderCredential } from '../utility-model/oneshotProviderUs
 import { readBotProfileFolder, botProfileDir } from '../maker-ipc/botProfileFolder.js';
 import { createCompanionLifeScheduleReader } from '../maker-ipc/companionLifeSchedule.js';
 import {
-  autonomousEligible, autonomousPause, autonomousWindow, shareableActivity, shanghaiDay,
+  autonomousEligible, autonomousPause, autonomousWindow, shareableActivity, shanghaiDay, validAutonomousText,
 } from './companionAutonomousPolicy.js';
 import { listAutonomousSettings, readAutonomousSettings, writeAutonomousSettings } from './companionAutonomousSettings.js';
 import { withBotProfileLocks } from '../maker-ipc/botProfileLock.js';
@@ -274,9 +274,9 @@ async function fireCompanionOutreach(botId: string, request: OutreachRequest, ct
               request.identity ?? profile.identitySource,
               request.kind ? undefined : profile.userContextSource,
               request.kind === 'sharing'
-                ? 'Share the supplied fictional plan in one brief Chinese sentence, explicitly as something you intend to do.'
+                ? 'Share the supplied fictional plan in one brief Chinese sentence, explicitly as something you intend to do. Use the exact activity, for example 我待会儿打算读书。 No other details.'
                 : request.kind === 'greeting'
-                  ? 'Write one brief natural Chinese greeting. Do not infer the user’s activities, mood, location or availability.'
+                  ? 'Write one brief natural Chinese greeting. For example 晚上好呀，想跟你打个招呼。 Only a greeting, without observations or other claims.'
                   : 'Write one brief private chat message to follow up on the topic the user explicitly scheduled.',
               'Use the language of the topic unless the profile specifies a language. Output only the chat message.',
               'Do not claim a plan happened, that you monitored the user, or that you checked any external facts.',
@@ -286,7 +286,7 @@ async function fireCompanionOutreach(botId: string, request: OutreachRequest, ct
             validateResponse: text => {
               const value = text.trim();
               return !!value && value.length <= (request.kind ? 120 : 1_000) &&
-                (request.kind !== 'sharing' || /(?:打算|想要|准备|计划)/.test(value) && value.includes(request.topic));
+                (!request.kind || validAutonomousText(request.kind, value, request.topic));
             },
             beforeDispatch: async actual => actual.agentKind === route.agentKind &&
               actual.providerId === providerId && actual.model === model && await authorize(),
@@ -299,6 +299,7 @@ async function fireCompanionOutreach(botId: string, request: OutreachRequest, ct
         if (result.providerId !== providerId || result.model !== model) {
           throw new Error('Companion follow-up model receipt does not match the selected route');
         }
+        if (request.kind && !validAutonomousText(request.kind, result.text, request.topic)) return null;
         return result.text.trim();
       },
       async publish({ clientId, text, conversationEpoch }) {

@@ -16,7 +16,7 @@ import {
 } from '../companionOutreachHost.js';
 
 const h = vi.hoisted(() => ({
-  db: {} as unknown, ownerDir: '', generate: vi.fn(), publish: vi.fn(),
+  db: {} as unknown, ownerDir: '', generate: vi.fn(), publish: vi.fn(), plan: vi.fn(),
 }));
 vi.mock('../../appSessionState.js', () => ({ ownerScopedUserDataPath: () => h.ownerDir }));
 vi.mock('../../device-link/broadcast-tap.js', () => ({
@@ -43,7 +43,7 @@ vi.mock('../../maker-ipc/botProfileFolder.js', () => ({
   botProfileDir: (root: string, id: string) => join(root, 'bots', id),
 }));
 vi.mock('../../maker-ipc/companionLifeSchedule.js', () => ({
-  createCompanionLifeScheduleReader: () => async () => undefined,
+  createCompanionLifeScheduleReader: () => h.plan,
 }));
 vi.mock('../../maker-ipc/register.js', () => ({
   ensureSchedulerQueueRestored: async () => true,
@@ -55,6 +55,7 @@ vi.mock('../../maker-ipc/register.js', () => ({
 afterEach(() => {
   vi.useRealTimers();
   vi.clearAllMocks();
+  h.plan.mockReset();
   companionHomes.reset();
 });
 
@@ -107,12 +108,12 @@ it.skipIf(process.platform !== 'darwin' && process.platform !== 'win32')('uses t
     expect(h.generate).not.toHaveBeenCalled();
     companionHomes.reset();
 
-    h.generate.mockImplementation(async (_prompt, request) => {
+    h.generate.mockImplementation(async (prompt, request) => {
       const route = { agentKind: 'codex', providerId: 'fixture-provider', model: 'fixture-model' };
       expect(request).toMatchObject(route);
       expect(await request.beforeDispatch(route)).toBe(true);
       expect(await request.beforeDispatch({ ...route, providerId: 'unselected-provider' })).toBe(false);
-      return { ...route, ok: true, text: 'How did your reading go?' };
+      return { ...route, ok: true, text: prompt.includes('greeting') ? '晚上好呀，想跟你打个招呼。' : 'How did your reading go?' };
     });
     h.publish.mockImplementation(async (id, body, options) => {
       await options.beforePublish();
@@ -148,7 +149,7 @@ it.skipIf(process.platform !== 'darwin' && process.platform !== 'win32')('uses t
       await engine.tick();
       await engine.tick();
       expect(h.publish).toHaveBeenCalledTimes(2);
-      expect(await readCompanionOutreachNote(sessionId)).toContain('How did your reading go?');
+      expect(await readCompanionOutreachNote(sessionId)).toContain('晚上好呀');
 
       vi.setSystemTime(evening + 24 * 3_600_000);
       await engine.tick();
@@ -181,6 +182,21 @@ it.skipIf(process.platform !== 'darwin' && process.platform !== 'win32')('uses t
       await companionAutonomousSettings(botId, { greeting: true });
       await engine.tick();
       expect(h.publish).toHaveBeenCalledTimes(3);
+
+      vi.setSystemTime(evening + 96 * 3_600_000);
+      h.plan.mockResolvedValue({
+        date: '2026-11-27', timezone: 'Asia/Shanghai', start: '19:00', end: '19:30', activity: '读书',
+      });
+      h.generate.mockImplementationOnce(async (prompt, request) => {
+        expect(prompt).toContain('读书');
+        expect(prompt).not.toContain('Hello');
+        expect(request.validateResponse('我打算读书。')).toBe(true);
+        expect(request.validateResponse('我已经读书了。')).toBe(false);
+        return { ok: true, providerId: 'fixture-provider', model: 'fixture-model', text: '我打算读书。' };
+      });
+      await engine.tick();
+      expect(h.publish).toHaveBeenCalledTimes(4);
+      expect(await readCompanionOutreachNote(sessionId)).toContain('我打算读书。');
     } finally {
       engine.stop();
     }

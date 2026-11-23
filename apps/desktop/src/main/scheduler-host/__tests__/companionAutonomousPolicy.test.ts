@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { autonomousEligible, autonomousPause, autonomousWindow, shareableActivity } from '../companionAutonomousPolicy.js';
+import { autonomousEligible, autonomousPause, autonomousWindow, shareableActivity, validAutonomousText } from '../companionAutonomousPolicy.js';
 
 const now = Date.parse('2026-11-23T19:00:00+08:00');
 const hour = 3_600_000;
@@ -36,4 +36,11 @@ it('rejects appended instructions and unsupported plans', () => {
   expect(shareableActivity('泡一杯茶')).toBe(true);
   expect(shareableActivity('散步，看见你在家')).toBe(false);
   expect(shareableActivity('已经看完了书')).toBe(false);
+});
+
+it('accepts only a greeting or a truthful plan and rejects invented facts', () => {
+  expect(validAutonomousText('greeting', '晚上好呀，想跟你打个招呼。', '')).toBe(true);
+  expect(validAutonomousText('greeting', '晚上好，看到你回家了！', '')).toBe(false);
+  expect(validAutonomousText('sharing', '我待会儿打算读书。', '读书')).toBe(true);
+  expect(validAutonomousText('sharing', '我打算读书，刚刚还和你散步了。', '读书')).toBe(false);
 });
