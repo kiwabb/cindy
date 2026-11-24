@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ChevronRight, Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -15,6 +15,61 @@ import { useSchedules } from '../scheduler/hooks/useSchedules';
 import { cronToHuman } from '../../../shared/scheduleCronLabel';
 import { formatLastRun, formatNextRun } from '../scheduler/lib/formatters';
 import { useBotTranslation } from './botPronounContext';
+
+type AutonomousApi = Window['electronAPI']['maker']['schedule']['companionAutonomous'];
+
+function CompanionAutonomousSettings({ botId }: { botId: string }) {
+  const { t } = useTranslation();
+  const [settings, setSettings] = useState<Awaited<ReturnType<AutonomousApi>> | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(false);
+  const api = window.electronAPI.maker.schedule.companionAutonomous;
+  useEffect(() => {
+    if (!api) return;
+    let active = true;
+    void api({ botId }).then(result => { if (active) setSettings(result); })
+      .catch(() => { if (active) setError(true); });
+    return () => { active = false; };
+  }, [api, botId]);
+  const save = async (update: NonNullable<Parameters<AutonomousApi>[0]['update']>) => {
+    setBusy(true);
+    setError(false);
+    try {
+      setSettings(await api({ botId, update }));
+    } catch {
+      setError(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+  if (!api) return null;
+  const editable = !!settings?.canEdit && !busy;
+  const prefix = 'bots.automations.autonomous';
+  return <section className="space-y-3 rounded-xl border border-[var(--border-default)] p-4">
+    <h3 className="text-14 font-medium">{t(prefix + '.title')}</h3>
+    <p className="text-13 text-[var(--text-secondary)]">{t(prefix + '.description')}</p>
+    {error && <p role="alert" className="text-13 text-[var(--text-danger)]">{t(prefix + '.error')}</p>}
+    {settings && <>
+      <label className="flex items-center justify-between gap-2 text-13">
+        {t(prefix + '.greeting')}
+        <Switch checked={settings.greeting} disabled={!editable}
+          onCheckedChange={greeting => void save({ greeting })} />
+      </label>
+      <label className="flex items-center justify-between gap-2 text-13">
+        {t(prefix + '.sharing')}
+        <Switch checked={settings.sharing} disabled={!editable}
+          onCheckedChange={sharing => void save({ sharing })} />
+      </label>
+      {settings.homeChanged && <p className="text-13">{t(prefix + '.homeChanged')}</p>}
+      {(settings.greeting || settings.sharing) && (
+        <Button type="button" variant="secondary" disabled={!settings.canEdit || busy}
+          onClick={() => void save(settings.paused ? { resume: true } : { paused: true })}>
+          {t(prefix + (settings.paused ? '.resume' : '.pause'))}
+        </Button>
+      )}
+    </>}
+  </section>;
+}
 
 /** The automations of a teammate's own project, as in the Automations page. */
 export function teammateProjectSchedules(schedules: readonly Schedule[], botId: string): Schedule[] {
@@ -108,6 +163,7 @@ export function BotAutomationsSettings({ bot, beforeLeave }: {
   };
 
   return <div className="space-y-4 py-3">
+    <CompanionAutonomousSettings key={bot.id} botId={bot.id} />
     <p className="text-13 leading-6 text-[var(--text-secondary)]">{t('bots.automations.description', { name: bot.name })}</p>
     <section className="space-y-3 rounded-xl border border-[var(--border-default)] p-4">
       <Button type="button" variant="secondary" aria-expanded={showFollowUp}

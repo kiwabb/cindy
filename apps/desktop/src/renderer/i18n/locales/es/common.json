@@ -12804,6 +12804,16 @@
       }
     },
     "automations": {
+      "autonomous": {
+        "title": "Chat proactivo",
+        "description": "Se evalúa cada cinco minutos fuera del horario de silencio de 00:00 a 08:00 de Shanghái. Hasta seis mensajes espontáneos al día. Los saludos y los planes ficticios se pueden activar por separado.",
+        "greeting": "Saludos ocasionales",
+        "sharing": "Compartir planes ficticios",
+        "pause": "Pausar",
+        "resume": "Reanudar",
+        "homeChanged": "Los mensajes espontáneos solo están disponibles en modo local.",
+        "error": "No se pudo cargar o guardar la configuración."
+      },
       "title": "Automatizaciones",
       "description": "Automatizaciones del proyecto de {{name}}. Actívalas o desactívalas aquí; edítalas en Automatizaciones.",
       "empty": "{{name}} aún no tiene automatizaciones.",

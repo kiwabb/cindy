@@ -12708,6 +12708,16 @@
       }
     },
     "automations": {
+      "autonomous": {
+        "title": "Proaktiver Chat",
+        "description": "Alle fünf Minuten außerhalb der Ruhezeit von 00:00 bis 08:00 Uhr (Shanghai). Bis zu sechs proaktive Nachrichten pro Tag. Begrüßungen und fiktive Pläne lassen sich getrennt aktivieren.",
+        "greeting": "Gelegentlich grüßen",
+        "sharing": "Fiktive Pläne teilen",
+        "pause": "Pausieren",
+        "resume": "Fortsetzen",
+        "homeChanged": "Proaktive Nachrichten sind nur im lokalen Modus verfügbar.",
+        "error": "Die Einstellungen konnten nicht geladen oder gespeichert werden."
+      },
       "title": "Automatisierungen",
       "description": "Automatisierungen im Projekt von {{name}}. Hier ein- oder ausschalten, bearbeiten unter Automatisierungen.",
       "empty": "{{name}} hat noch keine Automatisierungen.",

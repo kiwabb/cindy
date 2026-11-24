@@ -12708,6 +12708,16 @@
       }
     },
     "automations": {
+      "autonomous": {
+        "title": "Proactive chat",
+        "description": "Eligible every five minutes outside 00:00–08:00 Shanghai time. Up to six autonomous messages a day. Greeting and fictional plan sharing can be enabled separately.",
+        "greeting": "Occasional greetings",
+        "sharing": "Share fictional plans",
+        "pause": "Pause",
+        "resume": "Resume",
+        "homeChanged": "Autonomous messages are available in local mode only.",
+        "error": "Could not load or save these settings."
+      },
       "followUp": {
         "cancelled": "Cancelled",
         "title": "Schedule a chat follow-up",

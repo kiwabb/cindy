@@ -12804,6 +12804,16 @@
       }
     },
     "automations": {
+      "autonomous": {
+        "title": "Discussion proactive",
+        "description": "Évaluation toutes les cinq minutes hors des heures calmes de 00 h à 08 h, heure de Shanghai. Jusqu’à six messages spontanés par jour. Les salutations et les projets fictifs sont activables séparément.",
+        "greeting": "Saluer de temps en temps",
+        "sharing": "Partager des projets fictifs",
+        "pause": "Mettre en pause",
+        "resume": "Reprendre",
+        "homeChanged": "Les messages spontanés sont disponibles uniquement en mode local.",
+        "error": "Impossible de lire ou d’enregistrer ces réglages."
+      },
       "title": "Automatisations",
       "description": "Automatisations du projet de {{name}}. Activez-les ou désactivez-les ici ; modifiez-les dans Automatisations.",
       "empty": "{{name}} n'a pas encore d'automatisation.",

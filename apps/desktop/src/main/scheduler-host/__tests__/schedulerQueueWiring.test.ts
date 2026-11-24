@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => ({
   runnerDeps: null as MakerScheduleRunnerDeps | null,
   schedulerOptions: null as SchedulerOptions | null,
   runnerFire: vi.fn(),
+  startAutonomous: vi.fn(),
+  stopAutonomous: vi.fn(),
   captureGuard: vi.fn<() => () => void>(),
 }));
 
@@ -52,6 +54,10 @@ vi.mock('../../maker-ipc/register.js', () => ({
 // its own SQLite integration test and is isolated here like the other services.
 vi.mock('../companionOutreachHost.js', () => ({
   withCompanionFollowUps: (runner: unknown) => runner,
+  startCompanionAutonomous: () => {
+    mocks.startAutonomous();
+    return { stop: mocks.stopAutonomous };
+  },
 }));
 vi.mock('../storage.desktop', () => ({ DrizzleScheduleStorage: class {
   async deleteOrphanRuns() { return 0; }
@@ -83,10 +89,23 @@ afterEach(async () => {
   mocks.runnerDeps = null;
   mocks.schedulerOptions = null;
   mocks.runnerFire.mockReset();
+  mocks.startAutonomous.mockReset();
+  mocks.stopAutonomous.mockReset();
   mocks.captureGuard.mockReset();
 });
 
 describe('scheduler queue wiring', () => {
+  it('starts and stops autonomous outreach with the desktop scheduler', async () => {
+    await startScheduler({
+      maker: {} as StartSchedulerDeps['maker'], getDb: vi.fn(), getMainWindow: () => null,
+      feishuIm: {} as StartSchedulerDeps['feishuIm'], logger: {},
+    });
+    expect(mocks.startAutonomous).toHaveBeenCalledExactlyOnceWith();
+    expect(mocks.stopAutonomous).not.toHaveBeenCalled();
+    await resetScheduler();
+    expect(mocks.stopAutonomous).toHaveBeenCalledOnce();
+  });
+
   it.each([true, false])('checks the captured owner after its plugin check (changed=%s)', async (changed) => {
     let owner = 'a';
     mocks.captureGuard.mockImplementation(() => {

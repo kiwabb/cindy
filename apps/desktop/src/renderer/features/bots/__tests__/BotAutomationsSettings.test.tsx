@@ -41,3 +41,23 @@ it('creates exactly one Shanghai-time follow-up from the native settings, then r
   expect(screen.getByText('bots.automations.followUp.entry Check in on the reading plan')).toBeTruthy();
   expect(screen.getByRole('switch').getAttribute('aria-checked')).toBe('true');
 });
+
+it('saves greeting and sharing independently from an initially disabled state', async () => {
+  useSchedules.mockReturnValue({ schedules: [], loading: false, error: null, refresh });
+  const settings = {
+    greeting: false, sharing: false, paused: false, homeChanged: false, canEdit: true,
+  };
+  const companionAutonomous = vi.fn(async (input: { update?: Partial<typeof settings> }) =>
+    ({ ...Object.assign(settings, input.update) }));
+  vi.stubGlobal('electronAPI', { maker: { schedule: { companionAutonomous } } });
+  render(<BotAutomationsSettings bot={{ id: 'bot-fixture', name: 'Companion' }} />);
+
+  const greeting = await screen.findByRole('switch', { name: 'bots.automations.autonomous.greeting' });
+  const sharing = screen.getByRole('switch', { name: 'bots.automations.autonomous.sharing' });
+  expect(greeting.getAttribute('aria-checked')).toBe('false');
+  expect(sharing.getAttribute('aria-checked')).toBe('false');
+  fireEvent.click(greeting);
+  await waitFor(() => expect(greeting.getAttribute('aria-checked')).toBe('true'));
+  expect(companionAutonomous).toHaveBeenLastCalledWith({ botId: 'bot-fixture', update: { greeting: true } });
+  expect(sharing.getAttribute('aria-checked')).toBe('false');
+});

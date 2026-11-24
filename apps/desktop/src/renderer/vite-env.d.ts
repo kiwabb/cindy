@@ -7575,6 +7575,7 @@ interface ElectronAPI {
       }) => Promise<unknown>;
       get: (id: string) => Promise<unknown | null>;
       create: (input: unknown) => Promise<unknown>;
+      companionAutonomous: (input: { botId: string; update?: { greeting?: boolean; sharing?: boolean; paused?: boolean; resume?: boolean } }) => Promise<{ greeting: boolean; sharing: boolean; paused: boolean; homeChanged: boolean; canEdit: boolean }>;
       createCompanionFollowUp: (input: { botId: string; topic: string; dueAt: number }) => Promise<unknown>;
       update: (id: string, patch: unknown) => Promise<unknown>;
       delete: (id: string) => Promise<void>;

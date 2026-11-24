@@ -12804,6 +12804,16 @@
       }
     },
     "automations": {
+      "autonomous": {
+        "title": "Conversa proativa",
+        "description": "A cada cinco minutos fora do silêncio das 00:00 às 08:00 no horário de Xangai. Até seis mensagens espontâneas por dia. Saudações e planos fictícios podem ser ativados separadamente.",
+        "greeting": "Cumprimentos ocasionais",
+        "sharing": "Compartilhar planos fictícios",
+        "pause": "Pausar",
+        "resume": "Retomar",
+        "homeChanged": "As mensagens espontâneas só estão disponíveis no modo local.",
+        "error": "Não foi possível carregar ou salvar as configurações."
+      },
       "title": "Automações",
       "description": "Automações do projeto de {{name}}. Ative ou desative aqui; edite em Automações.",
       "empty": "{{name}} ainda não tem automações.",

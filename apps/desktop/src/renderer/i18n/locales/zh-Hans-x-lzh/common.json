@@ -12658,6 +12658,16 @@
       }
     },
     "automations": {
+      "autonomous": {
+        "title": "主动私聊",
+        "description": "依上海时，每五分一察，子正至辰正不发，日不过六讯。问候、虚拟行程可各启。",
+        "greeting": "偶尔问候",
+        "sharing": "分享虚构计划",
+        "pause": "暂停",
+        "resume": "恢复",
+        "homeChanged": "主动私讯今限本机模式。",
+        "error": "读取或保存设置失败。"
+      },
       "title": "自运",
       "description": "{{name}} 案中之自运。于此启闭，修改请往自运之页。",
       "empty": "{{name}} 尚无自运。",

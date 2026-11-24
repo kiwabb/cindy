@@ -424,6 +424,27 @@ export function registerScheduleHandlers(getMaker?: () => Maker | null): void {
     return withScheduler(({ scheduler }) => scheduler.get(scheduleId));
   });
 
+  ipcMain.handle(MAKER_INVOKE.SCHEDULE_COMPANION_AUTONOMOUS, async (event, raw) => {
+    if (isDeviceLinkInvoke() || !isTrustedAppRendererEvent(event)) {
+      throwIpcError('INVALID_PARAMS', 'Use the local desktop companion settings');
+    }
+    const { botId, update: payload } = requireObject(raw, 'autonomous settings');
+    const update: { greeting?: boolean; sharing?: boolean; paused?: boolean; resume?: boolean } = {};
+    if (payload !== undefined) {
+      const fields = requireObject(payload, 'settings update');
+      for (const key of ['greeting', 'sharing', 'paused', 'resume'] as const) {
+        const value = fields[key];
+        if (value === undefined) continue;
+        if (typeof value !== 'boolean') throwIpcError('INVALID_PARAMS', 'Expected a boolean setting');
+        update[key] = value;
+      }
+    }
+    return withScheduler(async () => {
+      const { companionAutonomousSettings } = await import('../scheduler-host/companionOutreachHost.js');
+      return companionAutonomousSettings(requireString(botId, 'botId'), payload === undefined ? undefined : update);
+    });
+  });
+
   ipcMain.handle(MAKER_INVOKE.SCHEDULE_CREATE_COMPANION_FOLLOW_UP, async (event, raw) => {
     if (isDeviceLinkInvoke() || !isTrustedAppRendererEvent(event)) {
       throwIpcError('INVALID_PARAMS', 'Schedule a follow-up from this companion’s settings on its main computer');
