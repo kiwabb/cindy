@@ -12710,12 +12710,12 @@
     "automations": {
       "autonomous": {
         "title": "Proactive chat",
-        "description": "At most once daily, 12:30–13:00 or 19:00–19:30 Shanghai time. No reply means a 48-hour break. Two unanswered messages pause outreach until you reach out or resume.",
+        "description": "Eligible every five minutes outside 00:00–08:00 Shanghai time. Up to six autonomous messages a day. Greeting and fictional plan sharing can be enabled separately.",
         "greeting": "Occasional greetings",
         "sharing": "Share fictional plans",
         "pause": "Pause",
         "resume": "Resume",
-        "homeChanged": "Confirm this companion’s main computer. Select Resume on that computer to reconnect after a quiet day.",
+        "homeChanged": "Autonomous messages are available in local mode only.",
         "error": "Could not load or save these settings."
       },
       "followUp": {

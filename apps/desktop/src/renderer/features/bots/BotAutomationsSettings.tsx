@@ -52,19 +52,19 @@ function CompanionAutonomousSettings({ botId }: { botId: string }) {
     {settings && <>
       <label className="flex items-center justify-between gap-2 text-13">
         {t(prefix + '.greeting')}
-        <Switch checked={settings.greeting} disabled={!editable || (settings.homeChanged && !settings.greeting)}
+        <Switch checked={settings.greeting} disabled={!editable}
           onCheckedChange={greeting => void save({ greeting })} />
       </label>
       <label className="flex items-center justify-between gap-2 text-13">
         {t(prefix + '.sharing')}
-        <Switch checked={settings.sharing} disabled={!editable || (settings.homeChanged && !settings.sharing)}
+        <Switch checked={settings.sharing} disabled={!editable}
           onCheckedChange={sharing => void save({ sharing })} />
       </label>
       {settings.homeChanged && <p className="text-13">{t(prefix + '.homeChanged')}</p>}
-      {(settings.greeting || settings.sharing || settings.homeChanged) && (
+      {(settings.greeting || settings.sharing) && (
         <Button type="button" variant="secondary" disabled={!settings.canEdit || busy}
-          onClick={() => void save(settings.paused || settings.homeChanged ? { resume: true } : { paused: true })}>
-          {t(prefix + (settings.paused || settings.homeChanged ? '.resume' : '.pause'))}
+          onClick={() => void save(settings.paused ? { resume: true } : { paused: true })}>
+          {t(prefix + (settings.paused ? '.resume' : '.pause'))}
         </Button>
       )}
     </>}

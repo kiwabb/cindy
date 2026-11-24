@@ -180,7 +180,7 @@ const desktop = createSchedulerHost<StartSchedulerDeps>({
   dialogueWorkspaceRoots: () => dialogueWorkspaceRoots(),
   onStarted(scheduler, deps, passive) {
     stopAutonomous?.();
-    stopAutonomous = passive ? undefined : startCompanionAutonomous(() => scheduler.list()).stop;
+    stopAutonomous = passive ? undefined : startCompanionAutonomous().stop;
     startRewoundSchedulerPromptCleanup({ logger: deps.logger });
     if (!passive) void startScheduleWebhooks(scheduler, deps.logger).catch(error =>
       deps.logger.warn?.(`[scheduler-host] schedule webhooks failed to start (non-fatal): ${String(error)}`));

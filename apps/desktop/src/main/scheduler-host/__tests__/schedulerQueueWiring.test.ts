@@ -54,8 +54,8 @@ vi.mock('../../maker-ipc/register.js', () => ({
 // its own SQLite integration test and is isolated here like the other services.
 vi.mock('../companionOutreachHost.js', () => ({
   withCompanionFollowUps: (runner: unknown) => runner,
-  startCompanionAutonomous: (list: () => unknown) => {
-    mocks.startAutonomous(list);
+  startCompanionAutonomous: () => {
+    mocks.startAutonomous();
     return { stop: mocks.stopAutonomous };
   },
 }));
@@ -100,7 +100,7 @@ describe('scheduler queue wiring', () => {
       maker: {} as StartSchedulerDeps['maker'], getDb: vi.fn(), getMainWindow: () => null,
       feishuIm: {} as StartSchedulerDeps['feishuIm'], logger: {},
     });
-    expect(mocks.startAutonomous).toHaveBeenCalledExactlyOnceWith(expect.any(Function));
+    expect(mocks.startAutonomous).toHaveBeenCalledExactlyOnceWith();
     expect(mocks.stopAutonomous).not.toHaveBeenCalled();
     await resetScheduler();
     expect(mocks.stopAutonomous).toHaveBeenCalledOnce();

@@ -12806,12 +12806,12 @@
     "automations": {
       "autonomous": {
         "title": "Chat proactivo",
-        "description": "Como máximo una vez al día, de 12:30 a 13:00 o de 19:00 a 19:30 (hora de Shanghái). Si no hay respuesta, espera 48 horas. Tras dos mensajes sin respuesta, se pausa.",
+        "description": "Se evalúa cada cinco minutos fuera del horario de silencio de 00:00 a 08:00 de Shanghái. Hasta seis mensajes espontáneos al día. Los saludos y los planes ficticios se pueden activar por separado.",
         "greeting": "Saludos ocasionales",
         "sharing": "Compartir planes ficticios",
         "pause": "Pausar",
         "resume": "Reanudar",
-        "homeChanged": "Confirma el equipo principal del compañero. Selecciona Reanudar allí para volver tras un día de pausa.",
+        "homeChanged": "Los mensajes espontáneos solo están disponibles en modo local.",
         "error": "No se pudo cargar o guardar la configuración."
       },
       "title": "Automatizaciones",

@@ -12710,12 +12710,12 @@
     "automations": {
       "autonomous": {
         "title": "Proaktiver Chat",
-        "description": "Höchstens einmal am Tag, 12:30–13:00 oder 19:00–19:30 Uhr (Shanghai). Ohne Antwort wartet der Begleiter 48 Stunden. Nach zwei unbeantworteten Nachrichten wird pausiert.",
+        "description": "Alle fünf Minuten außerhalb der Ruhezeit von 00:00 bis 08:00 Uhr (Shanghai). Bis zu sechs proaktive Nachrichten pro Tag. Begrüßungen und fiktive Pläne lassen sich getrennt aktivieren.",
         "greeting": "Gelegentlich grüßen",
         "sharing": "Fiktive Pläne teilen",
         "pause": "Pausieren",
         "resume": "Fortsetzen",
-        "homeChanged": "Bestätige den Hauptcomputer dieses Begleiters. Wähle dort „Fortsetzen“. Danach gilt ein Tag Ruhezeit.",
+        "homeChanged": "Proaktive Nachrichten sind nur im lokalen Modus verfügbar.",
         "error": "Die Einstellungen konnten nicht geladen oder gespeichert werden."
       },
       "title": "Automatisierungen",

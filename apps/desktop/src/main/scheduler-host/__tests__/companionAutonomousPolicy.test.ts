@@ -1,46 +1,35 @@
 import { expect, it } from 'vitest';
-import { autonomousEligible, autonomousPause, autonomousWindow, shareableActivity, validAutonomousText } from '../companionAutonomousPolicy.js';
+import { autonomousRoll, autonomousTickHit, autonomousTickStart } from '../companionAutonomousPolicy.js';
+import { decideCompanionOutreach } from '../companionOutreachPolicy.js';
 
-const now = Date.parse('2026-11-23T19:00:00+08:00');
-const hour = 3_600_000;
-const settings = { greeting: true, sharing: false, paused: false, eligibleAt: 0, resumedAt: 0, home: 'local' };
-const input = { settings, published: [], lastContact: now - 13 * hour, now };
+const at = (time: string) => Date.parse('2026-11-23T' + time + ':00+08:00');
 
-it('admits only current Shanghai windows, never expired or quiet time', () => {
-  expect(autonomousWindow(now)).toEqual({ day: '2026-11-23', startsAt: now });
-  expect(autonomousWindow(now + 30 * 60_000)).toBeNull();
-  expect(autonomousWindow(now + 4 * hour)).toBeNull();
+it('buckets time into five-minute ticks and keeps the same result throughout that tick', () => {
+  const startsAt = at('08:05');
+  expect(autonomousTickStart(startsAt + 299_999)).toBe(startsAt);
+  expect(autonomousTickStart(startsAt + 300_000)).toBe(startsAt + 300_000);
+  const roll = autonomousTickHit('/owner', 'bot', startsAt);
+  expect(autonomousTickHit('/owner', 'bot', autonomousTickStart(startsAt + 299_999))).toBe(roll);
 });
 
-it('requires opt-in, twelve hours since contact and at most one delivery per day', () => {
-  expect(autonomousEligible(input)).toBe(true);
-  expect(autonomousEligible({ ...input, settings: { ...settings, greeting: false } })).toBe(false);
-  expect(autonomousEligible({ ...input, lastContact: now - 11 * hour })).toBe(false);
-  expect(autonomousEligible({ ...input, published: [now - 4 * hour] })).toBe(false);
-  expect(autonomousEligible({ ...input, settings: { ...settings, eligibleAt: now + hour } })).toBe(false);
+it('uses the HerAndHim uniform base threshold range', () => {
+  expect(autonomousRoll(2 / 288, 0)).toBe(true);
+  expect(autonomousRoll(3 / 288, 0)).toBe(false);
+  expect(autonomousRoll(3 / 288, 0.5)).toBe(true);
+  expect(autonomousRoll(6 / 288, 1)).toBe(false);
 });
 
-it('backs off for forty-eight hours and stops after two unanswered messages', () => {
-  const prior = now - 49 * hour;
-  const older = now - 100 * hour;
-  const noReply = now - 120 * hour;
-  expect(autonomousEligible({ ...input, lastContact: noReply, published: [now - 47 * hour] })).toBe(false);
-  expect(autonomousEligible({ ...input, lastContact: noReply, published: [prior] })).toBe(true);
-  expect(autonomousPause(settings, [prior, older], noReply).paused).toBe(true);
-  expect(autonomousPause(settings, [prior, older], prior + 1).paused).toBe(false);
-  expect(autonomousPause({ ...settings, resumedAt: now }, [prior, older], noReply).paused).toBe(false);
-  expect(autonomousPause({ ...settings, paused: true }, [], now).paused).toBe(true);
-});
-
-it('rejects appended instructions and unsupported plans', () => {
-  expect(shareableActivity('泡一杯茶')).toBe(true);
-  expect(shareableActivity('散步，看见你在家')).toBe(false);
-  expect(shareableActivity('已经看完了书')).toBe(false);
-});
-
-it('accepts only a greeting or a truthful plan and rejects invented facts', () => {
-  expect(validAutonomousText('greeting', '晚上好呀，想跟你打个招呼。', '')).toBe(true);
-  expect(validAutonomousText('greeting', '晚上好，看到你回家了！', '')).toBe(false);
-  expect(validAutonomousText('sharing', '我待会儿打算读书。', '读书')).toBe(true);
-  expect(validAutonomousText('sharing', '我打算读书，刚刚还和你散步了。', '读书')).toBe(false);
+it('respects only the autonomous daily cap and midnight to 08:00 quiet hours', () => {
+  const decide = (now: number, publishedAt: number[] = [], autonomous = true) =>
+    decideCompanionOutreach({
+      enabled: true, isHome: true, busy: false, now, publishedAt, eventAlreadyClaimed: false,
+      event: { key: 'tick', occurredAt: now, autonomous },
+    });
+  expect(decide(at('07:55'))).toBe('quiet-hours');
+  expect(decide(at('08:00'))).toBe('allow');
+  expect(decide(at('23:55'))).toBe('allow');
+  expect(decide(at('23:55'), Array(5).fill(at('23:50')))).toBe('allow');
+  expect(decide(at('23:55'), Array(6).fill(at('23:50')))).toBe('daily-limit');
+  expect(decide(at('23:55'), [], false)).toBe('quiet-hours');
+  expect(decide(at('21:55'), [at('21:50')], false)).toBe('minimum-spacing');
 });

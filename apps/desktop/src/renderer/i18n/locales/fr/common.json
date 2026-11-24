@@ -12806,12 +12806,12 @@
     "automations": {
       "autonomous": {
         "title": "Discussion proactive",
-        "description": "Au plus une fois par jour, de 12 h 30 à 13 h ou de 19 h à 19 h 30 (heure de Shanghai). Sans réponse, le compagnon attend 48 heures. Après deux messages sans réponse, il se met en pause.",
+        "description": "Évaluation toutes les cinq minutes hors des heures calmes de 00 h à 08 h, heure de Shanghai. Jusqu’à six messages spontanés par jour. Les salutations et les projets fictifs sont activables séparément.",
         "greeting": "Saluer de temps en temps",
         "sharing": "Partager des projets fictifs",
         "pause": "Mettre en pause",
         "resume": "Reprendre",
-        "homeChanged": "Confirmez l’ordinateur principal du compagnon. Choisissez Reprendre sur cet ordinateur, puis attendez une journée.",
+        "homeChanged": "Les messages spontanés sont disponibles uniquement en mode local.",
         "error": "Impossible de lire ou d’enregistrer ces réglages."
       },
       "title": "Automatisations",

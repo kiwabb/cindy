@@ -24,11 +24,8 @@ export async function readAutonomousSettings(root: string, id: string): Promise<
   try {
     const value = JSON.parse(await readFile(file, 'utf8')) as Partial<AutonomousSettings> | null;
     if (value && typeof value.greeting === 'boolean' && typeof value.sharing === 'boolean' &&
-        typeof value.paused === 'boolean' && typeof value.home === 'string' &&
-        typeof value.resumedAt === 'number' && Number.isSafeInteger(value.resumedAt) &&
-        typeof value.eligibleAt === 'number' && Number.isSafeInteger(value.eligibleAt)) {
-      return { ...value, greeting: value.greeting, sharing: value.sharing, paused: value.paused,
-        home: value.home, resumedAt: value.resumedAt, eligibleAt: value.eligibleAt };
+        typeof value.paused === 'boolean') {
+      return { greeting: value.greeting, sharing: value.sharing, paused: value.paused };
     }
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT' && !(error instanceof SyntaxError)) throw error;

@@ -18,7 +18,9 @@ import {
 const h = vi.hoisted(() => ({
   db: {} as unknown, ownerDir: '', generate: vi.fn(), publish: vi.fn(), plan: vi.fn(),
 }));
-vi.mock('../../appSessionState.js', () => ({ ownerScopedUserDataPath: () => h.ownerDir }));
+vi.mock('../../appSessionState.js', () => ({
+  getActiveAppSession: () => ({ mode: 'local' }), ownerScopedUserDataPath: () => h.ownerDir,
+}));
 vi.mock('../../device-link/broadcast-tap.js', () => ({
   captureDataOwnerBroadcastScope: () => ({}),
   isDataOwnerBroadcastScopeCurrent: () => true,
@@ -140,40 +142,29 @@ it.skipIf(process.platform !== 'darwin' && process.platform !== 'win32')('uses t
 
     const evening = Date.parse('2026-11-23T19:00:00+08:00');
     vi.setSystemTime(evening);
-    const engine = startCompanionAutonomous(async () => []);
+    const fiveMinutes = 300_000;
+    let engine = startCompanionAutonomous(() => true);
     try {
-      // No configuration and sharing-only without a validated plan stay silent.
       await engine.tick();
       await companionAutonomousSettings(botId, { sharing: true });
+      vi.setSystemTime(evening + fiveMinutes);
       await engine.tick();
       expect(h.publish).toHaveBeenCalledOnce();
       await companionAutonomousSettings(botId, { greeting: true });
+      vi.setSystemTime(evening + 2 * fiveMinutes);
       await engine.tick();
       await engine.tick();
       expect(h.publish).toHaveBeenCalledTimes(2);
-      expect(await readCompanionOutreachNote(sessionId)).toContain('晚上好呀');
-
-      vi.setSystemTime(evening + 24 * 3_600_000);
+      engine.stop();
+      engine = startCompanionAutonomous(() => true);
       await engine.tick();
       expect(h.publish).toHaveBeenCalledTimes(2);
-      vi.setSystemTime(evening + 48 * 3_600_000);
+      vi.setSystemTime(evening + 3 * fiveMinutes);
       await engine.tick();
       expect(h.publish).toHaveBeenCalledTimes(3);
-      expect(await companionAutonomousSettings(botId)).toMatchObject({ paused: true });
-
-      db.insert(messages).values({
-        id: 'synthetic', clientId: 'synthetic', sessionId, role: 'user',
-        content: '[UI_ACTION_TRIGGER]', createdAt: Date.now() + 1,
-      }).run();
-      expect(await companionAutonomousSettings(botId)).toMatchObject({ paused: true });
-      db.insert(messages).values({
-        id: 'human', clientId: 'human', sessionId, role: 'user',
-        content: 'Hello', createdAt: Date.now() + 2,
-      }).run();
       expect(await companionAutonomousSettings(botId)).toMatchObject({ paused: false });
 
-      // An owner change to settings during generation wins against delivery.
-      vi.setSystemTime(evening + 72 * 3_600_000);
+      vi.setSystemTime(evening + 4 * fiveMinutes);
       h.generate.mockImplementationOnce(async (_prompt, request) => {
         await companionAutonomousSettings(botId, { greeting: false });
         expect(request.signal.aborted).toBe(true);
@@ -181,13 +172,17 @@ it.skipIf(process.platform !== 'darwin' && process.platform !== 'win32')('uses t
       });
       await engine.tick();
       expect(h.publish).toHaveBeenCalledTimes(3);
-      await companionAutonomousSettings(botId, { greeting: true });
-      await engine.tick();
-      expect(h.publish).toHaveBeenCalledTimes(3);
 
-      vi.setSystemTime(evening + 96 * 3_600_000);
+      await companionAutonomousSettings(botId, { greeting: true });
+      vi.setSystemTime(evening + 5 * fiveMinutes);
+      companionHomes.update({ ...EMPTY_COMPANION_CLOUD_SNAPSHOT, enabled: true });
+      await engine.tick();
+      expect(await companionAutonomousSettings(botId)).toMatchObject({ canEdit: false });
+      expect(h.publish).toHaveBeenCalledTimes(3);
+      companionHomes.reset();
+
       h.plan.mockResolvedValue({
-        date: '2026-11-27', timezone: 'Asia/Shanghai', start: '19:00', end: '19:30', activity: '读书',
+        date: '2026-11-23', timezone: 'Asia/Shanghai', start: '19:00', end: '20:00', activity: '整理还没画完的插画草图',
       });
       h.plan.mockClear();
       db.update(botProfiles).set({ currentVersion: 2 }).run();
@@ -195,18 +190,17 @@ it.skipIf(process.platform !== 'darwin' && process.platform !== 'win32')('uses t
       expect(h.plan).not.toHaveBeenCalled();
       expect(h.publish).toHaveBeenCalledTimes(3);
       db.update(botProfiles).set({ currentVersion: 1 }).run();
+      vi.setSystemTime(evening + 6 * fiveMinutes);
       h.generate.mockImplementationOnce(async (prompt, request) => {
         expect(h.plan).toHaveBeenLastCalledWith('Active companion snapshot');
         expect(request.systemPrompt).toContain('Active companion snapshot');
-        expect(prompt).toContain('读书');
-        expect(prompt).not.toContain('Hello');
-        expect(request.validateResponse('我打算读书。')).toBe(true);
-        expect(request.validateResponse('我已经读书了。')).toBe(false);
-        return { ok: true, providerId: 'fixture-provider', model: 'fixture-model', text: '我打算读书。' };
+        expect(request.systemPrompt).toContain('Do not claim a plan happened');
+        expect(prompt).toContain('整理还没画完的插画草图');
+        return { ok: true, providerId: 'fixture-provider', model: 'fixture-model', text: '我待会儿打算整理一下插画草图。' };
       });
       await engine.tick();
       expect(h.publish).toHaveBeenCalledTimes(4);
-      expect(await readCompanionOutreachNote(sessionId)).toContain('我打算读书。');
+      expect(await readCompanionOutreachNote(sessionId)).toContain('我待会儿打算整理一下插画草图。');
     } finally {
       engine.stop();
     }

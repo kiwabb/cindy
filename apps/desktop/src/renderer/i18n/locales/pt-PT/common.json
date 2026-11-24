@@ -12806,12 +12806,12 @@
     "automations": {
       "autonomous": {
         "title": "Conversa proativa",
-        "description": "Até uma vez por dia, das 12:30 às 13:00 ou das 19:00 às 19:30 (hora de Xangai). Sem resposta, o companheiro espera 48 horas. Após duas mensagens sem resposta, fica em pausa.",
+        "description": "A cada cinco minutos fora do silêncio das 00:00 às 08:00, hora de Xangai. Até seis mensagens espontâneas por dia. As saudações e os planos fictícios podem ser ativados separadamente.",
         "greeting": "Cumprimentos ocasionais",
         "sharing": "Partilhar planos fictícios",
         "pause": "Pausar",
         "resume": "Retomar",
-        "homeChanged": "Confirme o computador principal do companheiro. Escolha Retomar nesse computador e aguarde um dia.",
+        "homeChanged": "As mensagens espontâneas só estão disponíveis no modo local.",
         "error": "Não foi possível carregar ou guardar as definições."
       },
       "title": "Automatizações",
