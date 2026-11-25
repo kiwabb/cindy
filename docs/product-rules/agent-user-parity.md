@@ -304,7 +304,7 @@ Host 不因当前输入缺少主人标记再追加行动同意判定。只认运
 
 伙伴例行任务（2026-10-26；2026-11-08 起 V2 不再适用：例行任务引擎与 `routine_*` 工具已移除，伙伴的定时工作是项目自动化，模型、`persistentSession` 等沿用 `schedule_*`）：桌面与 `routine_save` 共用每条规则的 `modelOverride`，可选引擎、来源、型号、执行位置、推理强度与 Fast；null 恢复跟随伙伴，省略保留选择。执行记录返回独立 `sessionId`。内置跟进也可选模型，指令与触发条件仍由宿主维护；每天查待办已是普通例行任务，指令与触发条件可改（2026-10-31）。`sessionMode`（`persistent` 复用同一任务／`fresh` 每次触发新建任务）同样经桌面与 `routine_save` 设置，省略保留原值。跨电脑桌面设置通过 `routines.saveWithModel` 与 `routines.saveWithSessionMode` 能力声明协商；手机仍按现有合同不提供例行任务管理。
 
-结果回传不做成工具（2026-11-09）：`notify_when_done` 与 `report_task_delivery` 已删除，派活方在消息里请对方做完用 `send_to_session` 发回，或自己用 `get_task_digest` 查；用户本人也是这样跟进任务的。
+结果回传不做成工具（2026-11-09）：`notify_when_done` 与 `report_task_delivery` 已删除，派活方在消息里请对方做完用 `send_to_session` 发回，或自己用 `get_task_digest` 查；用户本人也是这样跟进任务的。（fork 2026-11-25：本机任务停下、出错或有问题时改由宿主自动通知发起的对话，不再请对方发回、不定时查、不读记录看进度；另一台电脑上的任务仍照旧请对方发回。见 [派发方通知](dispatcher-notice.md)。）
 
 ## 历史查询的大结果分页
 
