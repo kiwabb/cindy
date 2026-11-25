@@ -28,6 +28,94 @@ export function writeAtomicJson(file: string, data: unknown): void {
 
 const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
 
+/**
+ * Exact executable paths, relative to the canonical bundle, of the Electron Crashpad handler. `proc_pidpath`
+ * reports the resolved vnode path; the unversioned form covers a launch through the `Helpers` symlink.
+ * A same-named handler of any other application is outside the bundle and never matches.
+ */
+export const PERSONAL_CRASHPAD_HANDLER_PATHS = [
+  'Contents/Frameworks/Electron Framework.framework/Versions/A/Helpers/chrome_crashpad_handler',
+  'Contents/Frameworks/Electron Framework.framework/Helpers/chrome_crashpad_handler',
+] as const;
+
+/** Consecutive seconds only the old bundle's Crashpad handler must remain before the monitor stops it. */
+export const CRASHPAD_GRACE_SECONDS = 10;
+
+/**
+ * The old app's Crashpad handler is spawned detached (double fork, reparented to PID 1) and exits only when
+ * every send right to its exception port is gone. Processes the app starts inherit that right, so an
+ * outside-bundle descendant that outlives the app can keep the handler, and therefore the bundle, alive.
+ *
+ * `only_stale_crashpad_left` accepts the helper's latest snapshot only when it is complete (`--bundle-status`
+ * exit 75, nothing unknown, fewer than 64 records) and every live record is either an exact in-bundle
+ * Crashpad handler path, or the old PID number already reused by an unrelated outside-bundle process.
+ * The old main process, any other bundle process, unknown state or a parse failure keeps the plain wait.
+ * `stop_stale_crashpad` signals only a PID whose kernel start time still equals the snapshot: SIGTERM, then
+ * SIGKILL after five seconds. The exchange still requires a later snapshot with an empty bundle.
+ */
+function staleCrashpadFunctions(previousPid: number): string[] {
+  const q = quote;
+  return [
+    `OLD_PID=${previousPid}`,
+    `CRASHPAD_GRACE=${CRASHPAD_GRACE_SECONDS}`,
+    `CRASHPAD_PATH_A=${q(PERSONAL_CRASHPAD_HANDLER_PATHS[0])}`,
+    `CRASHPAD_PATH_B=${q(PERSONAL_CRASHPAD_HANDLER_PATHS[1])}`,
+    'CRASHPAD_STOP_RECORD="${EXIT_STATUS%/*}/crashpad-stop.json"',
+    'STALE_CRASHPAD=""', 'CRASHPAD_STOP_ROUNDS=0', 'CRASHPAD_STOPPED=0', 'LAST_WAIT_CRASHPAD_ONLY=0',
+    'status_field() { /usr/bin/plutil -extract "$1" raw "$EXIT_STATUS" 2>/dev/null; }',
+    'only_stale_crashpad_left() {',
+    '  STALE_CRASHPAD=""',
+    '  [ "${BUNDLE_STATUS:-}" = 75 ] || return 1',
+    '  [ "$(status_field unknown)" = false ] || return 1',
+    '  [ "$(status_field blocked)" = true ] || return 1',
+    '  # The helper records at most 64 processes; a 64th record means the list may be incomplete.',
+    '  if status_field processes.63.pid >/dev/null; then return 1; fi',
+    '  N=0',
+    '  while P_PID=$(status_field "processes.$N.pid"); do',
+    '    [ "$N" -lt 63 ] || return 1',
+    '    case "$P_PID" in ""|*[!0-9]*) return 1 ;; esac',
+    '    P_ZOMBIE=$(status_field "processes.$N.zombie") || return 1',
+    '    P_EXE=$(status_field "processes.$N.executable") || return 1',
+    '    P_BIRTH=$(status_field "processes.$N.birth") || return 1',
+    '    case "$P_BIRTH" in ""|*[!0-9:]*) return 1 ;; esac',
+    '    if [ "$P_ZOMBIE" = true ]; then :',
+    '    elif [ "$P_ZOMBIE" != false ]; then return 1',
+    '    elif [ "$P_PID" != "$OLD_PID" ] && { [ "$P_EXE" = "$CRASHPAD_PATH_A" ] || [ "$P_EXE" = "$CRASHPAD_PATH_B" ]; }; then',
+    '      STALE_CRASHPAD="$STALE_CRASHPAD $P_PID=$P_BIRTH"',
+    '    elif [ "$P_PID" = "$OLD_PID" ] && [ "$P_EXE" = "<outside-bundle-or-unavailable>" ] \\',
+    '      && [ "$(status_field "processes.$N.oldIdentityMatches")" = false ]; then :',
+    '    else return 1',
+    '    fi',
+    '    N=$((N + 1))',
+    '  done',
+    '  [ -n "$STALE_CRASHPAD" ]',
+    '}',
+    'same_process() { [ "$("$HELPER" --pid-birth "$1" 2>/dev/null)" = "$2" ]; }',
+    'signal_stale_crashpad() {',
+    '  for ENTRY in $STALE_CRASHPAD; do',
+    '    if same_process "${ENTRY%%=*}" "${ENTRY#*=}"; then /bin/kill "$1" "${ENTRY%%=*}" 2>/dev/null || true; fi',
+    '  done',
+    '}',
+    'stale_crashpad_alive() {',
+    '  for ENTRY in $STALE_CRASHPAD; do',
+    '    if same_process "${ENTRY%%=*}" "${ENTRY#*=}"; then return 0; fi',
+    '  done',
+    '  return 1',
+    '}',
+    'stop_stale_crashpad() {',
+    '  CRASHPAD_STOP_ROUNDS=$((CRASHPAD_STOP_ROUNDS + 1))',
+    '  signal_stale_crashpad -TERM',
+    '  for j in 1 2 3 4 5; do',
+    '    if ! stale_crashpad_alive; then break; fi',
+    '    sleep 1',
+    '  done',
+    '  if stale_crashpad_alive; then signal_stale_crashpad -KILL; sleep 1; fi',
+    '  CRASHPAD_STOPPED=$((CRASHPAD_STOPPED + 1))',
+    `  printf '{"stopRounds":%s,"processes":"%s"}\\n' "$CRASHPAD_STOPPED" "$STALE_CRASHPAD" > "$CRASHPAD_STOP_RECORD" || true`,
+    '}',
+  ];
+}
+
 /** Only the new canonical app may acknowledge this nonce after its real owner DB opens. */
 export function acknowledgePersonalStorageReady(root: string, canonicalApp: string, identity: PersonalIdentity, ownerIdentity: string, processBirth: string, pid = process.pid): boolean {
   try {
@@ -78,9 +166,18 @@ export function buildPersonalMacTransaction(journal: PersonalJournal, root: stri
     '    /bin/mv "$EXIT_STATUS.tmp" "$EXIT_STATUS"', '    return 1',
     '  else', '    BUNDLE_STATUS=$?', '    /bin/mv "$EXIT_STATUS.tmp" "$EXIT_STATUS"',
     '    return 0', '  fi', '}',
+    ...staleCrashpadFunctions(journal.previousPid),
     'wait_old_bundle() {',
+    '  CRASHPAD_ONLY_SECONDS=0',
     '  for i in $(seq 1 "${1:-120}"); do',
     '    if ! bundle_alive; then return 0; fi',
+    '    if only_stale_crashpad_left; then',
+    '      LAST_WAIT_CRASHPAD_ONLY=1',
+    '      CRASHPAD_ONLY_SECONDS=$((CRASHPAD_ONLY_SECONDS + 1))',
+    '      if [ "$CRASHPAD_ONLY_SECONDS" -ge "$CRASHPAD_GRACE" ] && [ "$CRASHPAD_STOP_ROUNDS" -lt 2 ]; then',
+    '        stop_stale_crashpad', '        CRASHPAD_ONLY_SECONDS=0',
+    '      fi',
+    '    else', '      LAST_WAIT_CRASHPAD_ONLY=0', '      CRASHPAD_ONLY_SECONDS=0', '    fi',
     '    sleep 1', '  done', '  return 1', '}',
     'phase() { /usr/bin/plutil -replace phase -string "$1" -o "$JOURNAL.tmp" "$JOURNAL" && /bin/mv "$JOURNAL.tmp" "$JOURNAL" && "$HELPER" --sync "$JOURNAL"; }',
     'matches() {',
@@ -137,6 +234,7 @@ export function buildPersonalMacTransaction(journal: PersonalJournal, root: stri
     'phase waiting-for-exit',
     'if ! wait_old_bundle; then',
     '  FAILURE_REASON=old_bundle_exit_timeout',
+    '  if [ "$LAST_WAIT_CRASHPAD_ONLY" = 1 ]; then FAILURE_REASON=stale_crashpad_not_stopped; fi',
     '  if [ "${BUNDLE_STATUS:-2}" != 75 ]; then FAILURE_REASON=bundle_status_unavailable; fi',
     '  "$HELPER" --sync "$EXIT_STATUS" || true', '  exit 1', 'fi',
     'if bundle_alive; then FAILURE_REASON=bundle_reappeared_before_swap; exit 1; fi',

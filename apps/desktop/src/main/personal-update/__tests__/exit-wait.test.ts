@@ -1,0 +1,275 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { execFile } from 'node:child_process';
+import { describe, expect, it } from 'vitest';
+import { validatePersonalIdentity, validatePersonalPolicy } from '../contract.mjs';
+import { buildPersonalMacTransaction, PERSONAL_CRASHPAD_HANDLER_PATHS } from '../transaction';
+import { personalFailureKind, readPersonalFailureMarker, releaseRetryablePersonalFailure } from '../failure';
+
+// Regression (2026-11-25, personal Mac): normal quit finished, but the old bundle's Crashpad handler stayed
+// alive, the monitor's wait for an empty bundle timed out, and the revision was marked failed forever while
+// the banner said "preparation failed". Preparation had succeeded; only the wait before the exchange failed.
+
+const policy = validatePersonalPolicy({ schemaVersion: 1, repository: 'kiwabb/cindy', channel: 'personal-macos-arm64',
+  feedUrl: 'https://github.com/kiwabb/cindy/releases/download/personal-macos-arm64/personal-update.json', storageCompatibilityVersion: 1 });
+const identity = validatePersonalIdentity({ schemaVersion: 1, repository: policy.repository, channel: policy.channel,
+  revision: 42, sourceCommit: 'a'.repeat(40), platform: 'darwin', arch: 'arm64', region: 'global',
+  bundleIdentifier: 'com.xd.cindy', storageIdentity: 'b'.repeat(64) }, policy);
+
+const OLD_PID = 123;
+
+function transactionScript(root: string): string {
+  const nonce = randomUUID();
+  return buildPersonalMacTransaction({
+    schemaVersion: 1, nonce, phase: 'prepared', identity, previousIdentity: { ...identity, revision: 41 },
+    previousPid: OLD_PID, canonicalApp: '/Applications/Cindy.app', backup: `/Applications/.Cindy-personal-backup-${nonce}.app`,
+    health: path.join(root, `health-${nonce}.json`), zip: path.join(root, 'personal-42.zip'), sha256: 'c'.repeat(64),
+    helper: path.join(root, `attempt-${nonce}`, 'swap-apps'), helperSha256: 'd'.repeat(64), teamId: 'ABCDEFGHIJ',
+    ownerIdentity: 'e'.repeat(64),
+  }, root);
+}
+
+/** The emitted wait functions, from `bundle_alive` up to (not including) the journal `phase` helper. */
+function waitFunctions(script: string): string {
+  const begin = script.indexOf('bundle_alive() {');
+  const end = script.indexOf('phase() {', begin);
+  expect(begin).toBeGreaterThan(0);
+  expect(end).toBeGreaterThan(begin);
+  return script.slice(begin, end).replaceAll('\r\n', '\n');
+}
+
+// macOS runs the real /usr/bin/plutil. Elsewhere a stand-in implements only `-extract <keypath> raw <file>`
+// on JSON, failing (like plutil) for a missing key, a null or a collection.
+function findBash(): string | null {
+  if (process.platform === 'darwin' || process.platform === 'linux') return '/bin/bash';
+  const git = 'C:/Program Files/Git/bin/bash.exe';
+  return fs.existsSync(git) ? git : null;
+}
+const bash = findBash();
+const slash = (file: string) => file.replaceAll('\\', '/');
+
+interface ProcessRecord { pid: number; ppid?: number; state?: number; zombie: boolean; birth: string; oldIdentityMatches: boolean; executable: string }
+const status = (processes: ProcessRecord[], extra: Partial<{ blocked: boolean; unknown: boolean }> = {}) =>
+  ({ schemaVersion: 1, processes, blocked: processes.some(p => !p.zombie && p.executable !== '<outside-bundle-or-unavailable>'), unknown: false, ...extra });
+const crashpad = (pid = 900, birth = '1700000000:5', executable: string = PERSONAL_CRASHPAD_HANDLER_PATHS[0]): ProcessRecord =>
+  ({ pid, ppid: 1, state: 2, zombie: false, birth, oldIdentityMatches: false, executable });
+const mainApp: ProcessRecord = { pid: OLD_PID, ppid: 1, state: 2, zombie: false, birth: '1700000000:1', oldIdentityMatches: true, executable: 'Contents/MacOS/Cindy' };
+const renderer: ProcessRecord = { pid: 901, ppid: OLD_PID, state: 2, zombie: false, birth: '1700000000:9', oldIdentityMatches: false, executable: 'Contents/Frameworks/Cindy Helper (Renderer).app/Contents/MacOS/Cindy Helper (Renderer)' };
+
+const sh = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
+
+/** `[keypath]=value` entries for scalar leaves: what `plutil -extract <keypath> raw` prints for them. */
+function flatten(value: unknown, prefix = ''): string[] {
+  if (value === null) return [];
+  if (typeof value !== 'object') return [`[${sh(prefix)}]=${sh(String(value))}`];
+  return Object.entries(value as object).flatMap(([key, child]) => flatten(child, prefix ? `${prefix}.${key}` : key));
+}
+
+/**
+ * Runs the emitted wait functions against an in-shell helper (no process per call, so the loop stays fast
+ * on Windows). `--bundle-status` serves `snapshot` (exit `code`) until a signal reaches one of its live
+ * PIDs, then an empty bundle. `--pid-birth` reports each record's birth (`births` overrides; '' = gone).
+ * `kill` and `sleep` are recorded, never real. macOS parses the snapshot with the real `/usr/bin/plutil`;
+ * elsewhere an in-shell stand-in answers `-extract <keypath> raw` for scalar leaves and fails otherwise.
+ */
+async function runWait(snapshot: object, options: { code?: number; births?: Record<number, string>; seconds?: number; classifyOnly?: boolean; grace?: number } = {}) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cindy-exit-wait-test-'));
+  try {
+    const births: Record<number, string> = {};
+    for (const p of (snapshot as { processes: ProcessRecord[] }).processes) births[p.pid] = p.birth;
+    Object.assign(births, options.births);
+    const realPlutil = process.platform === 'darwin';
+    const birthCases = Object.entries(births).map(([pid, birth]) => `    ${pid}) ${birth ? `printf '%s\n' ${sh(birth)}; return 0` : 'return 1'} ;;`).join('\n');
+    const liveCases = Object.entries(births).filter(([, b]) => b).map(([pid]) => pid).join('|') || 'none';
+    const functions = waitFunctions(transactionScript(root))
+      .replace(/^CRASHPAD_GRACE=\d+$/m, `CRASHPAD_GRACE=${options.grace ?? 3}`)
+      .replaceAll('/usr/bin/plutil', realPlutil ? '/usr/bin/plutil' : 'fake_plutil')
+      .replaceAll('/bin/kill', 'record_kill')
+      .replaceAll('/bin/mv', realPlutil ? '/bin/mv' : ':');
+    const program = `set -eu
+ROOT=${sh(slash(root))}
+HELPER=fake_helper
+APP=/Applications/Cindy.app
+EXIT_STATUS="$ROOT/exit-status.json"
+SLEPT=0; KILLED=0; KILLS=""
+sleep() { SLEPT=$((SLEPT + 1)); }
+record_kill() {
+  KILLS="$KILLS$1 $2;"
+  case "$2" in ${liveCases}) KILLED=1 ;; esac
+}
+fake_helper() {
+  if [ "$1" = --bundle-status ]; then
+    if [ "$KILLED" = 1 ]; then printf '%s\n' ${sh(JSON.stringify(status([])))}; return 0; fi
+    printf '%s\n' ${sh(JSON.stringify(snapshot))}; return ${options.code ?? 75}
+  fi
+  [ "$1" = --pid-birth ] && [ "$KILLED" = 0 ] || return 1
+  case "$2" in
+${birthCases}
+  esac
+  return 1
+}
+${realPlutil ? '' : `declare -A SNAPSHOT=(${flatten(snapshot).join(' ')})
+declare -A EMPTY=(${flatten(status([])).join(' ')})
+fake_plutil() {
+  [ "$1" = -extract ] && [ "$3" = raw ] && [ "$4" = "$EXIT_STATUS" ] || return 2
+  if [ "$KILLED" = 1 ]; then [[ -v EMPTY[$2] ]] || return 1; printf '%s\n' "\${EMPTY[$2]}"
+  else [[ -v SNAPSHOT[$2] ]] || return 1; printf '%s\n' "\${SNAPSHOT[$2]}"; fi
+}`}
+${functions}
+${options.classifyOnly
+    // One snapshot and the decision alone: whether this state may ever lead to a signal.
+    ? 'if bundle_alive && only_stale_crashpad_left; then RESULT=eligible; else RESULT=wait; fi'
+    : `if wait_old_bundle ${options.seconds ?? 30}; then RESULT=exchange; else RESULT=timeout; fi`}
+printf '%s %s %s %s %s\n' "$RESULT" "$SLEPT" "$LAST_WAIT_CRASHPAD_ONLY" "$CRASHPAD_STOPPED" "$KILLS"
+`;
+    // Asynchronous so a long emulated wait never blocks the test worker.
+    const result = await new Promise<{ status: number | null; stdout: string; stderr: string }>(resolve => {
+      const child = execFile(bash!, ['-s'], { encoding: 'utf8' }, (error, stdout, stderr) =>
+        resolve({ status: error ? (typeof error.code === 'number' ? error.code : 1) : 0, stdout, stderr }));
+      child.stdin!.end(program);
+    });
+    expect(result.status, result.stderr).toBe(0);
+    const [outcome, slept, lastCrashpadOnly, stopped, ...rest] = result.stdout.trim().split(' ');
+    const kills = rest.join(' ').split(';').filter(Boolean);
+    const stopRecord = path.join(root, 'crashpad-stop.json');
+    return { outcome, slept: Number(slept), lastCrashpadOnly: lastCrashpadOnly === '1', stopped: Number(stopped), kills,
+      stopRecord: fs.existsSync(stopRecord) ? JSON.parse(fs.readFileSync(stopRecord, 'utf8')) : null };
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+}
+
+describe.skipIf(!bash)('personal update wait for the old bundle to exit', () => {
+  it('stops a lone old-bundle Crashpad handler after the grace period, then exchanges', async () => {
+    const result = await runWait(status([crashpad()]));
+    expect(result.outcome).toBe('exchange');
+    expect(result.kills).toEqual(['-TERM 900']);
+    expect(result.slept).toBeGreaterThanOrEqual(3);
+    expect(result.stopRecord).toMatchObject({ stopRounds: 1 });
+  });
+
+  it('accepts the unversioned Helpers path and an already-exited (zombie) old main process', async () => {
+    const zombieMain = { ...mainApp, zombie: true, state: 5 };
+    const result = await runWait(status([zombieMain, crashpad(900, '1700000000:5', PERSONAL_CRASHPAD_HANDLER_PATHS[1])]));
+    expect(result.outcome).toBe('exchange');
+    expect(result.kills).toEqual(['-TERM 900']);
+  });
+
+  it('accepts the old PID number already reused by an unrelated outside-bundle process', async () => {
+    const reused = { pid: OLD_PID, ppid: 1, state: 2, zombie: false, birth: '1800000000:1', oldIdentityMatches: false, executable: '<outside-bundle-or-unavailable>' };
+    const result = await runWait(status([reused, crashpad()]));
+    expect(result.outcome).toBe('exchange');
+    expect(result.kills).toEqual(['-TERM 900']);
+  });
+
+  it.each([
+    ['the old main process is still alive', status([mainApp, crashpad()])],
+    ['only the old main process is alive', status([mainApp])],
+    ['another bundle process (a renderer) is still alive', status([renderer, crashpad()])],
+    ['a same-named handler runs from another path in the bundle', status([crashpad(902, '1700000000:7', 'Contents/Resources/chrome_crashpad_handler')])],
+    ['the old PID still matches its identity outside the bundle', status([{ ...mainApp, executable: '<outside-bundle-or-unavailable>' }, crashpad()])],
+    ['the helper reports unknown process state', status([crashpad()], { unknown: true })],
+    ['the snapshot is truncated at the 64-record limit', status(Array.from({ length: 64 }, (_, i) => crashpad(1000 + i, `1700000000:${i}`)))],
+  ])('never treats the bundle as Crashpad-only while %s', async (_label, snapshot) => {
+    expect((await runWait(snapshot, { classifyOnly: true })).outcome).toBe('wait');
+  });
+
+  it('keeps the plain wait, without signals, when the old main process stays alive', async () => {
+    const result = await runWait(status([mainApp, crashpad()]), { seconds: 6 });
+    expect(result.outcome).toBe('timeout');
+    expect(result.kills).toEqual([]);
+    expect(result.lastCrashpadOnly).toBe(false);
+  });
+
+  it('does not treat a failed status call (exit 2) as Crashpad-only', async () => {
+    expect((await runWait(status([crashpad()]), { code: 2, classifyOnly: true })).outcome).toBe('wait');
+  });
+
+  it('does not signal a PID whose start time no longer matches the snapshot (PID reused)', async () => {
+    const result = await runWait(status([crashpad()]), { births: { 900: '1800000000:1' }, seconds: 8 });
+    expect(result.outcome).toBe('timeout');
+    expect(result.kills).toEqual([]);
+    // Two bounded stop rounds were attempted, and the failure names the lone-handler case.
+    expect(result.stopped).toBe(2);
+    expect(result.lastCrashpadOnly).toBe(true);
+  });
+
+  it('records the lone-handler timeout reason in the emitted failure path', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cindy-exit-wait-script-'));
+    try {
+      const script = transactionScript(root);
+      expect(script).toContain('FAILURE_REASON=stale_crashpad_not_stopped');
+      // The re-check before the exchange is unchanged: the bundle must still be empty afterwards.
+      expect(script).toContain('if bundle_alive; then FAILURE_REASON=bundle_reappeared_before_swap; exit 1; fi');
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+  });
+});
+
+describe('personal update failure marker after the macOS monitor rolls back', () => {
+  const journalCopy = (failureReason: string | undefined, failedFromPhase: string) =>
+    ({ schemaVersion: 1, phase: 'failed', failedFromPhase, ...(failureReason ? { failureReason } : {}), identity: { revision: 42 } });
+  const withMarker = <T>(value: unknown, run: (root: string) => T): T => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cindy-failure-marker-test-'));
+    try {
+      fs.writeFileSync(path.join(root, 'failed-42.json'), typeof value === 'string' ? value : JSON.stringify(value));
+      return run(root);
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+  };
+
+  it.each([
+    ['old_bundle_exit_timeout', 'waiting-for-exit', 'PERSONAL_UPDATE_OLD_APP_EXIT_TIMEOUT', 'exit'],
+    ['stale_crashpad_not_stopped', 'waiting-for-exit', 'PERSONAL_UPDATE_OLD_APP_EXIT_TIMEOUT', 'exit'],
+    ['bundle_reappeared_before_swap', 'waiting-for-exit', 'PERSONAL_UPDATE_OLD_APP_REAPPEARED', 'exit'],
+    ['bundle_status_unavailable', 'waiting-for-exit', 'PERSONAL_UPDATE_EXIT_STATUS_UNAVAILABLE', 'install'],
+    ['transaction_command_failed', 'awaiting-health', 'PERSONAL_UPDATE_NEW_APP_HEALTH_FAILED', 'install'],
+    ['transaction_command_failed', 'swapping', 'PERSONAL_UPDATE_APPLY_FAILED', 'install'],
+    [undefined, 'prepared', 'PERSONAL_UPDATE_APPLY_FAILED', 'install'],
+    ['some_future_reason', 'not-a-phase', 'PERSONAL_UPDATE_APPLY_FAILED', 'install'],
+  ] as const)('maps monitor reason %s from %s to %s', (failureReason, phase, code, kind) => {
+    const marker = withMarker(journalCopy(failureReason, phase), root => readPersonalFailureMarker(root, 42));
+    expect(marker?.reason).toBe(code);
+    expect(personalFailureKind(marker!.reason)).toBe(kind);
+    expect(marker?.failedFromPhase).toBe(phase === 'not-a-phase' ? undefined : phase);
+  });
+
+  it('keeps preparation failures on the preparation wording', () => {
+    expect(withMarker({ revision: 42, phase: 'preparation-failed', reason: 'PERSONAL_UPDATE_RESIGN_FAILED' },
+      root => personalFailureKind(readPersonalFailureMarker(root, 42)!.reason))).toBe('failed');
+    expect(withMarker({ revision: 42, phase: 'preparation-failed' }, root => readPersonalFailureMarker(root, 42)?.reason))
+      .toBe('PERSONAL_UPDATE_PREPARATION_FAILED');
+    expect(withMarker('not json', root => readPersonalFailureMarker(root, 42)?.reason)).toBe('PERSONAL_UPDATE_PREPARATION_FAILED');
+  });
+
+  it('releases an exit-wait failure for exactly one more automatic attempt, keeping the evidence', () => {
+    withMarker(journalCopy('old_bundle_exit_timeout', 'waiting-for-exit'), root => {
+      // An unrelated revision whose number shares the prefix must not count as a retry of 42.
+      fs.writeFileSync(path.join(root, 'exit-retry-420-1.json'), '{}');
+      expect(releaseRetryablePersonalFailure(root, 42)).toBe(true);
+      expect(readPersonalFailureMarker(root, 42)).toBeNull();
+      expect(JSON.parse(fs.readFileSync(path.join(root, 'exit-retry-42-1.json'), 'utf8')).failureReason).toBe('old_bundle_exit_timeout');
+      // The retry fails the same way: the revision is now skipped and shown with the exit wording.
+      fs.writeFileSync(path.join(root, 'failed-42.json'), JSON.stringify(journalCopy('stale_crashpad_not_stopped', 'waiting-for-exit')));
+      expect(releaseRetryablePersonalFailure(root, 42)).toBe(false);
+      expect(readPersonalFailureMarker(root, 42)?.reason).toBe('PERSONAL_UPDATE_OLD_APP_EXIT_TIMEOUT');
+    });
+  });
+
+  it.each([
+    ['a preparation failure', { revision: 42, phase: 'preparation-failed', reason: 'PERSONAL_UPDATE_RESIGN_FAILED' }],
+    ['a signing preflight failure', { revision: 42, phase: 'preflight-failed', reason: 'PERSONAL_UPDATE_INSTALLED_APP_SIGNATURE' }],
+    ['a failed new-app health check', journalCopy('transaction_command_failed', 'awaiting-health')],
+    ['an unavailable process status', journalCopy('bundle_status_unavailable', 'waiting-for-exit')],
+    ['a Windows apply failure', { revision: 42, phase: 'windows-apply-failed' }],
+  ])('never releases %s', (_label, value) => {
+    withMarker(value, root => {
+      expect(releaseRetryablePersonalFailure(root, 42)).toBe(false);
+      expect(fs.existsSync(path.join(root, 'failed-42.json'))).toBe(true);
+    });
+  });
+
+  it('does nothing without a marker', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cindy-failure-marker-empty-'));
+    try { expect(releaseRetryablePersonalFailure(root, 42)).toBe(false); }
+    finally { fs.rmSync(root, { recursive: true, force: true }); }
+  });
+});

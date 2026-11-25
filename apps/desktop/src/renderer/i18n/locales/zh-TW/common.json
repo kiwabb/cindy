@@ -10705,7 +10705,9 @@
       "manualButton": "下載安裝包",
       "manualAria": "下載 {{version}} 安裝包",
       "manualReasonSigning": "目前安裝的版本不是開發團隊簽署，無法自動更新。可以下載安裝檔手動安裝。",
-      "manualReasonFailed": "自動安裝準備失敗，已略過這個版本。可以下載安裝檔手動安裝。"
+      "manualReasonFailed": "自動安裝準備失敗，已略過這個版本。可以下載安裝檔手動安裝。",
+      "manualReasonExitTimeout": "舊版本沒能及時完全結束，自動安裝重試後仍未完成，已略過這個版本。可以下載安裝檔手動安裝。",
+      "manualReasonInstallFailed": "自動安裝在替換時沒有完成，已保留目前版本並略過這個版本。可以下載安裝檔手動安裝。"
     },
     "notice": {
       "title": "更新公告",

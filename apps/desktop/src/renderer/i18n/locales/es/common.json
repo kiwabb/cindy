@@ -10830,7 +10830,9 @@
       "manualButton": "Descargar instalador",
       "manualAria": "Descargar el instalador de {{version}}",
       "manualReasonSigning": "Esta instalación no está firmada por tu equipo de desarrollo, así que no puede actualizarse automáticamente. Puedes descargar el instalador e instalarlo manualmente.",
-      "manualReasonFailed": "No se pudo preparar la instalación automática, así que se omitió esta versión. Puedes descargar el instalador e instalarlo manualmente."
+      "manualReasonFailed": "No se pudo preparar la instalación automática, así que se omitió esta versión. Puedes descargar el instalador e instalarlo manualmente.",
+      "manualReasonExitTimeout": "La versión anterior no terminó de cerrarse a tiempo, ni siquiera tras un reintento, así que se omitió esta versión. Puedes descargar el instalador e instalarlo manualmente.",
+      "manualReasonInstallFailed": "La instalación automática no pudo completar el reemplazo, así que se conservó la versión actual y se omitió esta versión. Puedes descargar el instalador e instalarlo manualmente."
     },
     "notice": {
       "title": "¿Qué hay de nuevo?",

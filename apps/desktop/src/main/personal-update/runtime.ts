@@ -14,7 +14,7 @@ import type { PreparationRequest } from './prepareProcess.js';
 import { cleanupCommittedPersonalUpdates } from './cleanup.js';
 import { readLocalSigningIdentity } from './signing-core.mjs';
 import { createPreparationJob, recordPreparationWorker, finishPreparationJob, cleanupAbandonedPreparation } from './jobs.js';
-import { personalFailureCode, readPersonalFailureMarker, type PersonalFailureCode } from './failure.js';
+import { personalFailureCode, readPersonalFailureMarker, releaseRetryablePersonalFailure, type PersonalFailureCode } from './failure.js';
 import { checkMacPreparationPrerequisites } from './macPreflight.js';
 
 export interface PersonalUpdateContext {
@@ -78,7 +78,7 @@ export function readPersonalBuildInfo(): { identity: PersonalIdentity; builtAt?:
 export type PersonalManifestCheck =
   | { kind: 'install'; manifest: PersonalManifest }
   | { kind: 'manual'; manifest: PersonalManifest }
-  /** A newer revision this install already failed to prepare or apply; it is never retried automatically. */
+  /** A newer revision this install already failed to prepare or apply; it is not retried automatically (exit-wait failures get one retry first). */
   | { kind: 'skipped'; manifest: PersonalManifest; reason: PersonalFailureCode };
 
 export async function checkPersonalManifest(): Promise<PersonalManifestCheck | null> {
@@ -91,6 +91,8 @@ export async function checkPersonalManifest(): Promise<PersonalManifestCheck | n
   if (text.length > 32 * 1024) throw new Error('PERSONAL_UPDATE_FEED_TOO_LARGE');
   const manifest = validatePersonalManifest(JSON.parse(text), context.policy);
   if (manifest.revision <= context.identity.revision) return null;
+  // The old app not quitting in time is retried once with the same verified package; see failure.ts.
+  releaseRetryablePersonalFailure(context.root, manifest.revision);
   const failure = readPersonalFailureMarker(context.root, manifest.revision);
   if (failure) return { kind: 'skipped', manifest, reason: failure.reason };
   if (manifest.storageIdentity !== context.identity.storageIdentity) return { kind: 'manual', manifest };

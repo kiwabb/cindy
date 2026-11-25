@@ -10705,7 +10705,9 @@
       "manualButton": "下载安装包",
       "manualAria": "下载 {{version}} 安装包",
       "manualReasonSigning": "当前安装不是开发团队签名，不能自动更新。可以下载安装包手动安装。",
-      "manualReasonFailed": "自动安装准备失败，已跳过这个版本。可以下载安装包手动安装。"
+      "manualReasonFailed": "自动安装准备失败，已跳过这个版本。可以下载安装包手动安装。",
+      "manualReasonExitTimeout": "旧版本没能及时完全退出，自动安装重试后仍未完成，已跳过这个版本。可以下载安装包手动安装。",
+      "manualReasonInstallFailed": "自动安装在替换时没有完成，已保留当前版本并跳过这个版本。可以下载安装包手动安装。"
     },
     "notice": {
       "title": "更新公告",

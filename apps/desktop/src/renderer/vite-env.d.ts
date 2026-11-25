@@ -1011,7 +1011,7 @@ interface UpdateStatusPayload {
   displayVersion?: string;
   progress?: number;
   /** Personal `manual` only: why it cannot install automatically (see updateService). */
-  manualReason?: 'storage' | 'signing' | 'failed';
+  manualReason?: 'storage' | 'signing' | 'failed' | 'exit' | 'install';
   /** `manual` only: release page to download the installer from. */
   downloadUrl?: string;
   /** Machine-readable error subtype. `windows_vc_runtime_missing` keeps a

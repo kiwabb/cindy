@@ -444,9 +444,10 @@ export function UpdateBanner({
   if (isManual) {
     if (manualDismissed) return null;
     // Why this version cannot install automatically; the data-format case keeps the title alone.
-    const manualReasonKey = manualReason === 'signing'
-      ? 'update.banner.manualReasonSigning'
-      : manualReason === 'failed' ? 'update.banner.manualReasonFailed' : null;
+    const manualReasonKey = manualReason === 'signing' ? 'update.banner.manualReasonSigning'
+      : manualReason === 'failed' ? 'update.banner.manualReasonFailed'
+        : manualReason === 'exit' ? 'update.banner.manualReasonExitTimeout'
+          : manualReason === 'install' ? 'update.banner.manualReasonInstallFailed' : null;
     const openInstaller = () => { void window.electronAPI.openExternal(downloadUrl!); };
     if (isCollapsed) {
       return (

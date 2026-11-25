@@ -10830,7 +10830,9 @@
       "manualButton": "Télécharger l'installateur",
       "manualAria": "Télécharger l'installateur de {{version}}",
       "manualReasonSigning": "Cette installation n'est pas signée par votre équipe de développement et ne peut donc pas se mettre à jour automatiquement. Vous pouvez télécharger le programme d'installation et l'installer manuellement.",
-      "manualReasonFailed": "L'installation automatique n'a pas pu être préparée : cette version a été ignorée. Vous pouvez télécharger le programme d'installation et l'installer manuellement."
+      "manualReasonFailed": "L'installation automatique n'a pas pu être préparée : cette version a été ignorée. Vous pouvez télécharger le programme d'installation et l'installer manuellement.",
+      "manualReasonExitTimeout": "L'ancienne version ne s'est pas entièrement fermée à temps, même après une nouvelle tentative : cette version a été ignorée. Vous pouvez télécharger le programme d'installation et l'installer manuellement.",
+      "manualReasonInstallFailed": "L'installation automatique n'a pas pu terminer le remplacement : la version actuelle a été conservée et cette version a été ignorée. Vous pouvez télécharger le programme d'installation et l'installer manuellement."
     },
     "notice": {
       "title": "Nouveautés",
