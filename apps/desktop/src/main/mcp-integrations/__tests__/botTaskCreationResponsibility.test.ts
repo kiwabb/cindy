@@ -16,15 +16,19 @@ function fixture() {
   const capture = vi.fn(async (_caller: string) => { void _caller; return record; });
   const send = vi.fn(async (_params: unknown) => { void _params; return { ok: true, wakeKind: 'created', targetSessionId: 'new-task' }; });
   const report = vi.fn();
+  const noticeCreated = vi.fn();
   const dependencies = {
     tryGetOrcaCollabService: () => ({ sendToSession: send }),
     captureBotCreatedTaskResponsibility: capture,
     reportGroupTaskCreated: report,
     normalizeAutoTitle,
+    // 派发方通知（fork）：新建记派发关系、发给已有任务时记「已自己回信」。
+    dispatcherNoticeTaskCreated: noticeCreated,
+    dispatcherNoticeTaskMessage: vi.fn(),
   };
   const call = new Function(...Object.keys(dependencies), wired)(...Object.values(dependencies)) as
     (params: { targetSessionId?: string; dispatcherSessionId: string; message: string; workingDir?: string }) => Promise<Record<string, unknown>>;
-  return { call, record, capture, send, report };
+  return { call, record, capture, send, report, noticeCreated };
 }
 
 it('records only a successful fresh creation, using the original caller and the returned ID', async () => {
@@ -37,6 +41,8 @@ it('records only a successful fresh creation, using the original caller and the 
   expect(f.capture).toHaveBeenCalledWith('canonical-bot');
   expect(f.record).toHaveBeenCalledWith('new-task');
   expect(f.send).toHaveBeenCalledOnce();
+  // 新建成功后宿主记下「派发方 → 任务」，之后任务停下时由宿主通知派发方。
+  expect(f.noticeCreated).toHaveBeenCalledExactlyOnceWith('new-task', 'canonical-bot');
 });
 
 it('does not turn a message to an existing task into responsibility', async () => {

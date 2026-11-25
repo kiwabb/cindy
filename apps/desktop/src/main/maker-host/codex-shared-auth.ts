@@ -18,13 +18,32 @@ function resolveCodexCliHome(): string {
   return codexHomeDir(process.env, os.homedir());
 }
 
+/**
+ * 仅开发验证用：`XDT_DEV_NO_SHARED_CODEX_AUTH=1` 时，开发版沙箱完全不读安装版（Release）和本机 Codex CLI
+ * 的登录文件，所有 Codex 登录路径都指到沙箱自己 userData 下一个不存在的位置，沙箱里没有 Codex 登录。
+ * 只在未打包的开发构建生效；正式构建（app.isPackaged）忽略这个变量，行为不变。
+ */
+export const DEV_NO_SHARED_CODEX_AUTH_ENV = 'XDT_DEV_NO_SHARED_CODEX_AUTH';
+
+export function isDevSharedCodexAuthDisabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return !app.isPackaged && env[DEV_NO_SHARED_CODEX_AUTH_ENV] === '1';
+}
+
+function sandboxOnlyAuthPath(name: string): string {
+  return path.join(app.getPath('userData'), 'no-shared-codex-auth', name);
+}
+
 /** 本机 Codex CLI 维护的 OpenAI 登录态（默认 `~/.codex/auth.json`，随 `CODEX_HOME`）。 */
 export function getCodexCliAuthPath(): string {
+  if (isDevSharedCodexAuthDisabled()) return sandboxOnlyAuthPath('cli-auth.json');
   return path.join(resolveCodexCliHome(), 'auth.json');
 }
 
 /** 当前区域 Release 维护的 OpenAI 登录态。 */
 export function getReleaseCodexAuthPath(): string {
+  // 开发验证开关打开时不指向安装版目录；dirname 两级回到沙箱自己的 userData，
+  // getPreferredSharedCodexAuthPath 因此直接返回这个不存在的路径，不再读任何共享登录。
+  if (isDevSharedCodexAuthDisabled()) return path.join(app.getPath('userData'), 'codex-home-none', 'auth.json');
   return path.join(
     app.getPath('appData'),
     brandUserDataDirName(CURRENT_CINDY_REGION),

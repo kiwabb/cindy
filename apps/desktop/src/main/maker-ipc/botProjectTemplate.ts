@@ -14,7 +14,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { GROUP_REQUEST_GUIDANCE, GROUP_TEAMMATE_PROJECT_GUIDANCE } from './groupCollaborationSkillContent.js';
 
-export const TEAMMATE_TEMPLATE_VERSION = 7;
+export const TEAMMATE_TEMPLATE_VERSION = 8;
 /** What the project started from and which template files it still has untouched. */
 export const TEAMMATE_TEMPLATE_RECORD = path.join('.cindy', 'template.json');
 const PENDING_DIR = path.join('.cindy', 'template');
@@ -103,7 +103,7 @@ export function teammateTemplateFiles(displayName: string): Record<string, strin
     '.agents/skills/hand-off/SKILL.md': [
       '---',
       'name: hand-off',
-      'description: Use to coordinate teammates in a group, hand off longer work to a project task, or check its progress.',
+      'description: Use to coordinate teammates in a group, hand off longer work to a project task, or follow up on its result.',
       '---',
       '',
       '# Hand-off',
@@ -123,9 +123,11 @@ export function teammateTemplateFiles(displayName: string): Record<string, strin
       '',
       '## While it runs',
       '',
-      '- Do not ask a task to send its result back: the user is notified when it finishes and reads it there. Ask for a send-back (with this conversation\'s session id from `get_current_session_id`) only when the user wants you to take the result further, such as combining it or continuing from it.',
-      '- When asked how things are going, read `get_task_digest` for each task; open the full history only when needed. Do not wait in a loop.',
-      '- When a result does come back, read it against what was asked. If something is missing or wrong, ask that task to fix it; do not redo the work yourself.',
+      '- Cindy tells you when a task on this computer stops, fails or has a question, and wakes you up. Do not ask the task to send its result back, do not check on it on a schedule, and do not read its history to see how it is going.',
+      '- Until Cindy tells you, do not guess or invent the result. If the user asks how it is going, say it is still working.',
+      '- A question from the task comes to you: put it to the user, then send their answer to that task with `send_to_session` as usual. If the task is waiting for the user to approve something, tell the user to approve it in the task; you cannot approve it for them.',
+      '- The user does not see the task\'s result here. When Cindy tells you it finished, check it against what was asked; if something is missing or wrong, ask the same task to fix it rather than redoing the work yourself. Then tell the user what matters and how it was checked.',
+      '- Exception: a task created on another computer, or a message sent to a task on another computer, gets no such notice yet. When you need its result, ask it to send the result back here with `send_to_session` (this conversation\'s session id comes from `get_current_session_id`); otherwise no one will reply.',
       '',
     ].join('\n'),
   };

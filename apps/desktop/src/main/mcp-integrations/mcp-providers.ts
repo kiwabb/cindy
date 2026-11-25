@@ -142,6 +142,7 @@ import {
   saveBotSkillForSession,
 } from '../maker-ipc/botSkillService.js';
 import { captureBotCreatedTaskResponsibility } from '../maker-ipc/botTaskCreation.js';
+import { dispatcherNoticeTaskCreated, dispatcherNoticeTaskMessage } from '../dispatcher-notice/hooks.js';
 import { runBotProjectsTool } from '../maker-ipc/botLinkedProjects.js';
 import { captureDataOwnerBroadcastScope } from '../device-link/broadcast-tap.js';
 import {
@@ -1198,6 +1199,7 @@ export function createDesktopMcpProviders(deps: DesktopMcpProvidersDeps): LiziMc
                 message, sender: () => remoteHandoffSender(dispatcherSessionId),
               });
               if (!result.ok) return result;
+              if (dispatcherSessionId) dispatcherNoticeTaskMessage(dispatcherSessionId, { deviceId, sessionId });
               if (result.wakeKind === 'created') return { ok: false, errorCode: 'DELIVERY_UNKNOWN', message: 'Unexpected creation receipt for an existing task.' };
               return { ...result, wakeKind: result.wakeKind };
             },
@@ -1283,6 +1285,11 @@ export function createDesktopMcpProviders(deps: DesktopMcpProvidersDeps): LiziMc
           if (result.ok && result.wakeKind === 'created' && dispatcherSessionId)
             reportGroupTaskCreated(dispatcherSessionId, { taskId: result.targetSessionId, deviceId: null,
               title: result.targetTitle || title?.trim() || normalizeAutoTitle(message) });
+          // 派发方通知（dispatcher-notice）：新建记派发关系；发给已有对话时，若本任务正替它干活就算已自己回信。
+          if (result.ok && dispatcherSessionId) {
+            if (result.wakeKind === 'created') dispatcherNoticeTaskCreated(result.targetSessionId, dispatcherSessionId);
+            else dispatcherNoticeTaskMessage(dispatcherSessionId, { deviceId: 'local', sessionId: result.targetSessionId });
+          }
           if (result.ok && result.wakeKind === 'created' && recordCreation) {
             try { await recordCreation(result.targetSessionId); }
             catch { return { ...result, responsibilityRecorded: false }; }

@@ -20,7 +20,7 @@ import {
   getCodexAuthInvalidationMarkerPath,
   writeInvalidatedSystemCodexAuthMarker,
 } from '../codex-auth-invalidation.js';
-import { getPreferredSharedCodexAuthPath } from '../codex-shared-auth.js';
+import { getCodexCliAuthPath, getPreferredSharedCodexAuthPath, getReleaseCodexAuthPath } from '../codex-shared-auth.js';
 
 const dirs: string[] = [];
 const h = vi.hoisted(() => ({
@@ -512,6 +512,33 @@ describe('dev 沙箱凭证隔离(XDT_ISOLATED_AUTH)', () => {
   // 依据:提报者把 codex login 放在 CODEX_HOME=E:\CodexHome / NixOS 自定义目录,
   // 发现路径写死 ~/.codex 导致「使用本机 Codex 账号」找不到登录态;现有覆盖只测
   // ~/.codex 常规位置。最小失败输入:packaged + CODEX_HOME=自定义绝对目录。
+  // 开发验证开关（XDT_DEV_NO_SHARED_CODEX_AUTH=1）：开发沙箱完全不读安装版与本机 CLI 的 Codex 登录。
+  // 依据：真实验证要求开发版不读写安装版数据目录；最小失败输入：开关打开时路径仍指向 appData/CindyGlobal。
+  // 正式构建必须忽略这个变量（packaged 下路径与不设开关时一致）。
+  describe('开发验证开关：不读任何共享 Codex 登录', () => {
+    it('未打包 + 开关打开：所有 Codex 登录路径都落在沙箱 userData，且不存在', () => {
+      const { systemAuth } = fixture();
+      fs.mkdirSync(path.join(h.appDataDir, 'CindyGlobal', 'codex-home'), { recursive: true });
+      fs.writeFileSync(path.join(h.appDataDir, 'CindyGlobal', 'codex-home', 'auth.json'), '{"tokens":{}}');
+      vi.stubEnv('XDT_DEV_NO_SHARED_CODEX_AUTH', '1');
+      const paths = [getPreferredSharedCodexAuthPath('owner-a'), getReleaseCodexAuthPath(), getCodexCliAuthPath()];
+      for (const value of paths) {
+        expect(path.resolve(value).startsWith(path.resolve(h.userDataDir) + path.sep)).toBe(true);
+        expect(fs.existsSync(value)).toBe(false);
+      }
+      expect(paths).not.toContain(systemAuth);
+    });
+
+    it('正式构建忽略开关：路径与不设开关时完全一致', () => {
+      fixture();
+      h.isPackaged = true;
+      vi.stubEnv('XDT_DEV_NO_SHARED_CODEX_AUTH', '');
+      const before = [getPreferredSharedCodexAuthPath('owner-a'), getReleaseCodexAuthPath(), getCodexCliAuthPath()];
+      vi.stubEnv('XDT_DEV_NO_SHARED_CODEX_AUTH', '1');
+      expect([getPreferredSharedCodexAuthPath('owner-a'), getReleaseCodexAuthPath(), getCodexCliAuthPath()]).toEqual(before);
+    });
+  });
+
   describe('本机 Codex CLI 凭证发现跟随 CODEX_HOME (#8258)', () => {
     it('packaged 下 CODEX_HOME 为绝对路径时使用该目录的 auth.json', () => {
       const { systemAuth } = fixture();

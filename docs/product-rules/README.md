@@ -16,6 +16,7 @@
 | 学习页与导师对话的「今天」页签（fork）：只读导师的学习目标 | [学习页](learning-pages.md) |
 | 任务、对话、消息的用户称谓 | [命名](task-and-conversation-naming.md) |
 | 消息发送、来源标签与模型说明 | [消息来源](message-source.md) |
+| 派发方通知（fork）：伙伴开的任务完成、出错、等待时由宿主告诉伙伴 | [派发方通知](dispatcher-notice.md) |
 | IM 上下文展示与完成未读 | [IM 消息呈现](im-message-presentation.md) |
 | IM 工具授权、多端确认与暂停回执 | [IM 权限确认](im-permission-confirmation.md) |
 | Telegram 命令、消息、附件与官方／个人 bot 差异 | [Telegram 能力台账](telegram-bot-parity.md) |

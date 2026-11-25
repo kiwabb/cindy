@@ -712,6 +712,7 @@ import {
   type OrcaWorkerPermissionMode,
 } from '../../shared/orca-worker-permission-mode.js';
 import { t } from '../i18n.desktop.js';
+import { dispatcherNoticeInterceptQuestion, dispatcherNoticeOnProjection, installDispatcherNoticeBridge } from '../dispatcher-notice/hooks.js';
 import { createLogger } from '../logger.js';
 import { createSessionActionRuntime, type SessionRuntimeAction } from './sessionActionRuntime.js';
 import {
@@ -5717,6 +5718,12 @@ export function installDesktopInteractionListener(session: {
       return defaultDecisionForPending(req.kind, 'stale_turn');
     }
     flushAssistantBlock(session.id);
+    // 派发方通知（fork）：伙伴发起的请求里任务提问时，宿主不弹卡片，转交伙伴并告诉任务结束这一轮。
+    // 不适用（主人的轮次、主人插过话、伙伴不可用等）时返回 null，照旧弹卡片。
+    if (req.kind === 'ask_user_question') {
+      const forwarded = await dispatcherNoticeInterceptQuestion(session.id, req);
+      if (forwarded) return forwarded;
+    }
     // F1-a Phase 5: ask_user / plan_review 的消息本身也收口 main 单点落库(单 persistId,
     // 修 F1 重复),persistId 盖进 payload 让 renderer 用同一 id 建气泡 + answered 回写命中。
     // permission 不建 chat 消息 → persistId 为 undefined。
@@ -19902,6 +19909,7 @@ export function registerMakerIpc(maker: Maker, options: RegisterMakerIpcOptions)
       }
       broadcastToAllWindows(MAKER_PUSH.INPUT_PROJECTION, projection);
       if (!isGoalInputBlocked(projection.sessionId)) notifyGoalIdleAfterTurnSettled(projection.sessionId);
+      dispatcherNoticeOnProjection(projection);
     },
     ...createRuntimePluginInputHooks({
       getStableSessionForTurnBoundary, screenGhostUserMessage, rollbackAgentIslandUserPrompt,
@@ -19987,6 +19995,37 @@ export function registerMakerIpc(maker: Maker, options: RegisterMakerIpcOptions)
     getPersistedClientIds: getPersistedInputClientIds,
   });
   agentInputCoordinatorHolder = inputCoordinator;
+  // 派发方通知（dispatcher-notice）：只暴露投递、撤回、队列与续跑状态和挂起交互，判断逻辑在独立模块里。
+  installDispatcherNoticeBridge({
+    send: async ({ targetSessionId, clientId, text, taskId, taskTitle }) => {
+      const result = await sendToSessionInternal({
+        targetSessionId, clientId, message: text, forceQueue: true,
+        origin: { kind: 'session', senderSessionId: taskId, displayText: text,
+          ...(taskTitle ? { senderSessionTitle: taskTitle } : {}) },
+        autoReviewUserText: { kind: 'agent-request' },
+      });
+      return result.ok;
+    },
+    isQueued: (sessionId, clientId) => inputCoordinator.hasPendingQueueItem(sessionId, clientId),
+    withdraw: (sessionId, clientId) => { inputCoordinator.remove(sessionId, clientId); },
+    isActive: (sessionId) => isSessionInTurn(sessionId) || hasPendingAgentInteractionForSession(sessionId),
+    isSettled: (sessionId) => {
+      if (isSessionInTurn(sessionId) || hasPendingAgentInteractionForSession(sessionId)) return false;
+      if (inputCoordinator.isAutoResumePending(sessionId) || inputCoordinator.isAutoResumeDeferred(sessionId)
+        || inputCoordinator.hasQueuedAutoResume(sessionId) || inputCoordinator.hasProviderGroupSwitchHold(sessionId)
+        || inputCoordinator.hasUsageLimitRecovery(sessionId)) return false;
+      // 暂停的队列或等人点「重试」的出错横幅都算停下：没有人介入就不会再跑。
+      const projection = inputCoordinator.getProjection(sessionId);
+      return !(inputCoordinator.hasPendingQueuedWork(sessionId) && !projection.queuePaused && projection.recovery === null);
+    },
+    isResumeQueued: async (sessionId) => {
+      await inputCoordinator.ensureQueueRestored(sessionId);
+      const projection = inputCoordinator.getProjection(sessionId);
+      return inputCoordinator.hasQueuedAutoResume(sessionId) || inputCoordinator.isAutoResumePending(sessionId)
+        || (inputCoordinator.hasPendingQueuedWork(sessionId) && !projection.queuePaused && projection.recovery === null);
+    },
+    pendingInteractions: (sessionId) => getPendingInteractionsForSession(sessionId),
+  });
   asyncQuestionInputDispatcher = async (session, text, signal, requestId, displayText, origin) => {
     const sharedTask = getDeviceLinkInvokeContext()?.sharedTask;
     const pausedBeforeAnswer = inputCoordinator.getProjection(session.id).queuePaused;

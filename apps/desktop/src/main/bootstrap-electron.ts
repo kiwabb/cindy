@@ -637,6 +637,7 @@ import {
 import { initNotificationService, showDeviceSessionDesktopEvent } from './notificationService';
 import { initWecomGroupNotificationIpc } from './wecomGroupNotification';
 import { getAgentIslandService, initAgentIslandService } from './agent-island/service.js';
+import { configureDispatcherNotice, dispatcherNoticeOnActivity, initDispatcherNotice } from './dispatcher-notice/desktop.js';
 import { startAgentIslandQuota } from './agent-island/quota.js';
 import { setCompanionAvatarResolver } from './agent-island/companionIdentity.js';
 import { companionAvatarCache } from './companion-cloud/avatarCacheHost.js';
@@ -5326,6 +5327,12 @@ const registerIpcHandlers = () => {
       showDeviceSessionDesktopEvent(() => getWindow() ?? null, event);
     },
   })?.setAppFocused(hasFocusedAppWindow());
+  // 派发方通知：订阅同一份规范活动（灵动岛关闭时也照常产生），并在当前账号就绪后做启动扫描。
+  configureDispatcherNotice({ getMainWindow: () => getWindow() ?? null });
+  getAgentIslandService()?.subscribeSessionActivity(({ sessionId, previous, current }) => {
+    dispatcherNoticeOnActivity({ sessionId, previous, current });
+  });
+  initDispatcherNotice();
   // 定向 replay:快照只补发给刚完成 sessions 订阅的那一台控制端。若沿默认广播
   // 通道扇出,每次 subscribe 都会把 O(会话数) 的帧重复灌给其它所有控制端,
   // 多控制端重连风暴中会互相挤爆对方的可靠传输窗口。
