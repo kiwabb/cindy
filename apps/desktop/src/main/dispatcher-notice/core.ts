@@ -10,7 +10,8 @@
  * - 等待（提问、选项、计划、权限）立即发，同一次等待只发一次；主人先处理掉就撤回或补一句。
  * - 主人手动停止：静默结清。
  * - 任务这串请求期间已自己发回派发方：不再发「完成」，出错与等待照发。
- * - 同一任务 24 小时内结果类、等待类各有上限；第一次超限给主人发一次系统提醒。
+ * - 不按天限量：正常通知一条都不吞。只有「派发方与任务连续来回、期间主人在两边都没说话」达到可配置次数
+ *   （默认很宽，0 = 关闭）时暂停这件任务的通知，给主人发提醒、给派发方发最后一条「已暂停」；主人在任一边说话即恢复。
  *
  * 所有函数都是 (record, input) -> { record, actions } 的纯函数；宿主适配层负责读状态、投递与持久化。
  */
@@ -42,7 +43,7 @@ export interface TurnInput {
   sender?: DispatcherRef;
 }
 
-export type NoticeKind = 'done' | 'error' | 'interrupted' | 'dispatch-failed' | 'waiting' | 'resolved';
+export type NoticeKind = 'done' | 'error' | 'interrupted' | 'dispatch-failed' | 'waiting' | 'resolved' | 'paused';
 type NoticeBucket = 'result' | 'waiting';
 
 export function noticeBucket(kind: NoticeKind): NoticeBucket {
@@ -54,6 +55,11 @@ export type InteractionKind = 'question' | 'plan' | 'permission' | 'other';
 export interface PendingQuestion {
   question: string;
   options: string[];
+  /** 题目的稳定 id（回答按它作键；旧题没有，用题干）。 */
+  id?: string;
+  multiSelect?: boolean;
+  /** 只能从这些选项里选（不接受手打文字）。 */
+  choices?: string[];
 }
 
 export interface PendingInteraction {
@@ -96,8 +102,10 @@ export interface TaskRecord {
   chain: Chain | null;
   /** 最近 24 小时发过的通知。 */
   sent: SentNotice[];
-  /** 已经因超限给主人发过提醒的时间（每个 24 小时窗口一次）。 */
-  capAlertedAt?: number;
+  /** 主人没参与的连续来回次数与暂停状态。 */
+  loop?: { exchanges: number; paused: boolean; since?: number };
+  /** 已归类过的最后一条用户行（数据库 rowid）；之后的行属于新的输入。 */
+  inputCursor?: number;
 }
 
 export function emptyRecord(taskId: string): TaskRecord {
@@ -121,8 +129,8 @@ export type NoticeAction =
   | { type: 'deliver'; notice: Notice; replaceClientId?: string }
   /** 撤回还在派发方队列里没被处理的通知。 */
   | { type: 'withdraw'; target: DispatcherRef; clientId: string }
-  /** 给主人发系统提醒（超限）。 */
-  | { type: 'owner-alert'; reason: 'cap'; taskId: string };
+  /** 给主人发系统提醒（连续来回达到设定次数，已暂停这件任务的通知）。 */
+  | { type: 'owner-alert'; reason: 'loop-paused'; taskId: string };
 
 export interface Step {
   record: TaskRecord;
@@ -130,12 +138,29 @@ export interface Step {
 }
 
 export const DAY_MS = 24 * 60 * 60_000;
-export const LIMITS: Record<NoticeBucket, number> = { result: 6, waiting: 6 };
+/** 默认：主人没参与的连续来回 30 次才暂停（很宽，正常派活几乎碰不到）；0 = 关闭保护。 */
+export const DEFAULT_LOOP_PAUSE_AFTER = 30;
 
+/**
+ * 适配层提供的环境：
+ * - queued：这条通知是否还在派发方队列里没被处理；
+ * - pauseAfter：连续来回多少次后暂停（0 = 关闭）；
+ * - ownerSpoke：自上次通知以来，主人是否在这个派发方对话里说过话（适配层预先读好）。
+ */
+export interface CoreEnv {
+  queued(target: DispatcherRef, clientId: string): boolean;
+  pauseAfter?: number;
+  ownerSpoke?(target: DispatcherRef): boolean;
+}
+export type QueueProbe = CoreEnv | ((target: DispatcherRef, clientId: string) => boolean);
+
+function envOf(probe: QueueProbe): CoreEnv {
+  return typeof probe === 'function' ? { queued: probe } : probe;
+}
+
+/** 只保留 24 小时内的发送记录（用于合并与撤回）。 */
 function prune(record: TaskRecord, now: number): TaskRecord {
-  const { capAlertedAt, ...rest } = record;
-  const sent = record.sent.filter(entry => now - entry.at < DAY_MS);
-  return capAlertedAt !== undefined && now - capAlertedAt < DAY_MS ? { ...rest, sent, capAlertedAt } : { ...rest, sent };
+  return { ...record, sent: record.sent.filter(entry => now - entry.at < DAY_MS) };
 }
 
 function noticeId(taskId: string, kind: NoticeKind, target: DispatcherRef, now: number, extra = ''): string {
@@ -143,31 +168,41 @@ function noticeId(taskId: string, kind: NoticeKind, target: DispatcherRef, now: 
 }
 
 /**
- * 发一条通知给链上所有派发方：处理上限、合并（同目标同类桶还在排队的旧通知可被替换）。
- * `queued(target, clientId)` 由适配层回答：这条通知是否还在派发方队列里没被处理。
+ * 发一条通知给链上所有派发方：合并（同目标同类、还在排队没被处理的旧通知被替换）与来回保护。
  */
 function emit(
   record: TaskRecord,
   targets: DispatcherRef[],
   base: Omit<Notice, 'id' | 'target' | 'clientId'>,
   now: number,
-  queued: (target: DispatcherRef, clientId: string) => boolean,
+  probe: QueueProbe,
 ): Step {
+  const env = envOf(probe);
   let next = prune(record, now);
   const actions: NoticeAction[] = [];
   const bucket = noticeBucket(base.kind);
-  for (const target of targets) {
-    const used = next.sent.filter(entry => noticeBucket(entry.kind) === bucket).length;
-    const replace = [...next.sent].reverse().find(entry => noticeBucket(entry.kind) === bucket
-      && sameDispatcher(entry.target, target) && queued(target, entry.clientId)
-      && (bucket === 'result' || entry.interactionId === base.interaction?.id));
-    if (!replace && used >= LIMITS[bucket]) {
-      if (next.capAlertedAt === undefined) {
-        next = { ...next, capAlertedAt: now };
-        actions.push({ type: 'owner-alert', reason: 'cap', taskId: record.taskId });
-      }
-      continue;
+  // 来回保护：主人在任务里或派发方对话里说过话就清零并恢复。
+  const pauseAfter = env.pauseAfter ?? DEFAULT_LOOP_PAUSE_AFTER;
+  let loop = next.loop ?? { exchanges: 0, paused: false };
+  if (targets.some(target => env.ownerSpoke?.(target))) loop = { exchanges: 0, paused: false };
+  if (loop.paused) return { record: { ...next, loop }, actions };
+  if (pauseAfter > 0 && loop.exchanges >= pauseAfter) {
+    // 达到次数：这条不发普通通知，改发「已暂停」给派发方，并提醒主人；之后等主人介入。
+    next = { ...next, loop: { exchanges: loop.exchanges, paused: true, since: now } };
+    actions.push({ type: 'owner-alert', reason: 'loop-paused', taskId: record.taskId });
+    for (const target of targets) {
+      const id = noticeId(record.taskId, 'paused', target, now);
+      actions.push({ type: 'deliver', notice: { ...base, kind: 'paused', id, target, clientId: id } });
+      next = { ...next, sent: [...next.sent, { id, kind: 'paused', at: now, target, clientId: id }] };
     }
+    return { record: next, actions };
+  }
+  // 「已由用户处理」这类宿主补充说明不算一次来回。
+  next = { ...next, loop: { exchanges: loop.exchanges + (base.kind === 'resolved' ? 0 : 1), paused: false } };
+  for (const target of targets) {
+    const replace = [...next.sent].reverse().find(entry => noticeBucket(entry.kind) === bucket
+      && sameDispatcher(entry.target, target) && env.queued(target, entry.clientId)
+      && (bucket === 'result' || entry.interactionId === base.interaction?.id));
     const id = noticeId(record.taskId, base.kind, target, now, base.interaction?.id);
     const clientId = replace?.clientId ?? id;
     const notice: Notice = { ...base, id, target, clientId };
@@ -203,6 +238,8 @@ export function onTurnStarted(record: TaskRecord, inputs: readonly TurnInput[], 
   const hasOwnerInput = inputs.some(input => input.kind === 'owner'
     || (input.kind === 'dispatcher' && (!input.sender || !qualifies(record, input.sender))));
   const chain = record.chain;
+  // 主人在任务里说话：来回计数清零，暂停解除。
+  if (hasOwnerInput && record.loop) record = { ...record, loop: { exchanges: 0, paused: false } };
   if (owners.length) {
     const merged = chain ? [...chain.owners, ...owners.filter(owner => !chain.owners.some(o => sameDispatcher(o, owner)))] : owners;
     return { ...record, chain: {
@@ -240,7 +277,7 @@ export function onSelfReport(record: TaskRecord, target: DispatcherRef): TaskRec
 /** 任务进入等待（提问 / 选项 / 计划 / 权限）。立即通知，同一次等待只发一次。 */
 export function onWaiting(
   record: TaskRecord, interaction: PendingInteraction, now: number,
-  queued: (target: DispatcherRef, clientId: string) => boolean,
+  queued: QueueProbe,
 ): Step {
   const chain = record.chain;
   if (!chain || chain.waitingNotified.includes(interaction.id)) return { record, actions: [] };
@@ -253,14 +290,15 @@ export function onWaiting(
 /** 等待被处理掉（主人在任务里答了 / 批了，或问题被撤回）。 */
 export function onInteractionResolved(
   record: TaskRecord, interactionId: string, now: number,
-  queued: (target: DispatcherRef, clientId: string) => boolean,
+  queued: QueueProbe,
 ): Step {
   const notified = record.sent.filter(entry => entry.kind === 'waiting' && entry.interactionId === interactionId);
   if (!notified.length) return { record, actions: [] };
   const actions: NoticeAction[] = [];
   let next = record;
+  const env = envOf(queued);
   for (const entry of notified) {
-    if (queued(entry.target, entry.clientId)) {
+    if (env.queued(entry.target, entry.clientId)) {
       // 还没被派发方处理：直接撤回，不再打扰。撤回的不计入上限。
       actions.push({ type: 'withdraw', target: entry.target, clientId: entry.clientId });
       next = { ...next, sent: next.sent.filter(item => item !== entry) };
@@ -270,7 +308,7 @@ export function onInteractionResolved(
     const step = emit(next, [entry.target], {
       kind: 'resolved', taskId: record.taskId, ownerInterjected: false,
       interaction: { id: interactionId, kind: 'other' },
-    }, now, () => false);
+    }, now, { ...env, queued: () => false });
     next = step.record;
     actions.push(...step.actions);
   }
@@ -288,7 +326,7 @@ export interface StopFacts {
 /** 一轮停在完成或出错。只有真正停下才发通知并结清这串请求。 */
 export function onStopped(
   record: TaskRecord, facts: StopFacts, now: number,
-  queued: (target: DispatcherRef, clientId: string) => boolean,
+  queued: QueueProbe,
 ): Step {
   const chain = record.chain;
   if (!chain) return { record, actions: [] };
@@ -315,7 +353,7 @@ export function onStoppedByOwner(record: TaskRecord): TaskRecord {
 /** 派发方的消息在投递前就失败（Agent 起不来等），任务没有开始这一轮。 */
 export function onDispatchFailed(
   record: TaskRecord, input: TurnInput, error: string, now: number,
-  queued: (target: DispatcherRef, clientId: string) => boolean,
+  queued: QueueProbe,
 ): Step {
   const owners = record.chain?.owners.slice() ?? [];
   if (input.kind === 'dispatcher' && input.sender && qualifies(record, input.sender)
@@ -339,7 +377,7 @@ export interface RestartFacts {
 /** Cindy 启动后对每个还挂着请求的任务补判一次。 */
 export function onRestart(
   record: TaskRecord, facts: RestartFacts, now: number,
-  queued: (target: DispatcherRef, clientId: string) => boolean,
+  queued: QueueProbe,
 ): Step {
   const chain = record.chain;
   if (!chain || facts.active || facts.resumeQueued) return { record, actions: [] };
@@ -354,4 +392,20 @@ export function onRestart(
       ...(chain.lastError ? { error: chain.lastError } : {}) }, now, queued);
   }
   return { record, actions: [] };
+}
+
+/**
+ * 派发方用 send_to_session 的回复被宿主当作对提问的回答交了进去：这条等待已由派发方处理，
+ * 之后提问消失时不再发「已由用户处理」，也不撤回。
+ */
+export function onAnsweredByDispatcher(record: TaskRecord, interactionId: string): TaskRecord {
+  return { ...record, sent: record.sent.filter(entry => !(entry.kind === 'waiting' && entry.interactionId === interactionId)) };
+}
+
+/** 这次请求期间，派发方可以用普通回复作答的提问：只限这串请求里通知过它的提问类等待，最早的一个。 */
+export function answerableQuestion(record: TaskRecord, sender: DispatcherRef, pending: readonly PendingInteraction[]): PendingInteraction | null {
+  const chain = record.chain;
+  if (!chain || !chain.owners.some(owner => sameDispatcher(owner, sender))) return null;
+  return pending.find(item => item.kind === 'question' && chain.waitingNotified.includes(item.id)
+    && record.sent.some(entry => entry.kind === 'waiting' && entry.interactionId === item.id && sameDispatcher(entry.target, sender))) ?? null;
 }

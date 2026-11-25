@@ -712,6 +712,7 @@ import {
   type OrcaWorkerPermissionMode,
 } from '../../shared/orca-worker-permission-mode.js';
 import { t } from '../i18n.desktop.js';
+import { dispatcherNoticeOnProjection, installDispatcherNoticeBridge } from '../dispatcher-notice/hooks.js';
 import { createLogger } from '../logger.js';
 import { createSessionActionRuntime, type SessionRuntimeAction } from './sessionActionRuntime.js';
 import {
@@ -19902,6 +19903,7 @@ export function registerMakerIpc(maker: Maker, options: RegisterMakerIpcOptions)
       }
       broadcastToAllWindows(MAKER_PUSH.INPUT_PROJECTION, projection);
       if (!isGoalInputBlocked(projection.sessionId)) notifyGoalIdleAfterTurnSettled(projection.sessionId);
+      dispatcherNoticeOnProjection(projection);
     },
     ...createRuntimePluginInputHooks({
       getStableSessionForTurnBoundary, screenGhostUserMessage, rollbackAgentIslandUserPrompt,
@@ -19987,6 +19989,50 @@ export function registerMakerIpc(maker: Maker, options: RegisterMakerIpcOptions)
     getPersistedClientIds: getPersistedInputClientIds,
   });
   agentInputCoordinatorHolder = inputCoordinator;
+  // 派发方通知（dispatcher-notice）：只暴露投递、撤回、队列与续跑状态和挂起交互，判断逻辑在独立模块里。
+  installDispatcherNoticeBridge({
+    send: async ({ targetSessionId, clientId, text, taskId, taskTitle }) => {
+      const result = await sendToSessionInternal({
+        targetSessionId, clientId, message: text, forceQueue: true,
+        origin: { kind: 'session', senderSessionId: taskId, displayText: text,
+          ...(taskTitle ? { senderSessionTitle: taskTitle } : {}) },
+        autoReviewUserText: { kind: 'agent-request' },
+      });
+      return result.ok;
+    },
+    isQueued: (sessionId, clientId) => inputCoordinator.hasPendingQueueItem(sessionId, clientId),
+    withdraw: (sessionId, clientId) => { inputCoordinator.remove(sessionId, clientId); },
+    isActive: (sessionId) => isSessionInTurn(sessionId) || hasPendingAgentInteractionForSession(sessionId),
+    isSettled: (sessionId) => {
+      if (isSessionInTurn(sessionId) || hasPendingAgentInteractionForSession(sessionId)) return false;
+      if (inputCoordinator.isAutoResumePending(sessionId) || inputCoordinator.isAutoResumeDeferred(sessionId)
+        || inputCoordinator.hasQueuedAutoResume(sessionId) || inputCoordinator.hasProviderGroupSwitchHold(sessionId)
+        || inputCoordinator.hasUsageLimitRecovery(sessionId)) return false;
+      // 暂停的队列或等人点「重试」的出错横幅都算停下：没有人介入就不会再跑。
+      const projection = inputCoordinator.getProjection(sessionId);
+      return !(inputCoordinator.hasPendingQueuedWork(sessionId) && !projection.queuePaused && projection.recovery === null);
+    },
+    isResumeQueued: async (sessionId) => {
+      await inputCoordinator.ensureQueueRestored(sessionId);
+      const projection = inputCoordinator.getProjection(sessionId);
+      return inputCoordinator.hasQueuedAutoResume(sessionId) || inputCoordinator.isAutoResumePending(sessionId)
+        || (inputCoordinator.hasPendingQueuedWork(sessionId) && !projection.queuePaused && projection.recovery === null);
+    },
+    pendingInteractions: (sessionId) => getPendingInteractionsForSession(sessionId),
+    // 与 RESOLVE_INTERACTION 里提问类作答同一条通路（异步提问先交给 Session，再结清挂起项）。只接受提问类。
+    answerQuestion: async (sessionId, requestId, answers) => {
+      const pending = pendingInteractionResolvers.get(requestId);
+      if (!pending || pending.sessionId !== sessionId || pending.request.kind !== 'ask_user_question') return false;
+      if (inputCoordinator.isExecutionPaused(sessionId)) return false;
+      const decision: InteractionDecision = { kind: 'ask_user_question', answers };
+      if (pending.request.delivery === 'async') {
+        const questionSession = maker.getSession(sessionId);
+        if (!questionSession || !await questionSession.submitAsyncQuestionAnswer(requestId, decision)) return false;
+        if (pendingInteractionResolvers.get(requestId) !== pending) return false;
+      }
+      return resolvePendingInteraction(requestId, decision);
+    },
+  });
   asyncQuestionInputDispatcher = async (session, text, signal, requestId, displayText, origin) => {
     const sharedTask = getDeviceLinkInvokeContext()?.sharedTask;
     const pausedBeforeAnswer = inputCoordinator.getProjection(session.id).queuePaused;

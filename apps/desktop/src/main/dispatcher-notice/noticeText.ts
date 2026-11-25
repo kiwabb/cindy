@@ -18,6 +18,8 @@ export type NoticeLanguage = 'zh' | 'en';
 export interface NoticeContext {
   title: string;
   lang: NoticeLanguage;
+  /** 宿主会把派发方下一条发给任务的消息当作回答（本机派发方）；否则只请用户到任务里作答。 */
+  replyAnswers?: boolean;
 }
 
 export function clip(text: string, max: number): string {
@@ -44,7 +46,9 @@ const STRINGS = {
     reason: '原因：',
     interjected: '（这串请求期间用户也在任务里发过消息。）',
     options: '选项：',
-    answerHint: (id: string) => `用户回答后，用 answer_session_question 交回（session_id=${id}）；也可以请用户直接到任务里作答。`,
+    answerHint: (id: string) => `用户回答后，用 send_to_session 把回答发给这个任务（target_session_id=${id}）：你下一条发给它的消息会被当作对这个问题的回答。可以写选项名或序号；多道题按「1. … 2. …」逐行写。`,
+    answerInTask: '请用户直接到任务里作答；你转述的话发给任务不会解除它的等待。',
+    paused: '你和这个任务已经连续来回多次、期间用户没有参与，宿主已暂停这件任务的通知并提醒了用户。用户在任务里或这里说话后自动恢复。',
     digest: (id: string) => `要看全文用 get_task_digest(${id})。无需回复确认；只有需要任务继续做事时再给它发消息。`,
   },
   en: {
@@ -64,7 +68,9 @@ const STRINGS = {
     reason: 'Reason: ',
     interjected: '(The user also sent messages in the task during this request.)',
     options: 'Options: ',
-    answerHint: (id: string) => `After the user answers, return it with answer_session_question (session_id=${id}), or ask the user to answer in the task.`,
+    answerHint: (id: string) => `After the user answers, send the answer to this task with send_to_session (target_session_id=${id}): your next message to it is used as the answer to this question. Option names or numbers work; for several questions write one line each as "1. … 2. …".`,
+    answerInTask: 'Ask the user to answer in the task; a message you send to the task will not release its wait.',
+    paused: 'You and this task have gone back and forth many times without the user taking part, so the host paused this task\'s notices and told the user. They resume when the user speaks in the task or here.',
     digest: (id: string) => `Use get_task_digest(${id}) for details. No need to acknowledge; message the task only when it should do more work.`,
   },
 } as const;
@@ -113,10 +119,13 @@ export function buildNoticeText(notice: Notice, context: NoticeContext): string 
     case 'resolved':
       lines.push(`${task}: ${s.resolved}`);
       return lines.join('\n');
+    case 'paused':
+      lines.push(`${task}: ${s.paused}`);
+      return lines.join('\n');
     case 'waiting': {
       const [first, ...rest] = waitingLines(notice, s);
       lines.push(`${task} ${first}`, ...rest);
-      if (notice.interaction?.kind === 'question') lines.push(s.answerHint(notice.taskId));
+      if (notice.interaction?.kind === 'question') lines.push(context.replyAnswers ? s.answerHint(notice.taskId) : s.answerInTask);
       break;
     }
   }

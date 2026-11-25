@@ -48,6 +48,10 @@ export type SendToSessionCallback = (params: {
     {
       targetDeviceId?: string;
       responsibilityRecorded?: false;
+      /** 宿主把这条消息当作对任务挂起提问的回答交了进去（派发方通知，fork）。 */
+      answeredQuestion?: true;
+      /** 任务在等这位派发方请求里的提问，但这条消息没能作为回答（照常排队）。 */
+      replyNotAnswered?: { reason: 'choice-required' | 'empty' | 'not-accepted'; choices?: string[] };
       targetSessionId: string;
       /** 'acp' only for collaboration-internal deliveries to a plugin-engine Worker. */
       agentKind: ControlWorkerEngine;
@@ -381,6 +385,10 @@ export function registerSendToSessionTool(
         agent_kind: result.agentKind,
         wake_kind: result.wakeKind,
         ...(result.responsibilityRecorded === false ? { responsibility_recorded: false, responsibility_note: "Task creation succeeded, but the responsibility record could not be saved. Do not recreate or resend this task; reconcile the responsibility with the host." } : {}),
+        ...(result.answeredQuestion ? { answered_question: true, note: "The task was waiting on a question from your request; this message was submitted as its answer and the task continues." } : {}),
+        ...(result.replyNotAnswered ? { answered_question: false, note: result.replyNotAnswered.reason === "choice-required"
+          ? `The task is waiting on a question that only accepts these choices: ${(result.replyNotAnswered.choices ?? []).join(" / ")}. Your message was queued instead; send one of the choices to answer it.`
+          : "The task is waiting on a question from your request, but this message could not be submitted as the answer and was queued instead. Ask the user to answer in the task." } : {}),
         ...(result.wakeKind === "created"
           ? { note: createdNote(result.targetSessionId) }
           : {}),
