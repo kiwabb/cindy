@@ -142,7 +142,7 @@ import {
   saveBotSkillForSession,
 } from '../maker-ipc/botSkillService.js';
 import { captureBotCreatedTaskResponsibility } from '../maker-ipc/botTaskCreation.js';
-import { dispatcherNoticeRouteReply, dispatcherNoticeTaskCreated, dispatcherNoticeTaskMessage } from '../dispatcher-notice/hooks.js';
+import { dispatcherNoticeTaskCreated, dispatcherNoticeTaskMessage } from '../dispatcher-notice/hooks.js';
 import { runBotProjectsTool } from '../maker-ipc/botLinkedProjects.js';
 import { captureDataOwnerBroadcastScope } from '../device-link/broadcast-tap.js';
 import {
@@ -1262,16 +1262,6 @@ export function createDesktopMcpProviders(deps: DesktopMcpProvidersDeps): LiziMc
             || effort !== undefined
             || fast !== undefined;
           const recordCreation = targetSessionId ? null : await captureBotCreatedTaskResponsibility(dispatcherSessionId);
-          // 派发方通知：任务正停在这位派发方请求引出的提问上时，宿主把这条消息当作回答交进去（不排队等人点卡片）。
-          const routed = targetSessionId && dispatcherSessionId
-            ? await dispatcherNoticeRouteReply(targetSessionId, dispatcherSessionId, message) : null;
-          if (routed?.answered && targetSessionId) {
-            const [row] = await getDbClient().drizzle.select({ title: sessions.title, agentKind: sessions.agentKind, userSendAt: sessions.userSendAt })
-              .from(sessions).where(eq(sessions.id, targetSessionId)).limit(1);
-            return { ok: true as const, targetSessionId, agentKind: (row?.agentKind ?? 'claude-code') as 'claude-code' | 'codex' | 'pi',
-              wakeKind: 'already-active' as const, targetTitle: row?.title ?? null,
-              targetLastUserSendAt: row?.userSendAt ? new Date(row.userSendAt).toISOString() : null, answeredQuestion: true as const };
-          }
           const result = await svc.sendToSession({
             targetSessionId,
             message,
@@ -1300,7 +1290,6 @@ export function createDesktopMcpProviders(deps: DesktopMcpProvidersDeps): LiziMc
             if (result.wakeKind === 'created') dispatcherNoticeTaskCreated(result.targetSessionId, dispatcherSessionId);
             else dispatcherNoticeTaskMessage(dispatcherSessionId, { deviceId: 'local', sessionId: result.targetSessionId });
           }
-          if (result.ok && routed && !routed.answered) return { ...result, replyNotAnswered: routed };
           if (result.ok && result.wakeKind === 'created' && recordCreation) {
             try { await recordCreation(result.targetSessionId); }
             catch { return { ...result, responsibilityRecorded: false }; }

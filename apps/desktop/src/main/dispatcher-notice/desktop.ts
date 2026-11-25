@@ -15,6 +15,7 @@ import { runTaskActionRequest } from '../maker-ipc/taskActionAuthorization.js';
 import { getResolvedMainLocale } from '../i18n.desktop.js';
 import { tryGetDbClient } from '../localDb/client/current.js';
 import { createLogger } from '../logger.js';
+import { getAgentIslandService } from '../agent-island/service.js';
 import { showDesktopSessionEvent } from '../notificationService.js';
 import { LOCAL_DEVICE, type DispatcherRef } from './core.js';
 import { record, text, toPendingInteraction } from './pendingInteraction.js';
@@ -22,11 +23,9 @@ import type { AgentInputProjection } from '../../shared/agentInputQueue.js';
 import type { PersistedInputRow } from './classify.js';
 import { createDispatcherNoticeService, type ActivityTransition, type DispatcherNoticeService, type ProjectionFacts } from './service.js';
 import { createDispatcherNoticeStore } from './store.js';
-import { getDispatcherNoticeBridge, registerDispatcherNoticeHooks, type DispatcherReplyRouting } from './hooks.js';
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
-import { DEFAULT_LOOP_PAUSE_AFTER } from './core.js';
-import { UI_ACTION_TRIGGER_PREFIX } from '@cindy/maker-shared/synthetic-trigger';
+import { getDispatcherNoticeBridge, registerDispatcherNoticeHooks } from './hooks.js';
+import type { InteractionDecision, InteractionRequest } from '@cindy/maker-core';
+import { forwardedAnswerText } from './noticeText.js';
 
 const log = createLogger('dispatcher-notice');
 const SCAN_RETRY_MS = 5_000;
@@ -44,19 +43,6 @@ function db() {
   const client = tryGetDbClient();
   if (!client) throw new Error('database not ready');
   return client;
-}
-
-/**
- * 可配置项：账号数据目录下 dispatcher-notice/settings.json 的 `loopPauseAfter`
- * （主人没参与的连续来回多少次后暂停通知；0 = 关闭）。没有文件或读不了时用默认值。
- */
-function readLoopPauseAfter(dir: string): number {
-  try {
-    const value = (JSON.parse(readFileSync(path.join(dir, 'settings.json'), 'utf8')) as { loopPauseAfter?: unknown }).loopPauseAfter;
-    return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : DEFAULT_LOOP_PAUSE_AFTER;
-  } catch {
-    return DEFAULT_LOOP_PAUSE_AFTER;
-  }
 }
 
 function createService(scope: string): DispatcherNoticeService {
@@ -124,6 +110,16 @@ function createService(scope: string): DispatcherNoticeService {
       if (!row) return null;
       try { return text(record(JSON.parse(row.content))?.message) ?? text(row.content); } catch { return text(row.content); }
     },
+    async isEligibleTask(taskId) {
+      const row = await db().queryOne<{ source: string; orcaRole: string | null; linked: number }>(`
+        SELECT s.source AS source, s.orca_role AS orcaRole,
+          EXISTS (SELECT 1 FROM bot_session_links l WHERE l.session_id = s.id AND l.archived_at IS NULL) AS linked
+        FROM sessions s WHERE s.id = ?`, [taskId]);
+      // 伙伴自己的对话、协同成员、复核、旁聊、共享给访客的任务、学习对话不作为通知对象。
+      return !!row && !row.orcaRole && !row.linked
+        && !['bot', 'review', 'side-chat', 'shared', 'learn'].includes(row.source);
+    },
+    turnStartedAt: (taskId) => getAgentIslandService()?.getSessionActivitySnapshot(taskId)?.startedAtMs ?? null,
     async readInterrupted(taskId) {
       const row = await db().queryOne<{ started: number | null; ended: number | null }>(
         'SELECT active_turn_started_at AS started, last_turn_ended_at AS ended FROM sessions WHERE id = ?', [taskId]);
@@ -131,22 +127,6 @@ function createService(scope: string): DispatcherNoticeService {
     },
     pendingInteractions: (taskId) => (getDispatcherNoticeBridge()?.pendingInteractions(taskId) ?? [])
       .flatMap(item => { const parsed = toPendingInteraction(item); return parsed ? [parsed] : []; }),
-    loopPauseAfter: () => readLoopPauseAfter(dir),
-    async ownerSpokeSince(target, sinceMs) {
-      if (target.deviceId !== LOCAL_DEVICE) return false;
-      // 主人亲自说的话：没有来源标记、不是宿主续跑、不是宿主内部触发行。
-      const rows = await db().query<{ content: string; agentMeta: string | null }>(`
-        SELECT content, agent_meta AS agentMeta FROM messages
-        WHERE session_id = ? AND role = 'user' AND rewind_at IS NULL AND created_at > ?
-        ORDER BY rowid DESC LIMIT 50`, [target.sessionId, sinceMs]);
-      return rows.some(row => {
-        let meta: Record<string, unknown> | null = null;
-        try { meta = record(JSON.parse(row.agentMeta ?? 'null')); } catch { meta = null; }
-        if (meta?.origin || meta?.autoResume === true) return false;
-        return !row.content.includes(UI_ACTION_TRIGGER_PREFIX);
-      });
-    },
-    answerQuestion: (taskId, requestId, answers) => requireBridge().answerQuestion(taskId, requestId, answers),
     isSettled: (taskId) => requireBridge().isSettled(taskId),
     isActive: (taskId) => requireBridge().isActive(taskId),
     isResumeQueued: (taskId) => requireBridge().isResumeQueued(taskId),
@@ -251,14 +231,24 @@ function taskMessage(senderTaskId: string, target: DispatcherRef): void {
 }
 
 /** 启动时调用一次：确保当前账号有实例并安排启动扫描。 */
-async function routeReply(taskId: string, senderSessionId: string, message: string): Promise<DispatcherReplyRouting> {
+async function interceptQuestion(sessionId: string, request: InteractionRequest): Promise<InteractionDecision | null> {
+  if (request.kind !== 'ask_user_question') return null;
+  // 外部插件要求填表（Codex MCP elicitation）也走这个入口，它的题目总带填写约束；那不是任务在提问，照旧给主人。
+  if (request.questions.some(question => question.answerConstraints)) return null;
+  const interaction = toPendingInteraction({ request });
   const service = current();
-  if (!service) return null;
-  return runOutsideDeviceLinkInvokeContext(() => runTaskActionRequest(() =>
-    service.routeReply(taskId, { deviceId: LOCAL_DEVICE, sessionId: senderSessionId }, message)));
+  if (!interaction || !service) return null;
+  const forwarded = await runOutsideDeviceLinkInvokeContext(() => runTaskActionRequest(() =>
+    service.forwardQuestion(sessionId, interaction)));
+  if (!forwarded) return null;
+  // 异步提问（任务不等答案继续干）：撤掉卡片、不填答案；伙伴的答复以新消息到达。
+  if (request.delivery === 'async') return { kind: 'ask_user_question', answers: {}, dismissed: true };
+  const text = forwardedAnswerText(getResolvedMainLocale().startsWith('zh') ? 'zh' : 'en');
+  return { kind: 'ask_user_question',
+    answers: Object.fromEntries(request.questions.map(question => [question.id || question.question, text])) };
 }
 
 export function initDispatcherNotice(): void {
-  registerDispatcherNoticeHooks({ onProjection, taskCreated, taskMessage, routeReply });
+  registerDispatcherNoticeHooks({ onProjection, taskCreated, taskMessage, interceptQuestion });
   guard('init', async () => undefined);
 }

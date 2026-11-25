@@ -22,10 +22,9 @@ function fixture() {
     captureBotCreatedTaskResponsibility: capture,
     reportGroupTaskCreated: report,
     normalizeAutoTitle,
-    // 派发方通知（fork）：新建记派发关系、发给已有任务前先看是否能作为提问的回答。
+    // 派发方通知（fork）：新建记派发关系、发给已有任务时记「已自己回信」。
     dispatcherNoticeTaskCreated: noticeCreated,
     dispatcherNoticeTaskMessage: vi.fn(),
-    dispatcherNoticeRouteReply: vi.fn(async () => null),
   };
   const call = new Function(...Object.keys(dependencies), wired)(...Object.values(dependencies)) as
     (params: { targetSessionId?: string; dispatcherSessionId: string; message: string; workingDir?: string }) => Promise<Record<string, unknown>>;

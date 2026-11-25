@@ -712,7 +712,7 @@ import {
   type OrcaWorkerPermissionMode,
 } from '../../shared/orca-worker-permission-mode.js';
 import { t } from '../i18n.desktop.js';
-import { dispatcherNoticeOnProjection, installDispatcherNoticeBridge } from '../dispatcher-notice/hooks.js';
+import { dispatcherNoticeInterceptQuestion, dispatcherNoticeOnProjection, installDispatcherNoticeBridge } from '../dispatcher-notice/hooks.js';
 import { createLogger } from '../logger.js';
 import { createSessionActionRuntime, type SessionRuntimeAction } from './sessionActionRuntime.js';
 import {
@@ -5718,6 +5718,12 @@ export function installDesktopInteractionListener(session: {
       return defaultDecisionForPending(req.kind, 'stale_turn');
     }
     flushAssistantBlock(session.id);
+    // 派发方通知（fork）：伙伴发起的请求里任务提问时，宿主不弹卡片，转交伙伴并告诉任务结束这一轮。
+    // 不适用（主人的轮次、主人插过话、伙伴不可用等）时返回 null，照旧弹卡片。
+    if (req.kind === 'ask_user_question') {
+      const forwarded = await dispatcherNoticeInterceptQuestion(session.id, req);
+      if (forwarded) return forwarded;
+    }
     // F1-a Phase 5: ask_user / plan_review 的消息本身也收口 main 单点落库(单 persistId,
     // 修 F1 重复),persistId 盖进 payload 让 renderer 用同一 id 建气泡 + answered 回写命中。
     // permission 不建 chat 消息 → persistId 为 undefined。
@@ -20019,19 +20025,6 @@ export function registerMakerIpc(maker: Maker, options: RegisterMakerIpcOptions)
         || (inputCoordinator.hasPendingQueuedWork(sessionId) && !projection.queuePaused && projection.recovery === null);
     },
     pendingInteractions: (sessionId) => getPendingInteractionsForSession(sessionId),
-    // 与 RESOLVE_INTERACTION 里提问类作答同一条通路（异步提问先交给 Session，再结清挂起项）。只接受提问类。
-    answerQuestion: async (sessionId, requestId, answers) => {
-      const pending = pendingInteractionResolvers.get(requestId);
-      if (!pending || pending.sessionId !== sessionId || pending.request.kind !== 'ask_user_question') return false;
-      if (inputCoordinator.isExecutionPaused(sessionId)) return false;
-      const decision: InteractionDecision = { kind: 'ask_user_question', answers };
-      if (pending.request.delivery === 'async') {
-        const questionSession = maker.getSession(sessionId);
-        if (!questionSession || !await questionSession.submitAsyncQuestionAnswer(requestId, decision)) return false;
-        if (pendingInteractionResolvers.get(requestId) !== pending) return false;
-      }
-      return resolvePendingInteraction(requestId, decision);
-    },
   });
   asyncQuestionInputDispatcher = async (session, text, signal, requestId, displayText, origin) => {
     const sharedTask = getDeviceLinkInvokeContext()?.sharedTask;

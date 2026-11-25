@@ -2,6 +2,7 @@
  * 派发方通知 · 轻量挂钩点。register.ts 与 mcp-providers.ts 只依赖这里（不引入 Electron、通知、设备互联），
  * Desktop 装配（desktop.ts）在启动时注册真正的实现；未注册时所有调用都是空操作。
  */
+import type { InteractionDecision, InteractionRequest } from '@cindy/maker-core';
 import type { AgentInputProjection } from '../../shared/agentInputQueue.js';
 import type { DispatcherRef } from './core.js';
 
@@ -15,21 +16,13 @@ export interface DispatcherNoticeHostBridge {
   isActive(sessionId: string): boolean;
   isResumeQueued(sessionId: string): Promise<boolean>;
   pendingInteractions(sessionId: string): unknown[];
-  /** 用一组回答结清任务挂起的提问（与主人在卡片里作答同一条宿主通路）。 */
-  answerQuestion(sessionId: string, requestId: string, answers: Record<string, string>): Promise<boolean>;
 }
-
-/** 派发方的回复被当作提问回答的结果（null = 不适用，照常投递）。 */
-export type DispatcherReplyRouting =
-  | null
-  | { answered: true; requestId: string }
-  | { answered: false; reason: 'choice-required' | 'empty' | 'not-accepted'; choices?: string[] };
 
 export interface DispatcherNoticeHooks {
   onProjection(projection: Pick<AgentInputProjection, 'sessionId' | 'error' | 'recovery' | 'pendingQueue'>): void;
   taskCreated(taskId: string, dispatcherSessionId: string): void;
   taskMessage(senderTaskId: string, target: DispatcherRef): void;
-  routeReply(taskId: string, senderSessionId: string, message: string): Promise<DispatcherReplyRouting>;
+  interceptQuestion(sessionId: string, request: InteractionRequest): Promise<InteractionDecision | null>;
 }
 
 let bridge: DispatcherNoticeHostBridge | null = null;
@@ -59,10 +52,14 @@ export function dispatcherNoticeTaskMessage(senderTaskId: string, target: Dispat
   hooks?.taskMessage(senderTaskId, target);
 }
 
-/** send_to_session 发给本机已有任务之前：任务正等着这位派发方请求里的提问时，把消息当作回答交进去。 */
-export async function dispatcherNoticeRouteReply(taskId: string, senderSessionId: string, message: string): Promise<DispatcherReplyRouting> {
+/**
+ * 任务提问时（宿主交互入口，三种引擎共用）：伙伴发起的请求由宿主转交伙伴并返回给任务的结果；
+ * 返回 null 表示照旧弹卡片给主人。任何异常都按 null 处理，绝不吞掉提问。
+ */
+export async function dispatcherNoticeInterceptQuestion(sessionId: string, request: InteractionRequest): Promise<InteractionDecision | null> {
+  if (request.kind !== 'ask_user_question' || !hooks) return null;
   try {
-    return (await hooks?.routeReply(taskId, senderSessionId, message)) ?? null;
+    return await hooks.interceptQuestion(sessionId, request);
   } catch {
     return null;
   }

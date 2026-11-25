@@ -25,8 +25,9 @@ import {
   onStoppedByOwner,
   onTurnStarted,
   onWaiting,
-  answerableQuestion,
-  onAnsweredByDispatcher,
+  forwardTarget,
+  onQuestionForwarded,
+  FORWARD_QUIET_MS,
   recordDispatch,
   type DispatcherRef,
   type NoticeAction,
@@ -37,7 +38,6 @@ import { buildNoticeText, LIMITS as TEXT_LIMITS } from '../noticeText.js';
 import { createDispatcherNoticeStore, type DispatcherNoticeStore } from '../store.js';
 import { createDispatcherNoticeService, type ActivityState, type TargetState } from '../service.js';
 import { toPendingInteraction } from '../pendingInteraction.js';
-import { mapReplyToAnswers } from '../answerRouting.js';
 
 const BOT: DispatcherRef = { deviceId: 'local', sessionId: 'bot-main', botId: 'bot-1' };
 const OTHER_BOT: DispatcherRef = { deviceId: 'local', sessionId: 'bot2-main', botId: 'bot-2' };
@@ -126,40 +126,17 @@ describe('dedupe, merge and caps', () => {
     expect(second.record.sent).toHaveLength(1);
   });
 
-  // 主人裁决（2026-11-25）：不按天限量；只有派发方与任务连续来回、主人两边都没参与达到设定次数才暂停，且暂停要让主人看得到。
-  function exchange(record: TaskRecord, i: number, env: Parameters<typeof onStopped>[3]) {
-    return onStopped(onTurnStarted(record, [fromBot(`b${i}`)], T0 + i), { phase: 'completed', settled: true }, T0 + i, env);
-  }
-
-  it('no daily cap: many ordinary notices all go out when the pause is off', () => {
+  // 主人决定（2026-11-25）：不设任何上限或来回熔断，正常通知一条都不吞。
+  it('no cap: many back-and-forth notices all go out', () => {
     let record = emptyRecord('task');
     const all: NoticeAction[] = [];
     for (let i = 0; i < 50; i++) {
-      const step = exchange(record, i, { queued: notQueued, pauseAfter: 0 });
+      const step = onStopped(onTurnStarted(record, [fromBot(`b${i}`)], T0 + i), { phase: 'completed', settled: true }, T0 + i, notQueued);
       record = step.record;
       all.push(...step.actions);
     }
     expect(delivered(all)).toHaveLength(50);
-    expect(all.filter(a => a.type === 'owner-alert')).toEqual([]);
-  });
-
-  it('pauses visibly after N exchanges without the owner, and resumes when the owner speaks', () => {
-    let record = emptyRecord('task');
-    const all: NoticeAction[] = [];
-    for (let i = 0; i < 5; i++) {
-      const step = exchange(record, i, { queued: notQueued, pauseAfter: 3 });
-      record = step.record;
-      all.push(...step.actions);
-    }
-    expect(delivered(all).map(n => n.kind)).toEqual(['done', 'done', 'done', 'paused']);
-    expect(all.filter(a => a.type === 'owner-alert')).toHaveLength(1);
-    // 主人在派发方对话里说了话：恢复正常通知。
-    const resumed = exchange(record, 9, { queued: notQueued, pauseAfter: 3, ownerSpoke: () => true });
-    expect(delivered(resumed.actions).map(n => n.kind)).toEqual(['done']);
-    // 主人在任务里说话同样清零。
-    const inTask = onStopped(onTurnStarted(record, [fromBot('x'), owner('o')], T0 + 20), { phase: 'completed', settled: true }, T0 + 20,
-      { queued: notQueued, pauseAfter: 3 });
-    expect(delivered(inTask.actions).map(n => n.kind)).toEqual(['done']);
+    expect(all.every(a => a.type === 'deliver')).toBe(true);
   });
 
   it('dispatch failure notifies the sender even though no round started', () => {
@@ -178,12 +155,11 @@ describe('waiting notices', () => {
   it('sends once per interaction with the question text and options', () => {
     const first = onWaiting(armed, question, T0, notQueued);
     const notice = delivered(first.actions)[0];
-    const text = buildNoticeText(notice, { title: 'Report', lang: 'en', replyAnswers: true });
+    const text = buildNoticeText(notice, { title: 'Report', lang: 'en' });
     expect(text).toContain('Which database should the report use?');
     expect(text).toContain('Production replica / Staging');
-    expect(text).toContain('your next message to it is used as the answer');
-    // 不能转接时（例如远程派发方）只请用户到任务里作答，不承诺转接。
-    expect(buildNoticeText(notice, { title: 'Report', lang: 'en' })).not.toContain('used as the answer');
+    // 没转交（卡片留给用户）时只请伙伴提醒用户到任务里作答。
+    expect(text).toContain('Remind the user to answer in the task');
     expect(onWaiting(first.record, question, T0 + 1, notQueued).actions).toEqual([]);
   });
 
@@ -192,7 +168,7 @@ describe('waiting notices', () => {
     const text = buildNoticeText(notice, { title: 'PR', lang: 'zh' });
     expect(text).toContain('mcp__github__merge_pr');
     expect(text).toContain('你不能代批');
-    expect(text).not.toContain('used as the answer');
+    expect(text).not.toContain('send_to_session');
   });
 
   it('a wait the owner handled first is withdrawn if still queued, otherwise followed by a short note', () => {
@@ -241,7 +217,7 @@ describe('host service (in-memory fakes)', () => {
   const at = (phase: string, extra: Partial<ActivityState> = {}): ActivityState => ({ phase, startedAtMs: T0, currentTurnActive: false, ...extra });
   const running = at('running', { currentTurnActive: true });
 
-  function harness(options: { target?: TargetState; settled?: boolean } = {}) {
+  function harness(options: { target?: TargetState; settled?: boolean; eligible?: boolean } = {}) {
     const records = new Map<string, TaskRecord>();
     const store: DispatcherNoticeStore = {
       read: async id => records.get(id) ?? emptyRecord(id),
@@ -257,7 +233,6 @@ describe('host service (in-memory fakes)', () => {
     const delivered: Array<{ target: string; text: string; clientId: string }> = [];
     const alerts: string[] = [];
     const queuedIds = new Set<string>();
-    const answered: Array<{ requestId: string; answers: Record<string, string> }> = [];
     const state = { settled: options.settled ?? true, pending: [] as unknown[], interrupted: false };
     const service = createDispatcherNoticeService({
       now: () => T0,
@@ -273,12 +248,9 @@ describe('host service (in-memory fakes)', () => {
       pendingInteractions: () => state.pending.flatMap(item => { const parsed = toPendingInteraction(item); return parsed ? [parsed] : []; }),
       isSettled: () => state.settled,
       isResumeQueued: async () => false,
-      answerQuestion: async (_task, requestId, answers) => {
-        answered.push({ requestId, answers });
-        state.pending = [];
-        return true;
-      },
       isActive: () => false,
+      isEligibleTask: async () => options.eligible ?? true,
+      turnStartedAt: () => T0,
       targetState: async () => options.target ?? 'available',
       queue: {
         isQueued: (_target, id) => queuedIds.has(id),
@@ -292,7 +264,7 @@ describe('host service (in-memory fakes)', () => {
       },
       alertOwner: ({ body }) => { alerts.push(body); },
     });
-    return { service, rows, delivered, alerts, queuedIds, state, records, answered };
+    return { service, rows, delivered, alerts, queuedIds, state, records };
   }
 
   it.each(['available', 'unavailable'] as const)('settled request with dispatcher %s: deliver to it or alert the owner', async (target) => {
@@ -364,19 +336,44 @@ describe('host service (in-memory fakes)', () => {
     expect(h.delivered.map(d => d.text)).toEqual([expect.stringContaining('interrupted')]);
   });
 
-  it('the teammate reply is submitted as the answer, and no "handled by the user" note follows', async () => {
+  // 以下几条都从「一轮刚开始」出发，不预先建立归属：归属必须在开始时就判定好。
+  const started = { previous: at('idle'), current: running };
+
+  it('a task that reports back mid-round gets no "done" notice', async () => {
     const h = harness();
     h.rows.push({ rowid: 1, clientId: 'b1', content: 'do it', agentMeta: botMeta });
-    h.state.pending = [{ request: { kind: 'ask_user_question', requestId: 'q1',
-      questions: [{ question: 'Which month?', options: [{ label: 'October' }, { label: 'November' }] }] } }];
-    const waiting = at('needs-interaction', { currentTurnActive: true, interactionKind: 'ask_user_question' });
-    await h.service.onActivity({ sessionId: 'task', previous: running, current: waiting });
-    // 别的伙伴的回复不转接。
-    expect(await h.service.routeReply('task', OTHER_BOT, 'October')).toBeNull();
-    expect(await h.service.routeReply('task', BOT, '2')).toEqual({ answered: true, requestId: 'q1' });
-    expect(h.answered).toEqual([{ requestId: 'q1', answers: { 'Which month?': 'November' } }]);
-    h.delivered.length = 0;
-    await h.service.onActivity({ sessionId: 'task', previous: waiting, current: running });
+    await h.service.onActivity({ sessionId: 'task', ...started });
+    await h.service.noteTaskMessage('task', BOT);
+    await h.service.onActivity({ sessionId: 'task', previous: running, current: at('completed') });
+    expect(h.delivered).toEqual([]);
+  });
+
+  it('a first round interrupted by a restart is reported by the restart scan', async () => {
+    const h = harness();
+    h.rows.push({ rowid: 1, clientId: 'b1', content: 'do it', agentMeta: botMeta });
+    await h.service.onActivity({ sessionId: 'task', ...started });
+    h.state.interrupted = true;
+    await h.service.restartScan();
+    expect(h.delivered.map(d => d.text)).toEqual([expect.stringContaining('interrupted')]);
+  });
+
+  it('after the owner stops a teammate round, the next owner-only round does not notify the teammate', async () => {
+    const h = harness();
+    h.rows.push({ rowid: 1, clientId: 'b1', content: 'do it', agentMeta: botMeta });
+    await h.service.onActivity({ sessionId: 'task', ...started });
+    await h.service.onActivity({ sessionId: 'task', previous: running, current: null });
+    h.rows.push({ rowid: 2, clientId: 'o1', content: 'my own follow-up', agentMeta: null });
+    await h.service.onActivity({ sessionId: 'task', previous: at('idle'), current: at('running', { currentTurnActive: true, startedAtMs: T0 + 9 }) });
+    await h.service.onActivity({ sessionId: 'task', previous: running, current: at('completed') });
+    expect(h.delivered).toEqual([]);
+  });
+
+  it('teammate messages to an ineligible task (another teammate chat, Orca, review) create nothing', async () => {
+    const h = harness({ eligible: false });
+    h.rows.push({ rowid: 1, clientId: 'b1', content: 'hi', agentMeta: botMeta });
+    await h.service.onActivity({ sessionId: 'task', ...started });
+    await h.service.onActivity({ sessionId: 'task', previous: running, current: at('completed') });
+    expect(h.records.size).toBe(0);
     expect(h.delivered).toEqual([]);
   });
 
@@ -402,38 +399,54 @@ describe('host service (in-memory fakes)', () => {
     // 归成主人输入的话会带「用户也发过消息」的提示；续跑不应带。
     expect(h.delivered[0].text).not.toContain('also sent messages');
   });
-});
 
-describe('a teammate reply answers the pending question (host routing, no extra tool)', () => {
-  const q = (extra: Record<string, unknown> = {}) => ({ question: 'Which month?', options: [{ label: 'October' }, { label: 'November' }], ...extra });
+  describe('questions in a teammate request go to the teammate instead of stopping the task', () => {
+  const question = { id: 'q1', kind: 'question' as const, questions: [{ question: 'Which month?', options: ['October', 'November'] }] };
 
   it.each([
-    ['option name, any case', [q()], 'november', { 'Which month?': 'November' }],
-    ['option number', [q()], '1', { 'Which month?': 'October' }],
-    ['free text becomes the typed answer', [q()], 'Use the fiscal month instead', { 'Which month?': 'Use the fiscal month instead' }],
-    ['multi-select by names', [q({ multiSelect: true })], 'October, November', { 'Which month?': JSON.stringify(['October', 'November']) }],
-    ['several questions answered line by line', [q({ id: 'm' }), { id: 'y', question: 'Which year?' }], '1. October\n2. 2026', { m: 'October', y: '2026' }],
-    ['several questions without numbering get the whole reply each', [q({ id: 'm' }), { id: 'y', question: 'Which year?' }], 'October 2026',
-      { m: 'October 2026', y: 'October 2026' }],
-  ] as const)('%s', (_name, questions, reply, answers) => {
-    expect(mapReplyToAnswers(questions as never, reply)).toEqual({ ok: true, answers });
+    ['teammate request, owner not involved', [fromBot()], true],
+    ['owner interjected in this request', [fromBot(), owner()], false],
+    ['owner-only round', [owner()], false],
+    ['two teammates in one request (ambiguous)', [fromBot(), fromBot('b2', OTHER_BOT)], false],
+  ] as const)('%s', (_name, inputs, forwards) => {
+    const record = onTurnStarted(emptyRecord('task'), inputs, T0);
+    expect(forwardTarget(record) !== null).toBe(forwards);
   });
 
-  it('a fixed-choice question that the reply does not match is not answered', () => {
-    expect(mapReplyToAnswers([q({ answerConstraints: { required: true, choices: ['October', 'November'] } })] as never, 'December'))
-      .toEqual({ ok: false, reason: 'choice-required', choices: ['October', 'November'] });
-  });
-
-  it('only questions notified to that teammate in its own request are answerable; permissions never are', () => {
+  it('the forward is the notice; a round that ends soon after sends no extra "done", one that keeps working does', () => {
     const armed = onTurnStarted(emptyRecord('task'), [fromBot()], T0);
-    const asked = onWaiting(armed, { id: 'q1', kind: 'question', questions: [{ question: 'Which month?', options: ['October'] }] }, T0, notQueued).record;
-    const withPermission = onWaiting(asked, { id: 'p1', kind: 'permission', title: 'Bash' }, T0, notQueued).record;
-    const pending = [{ id: 'p1', kind: 'permission' as const }, { id: 'q1', kind: 'question' as const, questions: [] }];
-    expect(answerableQuestion(withPermission, BOT, pending)?.id).toBe('q1');
-    expect(answerableQuestion(withPermission, OTHER_BOT, pending)).toBeNull();
-    expect(answerableQuestion(withPermission, BOT, [pending[0]])).toBeNull();
-    // 派发方答过之后，提问消失时不再补「已由用户处理」。
-    const answered = onAnsweredByDispatcher(withPermission, 'q1');
-    expect(onInteractionResolved(answered, 'q1', T0 + 1, notQueued).actions).toEqual([]);
+    const forwarded = onQuestionForwarded(armed, question, T0, notQueued);
+    const notice = delivered(forwarded.actions)[0];
+    expect(notice).toMatchObject({ kind: 'waiting', forwarded: true, target: BOT });
+    const text = buildNoticeText(notice, { title: 'Report', lang: 'en' });
+    expect(text).toContain('October / November');
+    expect(text).toContain('send_to_session');
+    expect(onStopped(forwarded.record, { phase: 'completed', settled: true }, T0 + 30_000, notQueued).actions).toEqual([]);
+    const kept = onStopped(forwarded.record, { phase: 'completed', settled: true }, T0 + FORWARD_QUIET_MS + 1, notQueued);
+    expect(delivered(kept.actions).map(n => n.kind)).toEqual(['done']);
   });
+
+  it('service: forwards a teammate question, falls back to the card when the teammate is unavailable', async () => {
+    for (const target of ['available', 'unavailable'] as const) {
+      const h = harness({ target });
+      h.rows.push({ rowid: 1, clientId: 'b1', content: 'do it', agentMeta: botMeta });
+      expect(await h.service.forwardQuestion('task', question)).toBe(target === 'available');
+      expect(h.delivered).toHaveLength(target === 'available' ? 1 : 0);
+      // 退回卡片时不给主人另发「派发方不可用」提醒（卡片本身就在主人面前）。
+      expect(h.alerts).toEqual([]);
+    }
+  });
+
+  it('service: an owner question is never forwarded, and a forwarded round that ends right away sends no "done"', async () => {
+    const owned = harness();
+    owned.rows.push({ rowid: 1, clientId: 'o1', content: 'my question', agentMeta: null });
+    expect(await owned.service.forwardQuestion('task', question)).toBe(false);
+
+    const h = harness();
+    h.rows.push({ rowid: 1, clientId: 'b1', content: 'do it', agentMeta: botMeta });
+    expect(await h.service.forwardQuestion('task', question)).toBe(true);
+    await h.service.onActivity({ sessionId: 'task', previous: running, current: at('completed') });
+    expect(h.delivered).toHaveLength(1);
+  });
+});
 });

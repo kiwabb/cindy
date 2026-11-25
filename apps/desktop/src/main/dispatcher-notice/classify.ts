@@ -4,7 +4,8 @@
  *   发送方带伙伴身份（senderBotId），或就是这件任务的派发方，才算派发方（dispatcher）。
  *   伙伴内部协调（botTaskCoordination）与群消息转入不算。
  * - 宿主自动续跑（autoResume）或宿主内部触发行（[UI_ACTION_TRIGGER] 开头、且没有其它来源）：continuation。
- * - 其它（主人手打、定时任务、插件、普通任务之间互发）：owner，不建立归属。
+ * - 没有来源标记的普通输入：owner（主人亲自说的）。
+ * - 其它有来源标记但不算派发方的（定时任务、插件、普通任务之间互发、远程派发方）：other。
  */
 import { UI_ACTION_TRIGGER_PREFIX } from '@cindy/maker-shared/synthetic-trigger';
 import { LOCAL_DEVICE, type DispatcherRef, type TaskRecord, type TurnInput } from './core.js';
@@ -54,10 +55,10 @@ export function classifyInputRow(row: PersistedInputRow, task: Pick<TaskRecord, 
     if ((botId || isDispatcher) && sender.deviceId === LOCAL_DEVICE) {
       return { clientId: row.clientId, kind: 'dispatcher', sender: isDispatcher && relation?.botId && !botId ? { ...sender, botId: relation.botId } : sender };
     }
-    return { clientId: row.clientId, kind: 'owner' };
+    return { clientId: row.clientId, kind: 'other' };
   }
   if (!origin && rowText(row.content).trimStart().startsWith(UI_ACTION_TRIGGER_PREFIX)) {
     return { clientId: row.clientId, kind: 'continuation' };
   }
-  return { clientId: row.clientId, kind: 'owner' };
+  return { clientId: row.clientId, kind: origin ? 'other' : 'owner' };
 }
