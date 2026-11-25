@@ -1145,6 +1145,8 @@ function devEnvEntries(env) {
     ['XDT_ISOLATED_AUTH', env.XDT_ISOLATED_AUTH],
     ['XDT_ALLOW_DEV_OAUTH_WRITE', env.XDT_ALLOW_DEV_OAUTH_WRITE],
     ['XDT_ISOLATED_AUTH_PROOF', env.XDT_ISOLATED_AUTH_PROOF],
+    // 仅开发验证用：沙箱完全不读安装版与本机 CLI 的 Codex 登录（codex-shared-auth.ts 消费，正式构建忽略）。
+    ['XDT_DEV_NO_SHARED_CODEX_AUTH', env.XDT_DEV_NO_SHARED_CODEX_AUTH],
     // CDP 端口覆写(bootstrap-electron 消费): 并行多开沙箱时给后起实例换端口。
     ['XDT_CDP_PORT', env.XDT_CDP_PORT],
     // 在原生 Apple 芯片上模拟 Rosetta 转译，检查 Intel 包换装提示(arm64Translation 消费，仅源码运行)。
