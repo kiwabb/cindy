@@ -108,6 +108,26 @@ describe('restart scan', () => {
     const notices = delivered(onRestart(record as TaskRecord, facts, T0 + 10, notQueued).actions);
     expect(notices.map(n => n.kind)).toEqual(kind ? [kind] : []);
   });
+
+  // 真实验证发现：重启后 Cindy 不自动续跑，而是弹窗问主人；报过「被打断」就结清归属，
+  // 主人点「继续」后的续跑结束时派发方收不到任何通知。最小失败输入：interrupted → 续跑一轮 → 完成。
+  const interrupted = { interrupted: true, resumeQueued: false, active: false };
+  it('after "interrupted", a resume the owner starts is still the request and reports when it ends', () => {
+    const reported = onRestart(armed, interrupted, T0 + 10, notQueued);
+    expect(delivered(reported.actions).map(n => n.kind)).toEqual(['interrupted']);
+    // 下次重启它仍没收尾：不重复报。
+    expect(onRestart(reported.record, interrupted, T0 + 20, notQueued).actions).toEqual([]);
+    const resumed = onTurnStarted(reported.record, [resume()], T0 + 30);
+    const done = onStopped(resumed, { phase: 'completed', settled: true }, T0 + 40, notQueued);
+    expect(delivered(done.actions).map(n => [n.kind, n.target])).toEqual([['done', BOT]]);
+  });
+
+  it('after "interrupted", a round the owner starts on their own is not the request', () => {
+    const reported = onRestart(armed, interrupted, T0 + 10, notQueued).record;
+    const ownRound = onTurnStarted(reported, [owner()], T0 + 30);
+    expect(ownRound.chain).toBeNull();
+    expect(onStopped(ownRound, { phase: 'completed', settled: true }, T0 + 40, notQueued).actions).toEqual([]);
+  });
 });
 
 describe('dedupe, merge and caps', () => {

@@ -100,6 +100,11 @@ export interface Chain {
   /** 最近一次回合终态；用于重启后补判。 */
   lastTerminal: 'completed' | 'error' | null;
   lastError?: string;
+  /**
+   * 重启后已经报过「被打断」。Cindy 重启后不自动接着做，而是弹窗问主人；主人点「继续」开的续跑
+   * 仍是这串请求，结束时照常通知派发方。主人自己另起的一轮不算，归属在那时结清。
+   */
+  interruptedNotified?: true;
 }
 
 export interface TaskRecord {
@@ -231,6 +236,13 @@ export function onTurnStarted(record: TaskRecord, inputs: readonly TurnInput[], 
     } };
   }
   if (!chain) return record;
+  if (chain.interruptedNotified) {
+    // 报过被打断：只有续跑（主人在弹窗或横幅里点「继续」）接上这串请求；主人另起的一轮不再归派发方。
+    if (!inputs.some(input => input.kind === 'continuation')) return { ...record, chain: null };
+    const resumed: Chain = { ...chain, lastTerminal: null, ownerInterjected: chain.ownerInterjected || hasOwnerInput };
+    delete resumed.interruptedNotified;
+    return { ...record, chain: resumed };
+  }
   // 宿主续跑沿用归属；主人插进来的一轮也还算这串请求（它没停下过），只记一笔。
   return { ...record, chain: { ...chain, lastTerminal: null, ownerInterjected: chain.ownerInterjected || hasOwnerInput } };
 }
@@ -392,7 +404,9 @@ export function onRestart(
   const chain = record.chain;
   if (!chain || facts.active || facts.resumeQueued) return { record, actions: [] };
   if (facts.interrupted) {
-    return emit({ ...record, chain: null }, chain.owners, {
+    // 每次被打断只报一次（之后每次重启扫描都还会看到它没收尾）；归属留着，等主人决定是否继续。
+    if (chain.interruptedNotified) return { record, actions: [] };
+    return emit({ ...record, chain: { ...chain, interruptedNotified: true } }, chain.owners, {
       kind: 'interrupted', taskId: record.taskId, ownerInterjected: chain.ownerInterjected,
     }, now, queued);
   }
