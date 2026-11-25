@@ -408,6 +408,8 @@ describe('host service (in-memory fakes)', () => {
     ['owner interjected in this request', [fromBot(), owner()], false],
     ['owner-only round', [owner()], false],
     ['two teammates in one request (ambiguous)', [fromBot(), fromBot('b2', OTHER_BOT)], false],
+    // 普通任务（没有伙伴身份）开出的任务：不转交，问题照旧给主人。
+    ['plain task dispatcher without a teammate identity', [fromBot('p1', { deviceId: 'local', sessionId: 'plain-task' })], false],
   ] as const)('%s', (_name, inputs, forwards) => {
     const record = onTurnStarted(emptyRecord('task'), inputs, T0);
     expect(forwardTarget(record) !== null).toBe(forwards);

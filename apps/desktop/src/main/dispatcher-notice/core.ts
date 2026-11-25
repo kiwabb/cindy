@@ -263,11 +263,15 @@ export function onWaiting(
   }, now, queued);
 }
 
-/** 这个提问能不能转交派发方：这串请求归唯一的派发方、主人没插过话。 */
+/**
+ * 这个提问能不能转交派发方：这串请求归唯一的派发方、主人没插过话，而且派发方是伙伴（带伙伴身份）。
+ * 普通任务开出的任务不转交：普通任务不会替主人转述，问题会落空。
+ */
 export function forwardTarget(record: TaskRecord): DispatcherRef | null {
   const chain = record.chain;
   if (!chain || chain.ownerInterjected || chain.owners.length !== 1) return null;
-  return chain.owners[0]!;
+  const owner = chain.owners[0]!;
+  return owner.botId ? owner : null;
 }
 
 /** 宿主把提问转交派发方：转交本身就是等待通知；记下时刻，这一轮随后停下时不再另发「完成」。 */
