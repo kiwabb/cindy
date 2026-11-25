@@ -145,7 +145,7 @@ describe.skipIf(!bash)('personal update wait for the old bundle to exit', () => 
     expect(result.outcome).toBe('exchange');
     expect(result.kills).toEqual(['-TERM 900']);
     expect(result.slept).toBeGreaterThanOrEqual(3);
-    expect(result.stopRecord).toMatchObject({ stopRounds: 1 });
+    expect(result.stopRecord).toMatchObject({ stopRounds: 1, signals: " -TERM:900" });
   });
 
   it('accepts the unversioned Helpers path and an already-exited (zombie) old main process', async () => {
@@ -189,8 +189,9 @@ describe.skipIf(!bash)('personal update wait for the old bundle to exit', () => 
     const result = await runWait(status([crashpad()]), { births: { 900: '1800000000:1' }, seconds: 8 });
     expect(result.outcome).toBe('timeout');
     expect(result.kills).toEqual([]);
-    // Two bounded stop rounds were attempted, and the failure names the lone-handler case.
-    expect(result.stopped).toBe(2);
+    // Both bounded rounds found no matching process: nothing is recorded as stopped, and the failure names the lone-handler case.
+    expect(result.stopped).toBe(0);
+    expect(result.stopRecord).toBeNull();
     expect(result.lastCrashpadOnly).toBe(true);
   });
 

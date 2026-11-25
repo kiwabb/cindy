@@ -1254,7 +1254,7 @@ async function doCheckPersonalUpdate(): Promise<CheckForUpdateResult> {
     // A ready patch or pending manual install stays on screen during the periodic re-check;
     // the result below replaces it.
     if (currentStatus !== 'manual' && currentStatus !== 'ready') setStatus('checking');
-    const check = await checkPersonalManifest();
+    const check = await checkPersonalManifest({ releaseRetryable: true });
     manualUpdate = undefined;
     if (!check) {
       readyFilePath = undefined;

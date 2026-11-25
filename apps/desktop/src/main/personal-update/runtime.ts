@@ -81,7 +81,11 @@ export type PersonalManifestCheck =
   /** A newer revision this install already failed to prepare or apply; it is not retried automatically (exit-wait failures get one retry first). */
   | { kind: 'skipped'; manifest: PersonalManifest; reason: PersonalFailureCode };
 
-export async function checkPersonalManifest(): Promise<PersonalManifestCheck | null> {
+/**
+ * `releaseRetryable`: only the updater's own check passes true. Read-only callers (the Agent's status
+ * query) must not change failure markers.
+ */
+export async function checkPersonalManifest(options: { releaseRetryable?: boolean } = {}): Promise<PersonalManifestCheck | null> {
   const context = personalUpdateContext();
   if (!context) return null;
   if (fs.existsSync(path.join(context.root, 'recovery-blocked.json'))) throw new Error('PERSONAL_UPDATE_RECOVERY_BLOCKED');
@@ -92,7 +96,7 @@ export async function checkPersonalManifest(): Promise<PersonalManifestCheck | n
   const manifest = validatePersonalManifest(JSON.parse(text), context.policy);
   if (manifest.revision <= context.identity.revision) return null;
   // The old app not quitting in time is retried once with the same verified package; see failure.ts.
-  releaseRetryablePersonalFailure(context.root, manifest.revision);
+  if (options.releaseRetryable) releaseRetryablePersonalFailure(context.root, manifest.revision);
   const failure = readPersonalFailureMarker(context.root, manifest.revision);
   if (failure) return { kind: 'skipped', manifest, reason: failure.reason };
   if (manifest.storageIdentity !== context.identity.storageIdentity) return { kind: 'manual', manifest };

@@ -105,10 +105,13 @@ describe('Windows personal update feed check', () => {
     const exitTimeout = JSON.stringify({ phase: 'failed', failedFromPhase: 'waiting-for-exit', failureReason: 'old_bundle_exit_timeout' });
     touch('failed-43.json', exitTimeout);
     serve(feed(43, identity.storageIdentity));
-    await expect(checkPersonalManifest()).resolves.toEqual(expect.objectContaining({ kind: 'install' }));
+    // A read-only caller (the Agent's status query) sees the skip and leaves the marker alone.
+    await expect(checkPersonalManifest()).resolves.toEqual(expect.objectContaining({ kind: 'skipped', reason: 'PERSONAL_UPDATE_OLD_APP_EXIT_TIMEOUT' }));
+    serve(feed(43, identity.storageIdentity));
+    await expect(checkPersonalManifest({ releaseRetryable: true })).resolves.toEqual(expect.objectContaining({ kind: 'install' }));
     touch('failed-43.json', exitTimeout);
     serve(feed(43, identity.storageIdentity));
-    await expect(checkPersonalManifest()).resolves.toEqual(expect.objectContaining({ kind: 'skipped', reason: 'PERSONAL_UPDATE_OLD_APP_EXIT_TIMEOUT' }));
+    await expect(checkPersonalManifest({ releaseRetryable: true })).resolves.toEqual(expect.objectContaining({ kind: 'skipped', reason: 'PERSONAL_UPDATE_OLD_APP_EXIT_TIMEOUT' }));
   });
 });
 
