@@ -83,6 +83,8 @@ export interface SentNotice {
   /** 投递到派发方队列时用的稳定 id，也用于替换或撤回。 */
   clientId: string;
   interactionId?: string;
+  /** 这条等待通知是宿主转交的提问：问题由宿主自己在任务里答掉，之后任务里的问题消失不代表主人处理了。 */
+  forwarded?: true;
 }
 
 export interface Chain {
@@ -187,7 +189,8 @@ function emit(
     const notice: Notice = { ...base, id, target, clientId };
     actions.push(replace ? { type: 'deliver', notice, replaceClientId: replace.clientId } : { type: 'deliver', notice });
     const entry: SentNotice = { id, kind: base.kind, at: now, target, clientId,
-      ...(base.interaction ? { interactionId: base.interaction.id } : {}) };
+      ...(base.interaction ? { interactionId: base.interaction.id } : {}),
+      ...(base.forwarded ? { forwarded: true as const } : {}) };
     // 替换不新增计数：同一条排队消息只是换了内容。
     next = { ...next, sent: replace
       ? next.sent.map(item => item.clientId === replace.clientId && sameDispatcher(item.target, target) ? entry : item)
@@ -292,16 +295,19 @@ export function onInteractionResolved(
   record: TaskRecord, interactionId: string, now: number,
   queued: QueueProbe,
 ): Step {
-  const notified = record.sent.filter(entry => entry.kind === 'waiting' && entry.interactionId === interactionId);
-  if (!notified.length) return { record, actions: [] };
+  // 转交的提问由宿主在任务里直接答掉（告诉任务已转交），问题随即消失：这不是主人处理了，
+  // 不补「已处理」，也不撤回还在排队的转交——那是派发方唯一能看到问题的地方。
+  const matching = record.sent.filter(entry => entry.kind === 'waiting' && entry.interactionId === interactionId);
+  if (!matching.length) return { record, actions: [] };
+  // 每个等待只结一次：处理完就从记录里拿掉，之后每次停下复查不会再补「已处理」。
+  let next: TaskRecord = { ...record, sent: record.sent.filter(entry => !matching.includes(entry)) };
+  const notified = matching.filter(entry => !entry.forwarded);
   const actions: NoticeAction[] = [];
-  let next = record;
   const env = envOf(queued);
   for (const entry of notified) {
     if (env.queued(entry.target, entry.clientId)) {
-      // 还没被派发方处理：直接撤回，不再打扰。撤回的不计入上限。
+      // 还没被派发方处理：直接撤回，不再打扰。
       actions.push({ type: 'withdraw', target: entry.target, clientId: entry.clientId });
-      next = { ...next, sent: next.sent.filter(item => item !== entry) };
       continue;
     }
     // 已经被处理过（派发方可能正在问主人）：补一句「已处理」。

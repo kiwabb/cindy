@@ -30,6 +30,12 @@ import { forwardedAnswerText } from './noticeText.js';
 const log = createLogger('dispatcher-notice');
 const SCAN_RETRY_MS = 5_000;
 const SCAN_MAX_ATTEMPTS = 24;
+/**
+ * 启动扫描先等一段时间：重启后「接着做被打断的任务」由界面在启动后几秒才排进队列，
+ * 扫描早于它会把马上要续跑的任务报成「被打断、没有接着做」（真实验证发现）。
+ * 等过这段时间，续跑的任务要么正在跑、要么已经按完成 / 出错正常通知过，扫描只补报真正没人接手的。
+ */
+const RESTART_SCAN_GRACE_MS = 60_000;
 
 let getMainWindow: () => BrowserWindow | null = () => null;
 let active: { scope: string; service: DispatcherNoticeService } | null = null;
@@ -177,7 +183,7 @@ function scheduleRestartScan(scope: string, service: DispatcherNoticeService, at
     service.restartScan().catch(error => log.warn('dispatcher notice restart scan failed', {
       error: error instanceof Error ? error.message : String(error),
     }));
-  }, SCAN_RETRY_MS);
+  }, attempt === 0 ? RESTART_SCAN_GRACE_MS : SCAN_RETRY_MS);
   scanTimer.unref?.();
 }
 

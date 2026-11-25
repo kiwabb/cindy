@@ -178,6 +178,9 @@ describe('waiting notices', () => {
     expect(withdrawn.actions).toEqual([{ type: 'withdraw', target: BOT, clientId }]);
     const consumed = onInteractionResolved(waited.record, 'q1', T0 + 1, notQueued);
     expect(delivered(consumed.actions).map(n => n.kind)).toEqual(['resolved']);
+    // 真实验证发现：已结的等待留在记录里，之后每次停下复查都会再补一句「已处理」。只结一次。
+    expect(onInteractionResolved(consumed.record, 'q1', T0 + 2, notQueued).actions).toEqual([]);
+    expect(onInteractionResolved(withdrawn.record, 'q1', T0 + 2, notQueued).actions).toEqual([]);
   });
 
   it('long question lists are cut to the total limit but keep the closing hints', () => {
@@ -426,6 +429,16 @@ describe('host service (in-memory fakes)', () => {
     expect(onStopped(forwarded.record, { phase: 'completed', settled: true }, T0 + 30_000, notQueued).actions).toEqual([]);
     const kept = onStopped(forwarded.record, { phase: 'completed', settled: true }, T0 + FORWARD_QUIET_MS + 1, notQueued);
     expect(delivered(kept.actions).map(n => n.kind)).toEqual(['done']);
+  });
+
+  // 真实验证发现：宿主替任务答掉转交的提问后，问题从任务里消失，曾被误报成「主人已在任务里处理」。
+  // 最小失败输入：转交后立刻 onInteractionResolved（无论转交通知是否还在排队）。
+  it('a forwarded question disappearing from the task is not "handled by the owner": no resolved, no withdraw', () => {
+    const armed = onTurnStarted(emptyRecord('task'), [fromBot()], T0);
+    for (const probe of [notQueued, () => true]) {
+      const forwarded = onQuestionForwarded(armed, question, T0, probe);
+      expect(onInteractionResolved(forwarded.record, question.id, T0 + 1_000, probe).actions).toEqual([]);
+    }
   });
 
   it('service: forwards a teammate question, falls back to the card when the teammate is unavailable', async () => {
