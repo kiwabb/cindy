@@ -10677,6 +10677,7 @@
       "confirmTitle": "仍有任务在运行中",
       "confirmBusyHint": "重启会中断运行中的任务",
       "confirmBusyActivities": "重启会中断{{activities}}。",
+      "relaunchBlocked": "没有重启：重启会中断{{activities}}。结束后再点“立即重启”。",
       "activityJoiner": "、",
       "activityJoinerPair": "、",
       "activityJoinerLast": "、",
@@ -10691,7 +10692,9 @@
         "backgroundCommand": "后台命令",
         "scheduledTask": "定时任务",
         "generation": "生成任务",
-        "subtask": "子任务"
+        "subtask": "子任务",
+        "remoteOperation": "其他设备发来的操作",
+        "unknown": "状态无法确认的任务"
       },
       "confirmButton": "仍要重启应用",
       "cancel": "取消",

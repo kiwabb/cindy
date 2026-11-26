@@ -10802,6 +10802,7 @@
       "confirmTitle": "Ainda há uma tarefa em execução",
       "confirmBusyHint": "Reiniciar irá interrompê-la",
       "confirmBusyActivities": "Reiniciar irá interromper {{activities}}.",
+      "relaunchBlocked": "Não reiniciou: isso interromperia {{activities}}. Escolha «Reiniciar» novamente quando terminar.",
       "activityJoiner": ", ",
       "activityJoinerPair": " e ",
       "activityJoinerLast": " e ",
@@ -10816,7 +10817,9 @@
         "backgroundCommand": "um comando em segundo plano",
         "scheduledTask": "uma tarefa agendada",
         "generation": "uma geração",
-        "subtask": "uma subtarefa"
+        "subtask": "uma subtarefa",
+        "remoteOperation": "uma operação de outro dispositivo",
+        "unknown": "uma tarefa cujo estado não foi possível confirmar"
       },
       "confirmButton": "Reiniciar a aplicação mesmo assim",
       "cancel": "Cancelar",

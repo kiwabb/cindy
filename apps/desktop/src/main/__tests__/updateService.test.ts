@@ -1787,6 +1787,7 @@ describe('app update forward-only policy', () => {
     let acknowledge: (() => void) | undefined;
     personalApply.mockImplementationOnce(() => new Promise<void>(resolve => { acknowledge = resolve; }));
     const service = await freshUpdateService('darwin');
+    service.setManualRelaunchGuard(async () => ({ blocked: false, reasons: [], categories: [] }));
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
     service.initUpdateService();
     try {
@@ -1806,6 +1807,127 @@ describe('app update forward-only policy', () => {
       expect(logError.mock.calls.some(call => String(call[0]).includes('incrementApplyAttempts failed'))).toBe(false);
       expect(fs.existsSync(zip)).toBe(true);
     } finally { exitSpy.mockRestore(); service.stopUpdateService(); }
+  });
+
+  // 2026-11-26 (personal Mac): two clicks on "restart" did nothing. The explicit click reused the unattended
+  // probe, so another device merely viewing this one (session / legacy / fs-watch subscription) refused it
+  // and the refusal returned without a word. The click now yields only to work a restart would cut off, and
+  // every refusal is pushed to the banner with fixed categories.
+  describe('explicit personal restart guard', () => {
+    type GuardDeps = import('../manualRelaunchGuard').ManualRelaunchGuardDeps;
+    const idleLocal = async () => ({ busy: false, reasons: [] as string[] });
+    async function personalClickFixture(guard: GuardDeps | 'unwired' | 'throws') {
+      readAutoUpdateSettings.mockReturnValue({ autoRelaunchOnIdle: false });
+      appGetVersion.mockReturnValue('0.0.0');
+      const fixture = personalUpdateFixture();
+      const sends: Array<{ channel: string; payload: unknown }> = [];
+      browserWindowGetAllWindows.mockReturnValue([{
+        isDestroyed: () => false,
+        webContents: { send: (channel: string, payload: unknown) => { sends.push({ channel, payload }); } },
+      } as never]);
+      const service = await freshUpdateService('darwin');
+      // Another device is viewing this one: the unattended probe stays busy throughout.
+      service.setUpdateAutoRelaunchBusyProbe(() => true);
+      const { evaluateManualRelaunchGuard } = await import('../manualRelaunchGuard');
+      if (guard === 'throws') service.setManualRelaunchGuard(async () => { throw new Error('probe exploded'); });
+      else if (guard !== 'unwired') service.setManualRelaunchGuard(() => evaluateManualRelaunchGuard(guard));
+      const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+      service.initUpdateService();
+      const blocks = () => sends.filter(entry => entry.channel === 'update-status')
+        .map(entry => (entry.payload as { relaunchBlock?: { categories: string[] } }).relaunchBlock)
+        .filter(Boolean);
+      return { ...fixture, service, exitSpy, blocks };
+    }
+
+    it('restarts while another device only views this one', async () => {
+      const { service, exitSpy, zip, blocks } = await personalClickFixture({
+        readLocalActivity: idleLocal, describeTurns: async () => null, hasInFlightRemoteOperations: () => false,
+      });
+      try {
+        await expect(service.checkForUpdate()).resolves.toBe('ready');
+        ipcListeners.get('update-relaunch')?.({}, 'dark');
+        await vi.waitFor(() => expect(personalApply).toHaveBeenCalledWith(zip));
+        await vi.waitFor(() => expect(appQuit).toHaveBeenCalledOnce());
+        expect(blocks()).toEqual([]);
+      } finally { exitSpy.mockRestore(); service.stopUpdateService(); }
+    });
+
+    it.each([
+      ['a conversation is mid-turn', {
+        readLocalActivity: async () => ({ busy: true, reasons: ['session-in-turn'] }),
+        describeTurns: async () => ({ companions: [], conversation: true }), hasInFlightRemoteOperations: () => false,
+      }, ['conversation']],
+      ['a scheduled run is running', {
+        readLocalActivity: async () => ({ busy: true, reasons: ['scheduler-run-running'] }),
+        describeTurns: async () => null, hasInFlightRemoteOperations: () => false,
+      }, ['scheduled-task']],
+      ['another device is operating on this computer', {
+        readLocalActivity: idleLocal, describeTurns: async () => null, hasInFlightRemoteOperations: () => true,
+      }, ['remote-operation']],
+      ['local activity cannot be read', {
+        readLocalActivity: async () => { throw new Error('tracker unavailable'); },
+        describeTurns: async () => null, hasInFlightRemoteOperations: () => false,
+      }, ['unknown']],
+    ] as Array<[string, GuardDeps, string[]]>)('refuses and says why when %s', async (_label, guard, categories) => {
+      const { service, exitSpy, blocks } = await personalClickFixture(guard);
+      const runners = await import('@cindy/maker-core/pi-subagent-runs');
+      const reclaim = vi.spyOn(runners, 'stopAllPiSubagentRunsForExit');
+      try {
+        await expect(service.checkForUpdate()).resolves.toBe('ready');
+        ipcListeners.get('update-relaunch')?.({}, 'dark');
+        await vi.waitFor(() => expect(blocks()).toHaveLength(1));
+        expect(blocks()[0]).toMatchObject({ categories });
+        expect(personalApply).not.toHaveBeenCalled();
+        expect(appQuit).not.toHaveBeenCalled();
+        // Refused before runner reclaim: nothing was stopped, and the update stays ready for the next click.
+        expect(reclaim).not.toHaveBeenCalled();
+        expect(service.getUpdateStatus()).toBe('ready');
+      } finally { reclaim.mockRestore(); exitSpy.mockRestore(); service.stopUpdateService(); }
+    });
+
+    it.each(['unwired', 'throws'] as const)('fails closed when the guard is %s', async guard => {
+      const { service, exitSpy, blocks } = await personalClickFixture(guard);
+      try {
+        await expect(service.checkForUpdate()).resolves.toBe('ready');
+        ipcListeners.get('update-relaunch')?.({}, 'dark');
+        await vi.waitFor(() => expect(blocks()).toHaveLength(1));
+        expect(blocks()[0]).toMatchObject({ categories: ['unknown'] });
+        expect(personalApply).not.toHaveBeenCalled();
+      } finally { exitSpy.mockRestore(); service.stopUpdateService(); }
+    });
+
+    it('refuses with a notice when work starts between the first check and the final apply boundary', async () => {
+      let calls = 0;
+      const { service, exitSpy, blocks } = await personalClickFixture({
+        readLocalActivity: async () => (++calls === 1
+          ? { busy: false, reasons: [] }
+          : { busy: true, reasons: ['background-bash'] }),
+        describeTurns: async () => null, hasInFlightRemoteOperations: () => false,
+      });
+      try {
+        await expect(service.checkForUpdate()).resolves.toBe('ready');
+        ipcListeners.get('update-relaunch')?.({}, 'dark');
+        await vi.waitFor(() => expect(blocks()).toHaveLength(1));
+        expect(blocks()[0]).toMatchObject({ categories: ['background-command'] });
+        expect(calls).toBe(2);
+        expect(personalApply).not.toHaveBeenCalled();
+      } finally { exitSpy.mockRestore(); service.stopUpdateService(); }
+    });
+
+    it('keeps the Agent install on the unattended probe even when the click guard is idle', async () => {
+      const { service, exitSpy, blocks } = await personalClickFixture({
+        readLocalActivity: idleLocal, describeTurns: async () => null, hasInFlightRemoteOperations: () => false,
+      });
+      try {
+        await expect(service.checkForUpdate()).resolves.toBe('ready');
+        const result = await service.applyConfirmedAppUpdateForAgent({
+          expectedVersion: 'personal-r42', beforeRelaunch: async () => true, beforeSpawn: () => true,
+        });
+        expect(result.status).toBe('failed');
+        expect(personalApply).not.toHaveBeenCalled();
+        expect(blocks()).toEqual([]);
+      } finally { exitSpy.mockRestore(); service.stopUpdateService(); }
+    });
   });
 
   it('reports a storage-incompatible personal release as a manual install and drops the cached patch', async () => {
@@ -1939,6 +2061,7 @@ describe('app update forward-only policy', () => {
     Object.defineProperty(process, 'resourcesPath', { value: resourcesPath, configurable: true });
     const tmpdirSpy = vi.spyOn(os, 'tmpdir').mockReturnValue(TEST_ROOT);
     const service = await freshUpdateService('win32');
+    service.setManualRelaunchGuard(async () => ({ blocked: false, reasons: [], categories: [] }));
     spawnProcess.mockClear();
     spawnProcess.mockImplementationOnce(() => ({ unref: vi.fn(), on: vi.fn() }));
     service.initUpdateService();

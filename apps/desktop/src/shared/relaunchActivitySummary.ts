@@ -179,7 +179,7 @@ export function classifyRelaunchTurnRows(
   return { companions: named, conversation };
 }
 
-const CATEGORY_KEYS: Record<RelaunchActivityCategory, string> = {
+export const RELAUNCH_ACTIVITY_CATEGORY_KEYS: Record<RelaunchActivityCategory, string> = {
   companion: 'update.banner.activity.companion',
   conversation: 'update.banner.activity.conversation',
   'background-command': 'update.banner.activity.backgroundCommand',
@@ -188,7 +188,7 @@ const CATEGORY_KEYS: Record<RelaunchActivityCategory, string> = {
   subtask: 'update.banner.activity.subtask',
 };
 
-function joinLocalized(
+export function joinLocalized(
   parts: readonly string[],
   translate: (key: string) => string,
   keys: { joiner: string; pair: string; last: string },
@@ -210,7 +210,7 @@ export function formatRelaunchActivityHint(
   const parts = summary.categories.map((category) => {
     if (category !== 'companion' || summary.companionNames.length === 0
       || summary.companionNames.length > MAX_LISTED_COMPANION_NAMES) {
-      return translate(CATEGORY_KEYS[category]);
+      return translate(RELAUNCH_ACTIVITY_CATEGORY_KEYS[category]);
     }
     const names = joinLocalized(summary.companionNames, (key) => translate(key), {
       joiner: 'update.banner.activityNameJoiner',

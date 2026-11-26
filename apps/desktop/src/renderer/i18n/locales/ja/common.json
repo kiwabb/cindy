@@ -10677,6 +10677,7 @@
       "confirmTitle": "実行中のタスクがあります",
       "confirmBusyHint": "再起動すると中断されます",
       "confirmBusyActivities": "再起動すると、{{activities}}が中断されます。",
+      "relaunchBlocked": "再起動しませんでした。{{activities}}が中断されるためです。終わってからもう一度「再起動」を選んでください。",
       "activityJoiner": "、",
       "activityJoinerPair": "、",
       "activityJoinerLast": "、",
@@ -10691,7 +10692,9 @@
         "backgroundCommand": "バックグラウンドコマンド",
         "scheduledTask": "スケジュールタスク",
         "generation": "生成タスク",
-        "subtask": "サブタスク"
+        "subtask": "サブタスク",
+        "remoteOperation": "別のデバイスからの操作",
+        "unknown": "状態を確認できない処理"
       },
       "confirmButton": "それでもアプリを再起動",
       "cancel": "キャンセル",

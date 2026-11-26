@@ -10802,6 +10802,7 @@
       "confirmTitle": "Une tâche est encore en cours",
       "confirmBusyHint": "Le redémarrage l'interrompra",
       "confirmBusyActivities": "Le redémarrage interrompra {{activities}}.",
+      "relaunchBlocked": "Pas de redémarrage : cela interromprait {{activities}}. Choisissez à nouveau « Relancer » une fois terminé.",
       "activityJoiner": ", ",
       "activityJoinerPair": " et ",
       "activityJoinerLast": " et ",
@@ -10816,7 +10817,9 @@
         "backgroundCommand": "une commande en arrière-plan",
         "scheduledTask": "une tâche planifiée",
         "generation": "une génération",
-        "subtask": "une sous-tâche"
+        "subtask": "une sous-tâche",
+        "remoteOperation": "une opération depuis un autre appareil",
+        "unknown": "une tâche dont l’état n’a pas pu être vérifié"
       },
       "confirmButton": "Redémarrer quand même",
       "cancel": "Annuler",

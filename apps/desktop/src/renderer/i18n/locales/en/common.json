@@ -10724,6 +10724,7 @@
       "confirmTitle": "A task is still running",
       "confirmBusyHint": "Restarting will interrupt it",
       "confirmBusyActivities": "Restarting will interrupt {{activities}}.",
+      "relaunchBlocked": "Didn’t restart: it would interrupt {{activities}}. Select Relaunch again when it’s done.",
       "activityJoiner": ", ",
       "activityJoinerPair": " and ",
       "activityJoinerLast": ", and ",
@@ -10738,7 +10739,9 @@
         "backgroundCommand": "a background command",
         "scheduledTask": "a scheduled task",
         "generation": "a generation",
-        "subtask": "a subtask"
+        "subtask": "a subtask",
+        "remoteOperation": "an operation from another device",
+        "unknown": "work whose status couldn’t be confirmed"
       },
       "confirmButton": "Restart App Anyway",
       "cancel": "Cancel",

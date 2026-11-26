@@ -62,6 +62,7 @@ import {
   normalizeRelaunchActivitySummary,
   type RelaunchActivitySummary,
 } from '../../../shared/relaunchActivitySummary';
+import { formatManualRelaunchBlock } from '../../../shared/manualRelaunchBlock';
 
 // 运行期端点清单(dev/packaged 都在启动阻断后有真值,烘焙兜底已退役)
 const websiteUrl = () => window.electronAPI.clientEndpoints.websiteUrl;
@@ -90,7 +91,10 @@ export function UpdateBanner({
   onOpenVersionNotice,
   autoOpenPrerequisiteDialogs = true,
 }: UpdateBannerProps) {
-  const { status, version, displayVersion, errorCode, downloadUrl, manualReason } = useUpdateStatus();
+  const { status, version, displayVersion, errorCode, downloadUrl, manualReason, relaunchBlock } = useUpdateStatus();
+  // The restart the user asked for was refused (personal builds); hidden again once they click.
+  const [hiddenBlockId, setHiddenBlockId] = useState<number | null>(null);
+  const shownBlock = relaunchBlock && relaunchBlock.id !== hiddenBlockId ? relaunchBlock : null;
   // What the user reads; `version` stays the key for comparisons, dismiss snapshots and release notes.
   const shownVersion = displayVersion ?? version;
   const { effectiveLocale } = useLocale();
@@ -133,6 +137,7 @@ export function UpdateBanner({
   const [showWindowsRuntimeDialog, setShowWindowsRuntimeDialog] = useState(false);
   const [showLinuxInstallationDialog, setShowLinuxInstallationDialog] = useState(false);
   const { t } = useTranslation();
+  const blockMessage = shownBlock ? formatManualRelaunchBlock((key, vars) => t(key, vars), shownBlock) : null;
 
   const [showSpawnFailedDialog, setShowSpawnFailedDialog] = useState(false);
   // 待安装版本的公告在 CDN 上是否可用 —— 决定文字链是否渲染。
@@ -290,7 +295,15 @@ export function UpdateBanner({
   // await 之后的两道复核是必需的,不是防御性冗余:探针在飞期间用户可能 dismiss、组件可能
   // 卸载、已就绪补丁可能被 superseding 顶掉。少了它们,「点了稍后却重启」「装回旧补丁」
   // 「confirming 残留到下次唤回」三种都会真实发生。
+  // A refusal replaces any open "restart anyway" step: main already decided, and the reason is shown.
+  useEffect(() => {
+    if (!relaunchBlock) return;
+    setActivitySummary(null);
+    setConfirming(false);
+  }, [relaunchBlock]);
+
   const handleRelaunchClick = async (): Promise<void> => {
+    if (relaunchBlock) setHiddenBlockId(relaunchBlock.id);
     if (isLinuxInstallationUnsupported) {
       setShowLinuxInstallationDialog(true);
       return;
@@ -585,7 +598,7 @@ export function UpdateBanner({
         <Tip
           text={isPreparing
             ? t('update.banner.preparingTooltip')
-            : t('update.banner.tooltipReady', { versionSuffix })}
+            : blockMessage ?? t('update.banner.tooltipReady', { versionSuffix })}
           side="right"
         >
           <button
@@ -659,13 +672,16 @@ export function UpdateBanner({
           <p
             className={cn(
               'text-center text-xs',
-              !isPreparing && confirming
+              !isPreparing && (confirming || blockMessage)
                 ? 'text-[var(--warning-fg)]'
                 : 'text-sidebar-muted',
             )}
+            role={blockMessage && !isPreparing && !confirming ? 'status' : undefined}
           >
             {isPreparing
               ? t('update.banner.preparingSubtitle')
+              : blockMessage && !confirming
+                ? blockMessage
               : confirming
                 ? (formatRelaunchActivityHint((key, vars) => t(key, vars), activitySummary) ?? t('update.banner.confirmBusyHint'))
                 : isNativeBuildSwitch

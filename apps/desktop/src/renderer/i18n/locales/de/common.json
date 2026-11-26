@@ -10724,6 +10724,7 @@
       "confirmTitle": "Eine Aufgabe läuft noch",
       "confirmBusyHint": "Ein Neustart unterbricht sie",
       "confirmBusyActivities": "Ein Neustart unterbricht {{activities}}.",
+      "relaunchBlocked": "Nicht neu gestartet: Das würde {{activities}} unterbrechen. Wähle „Neu starten“ erneut, sobald es fertig ist.",
       "activityJoiner": ", ",
       "activityJoinerPair": " und ",
       "activityJoinerLast": " und ",
@@ -10738,7 +10739,9 @@
         "backgroundCommand": "einen Hintergrundbefehl",
         "scheduledTask": "eine geplante Aufgabe",
         "generation": "eine Generierung",
-        "subtask": "eine Teilaufgabe"
+        "subtask": "eine Teilaufgabe",
+        "remoteOperation": "einen Vorgang von einem anderen Gerät",
+        "unknown": "eine Aufgabe, deren Status sich nicht prüfen ließ"
       },
       "confirmButton": "App trotzdem neu starten",
       "cancel": "Abbrechen",

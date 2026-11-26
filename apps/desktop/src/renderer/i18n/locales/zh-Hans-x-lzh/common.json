@@ -10677,6 +10677,7 @@
       "confirmTitle": "尚有差事方行",
       "confirmBusyHint": "重启将断方行之差事",
       "confirmBusyActivities": "重启将断{{activities}}。",
+      "relaunchBlocked": "未重启：重启将断{{activities}}。待其毕，再点「即重启」。",
       "activityJoiner": "、",
       "activityJoinerPair": "、",
       "activityJoinerLast": "、",
@@ -10691,7 +10692,9 @@
         "backgroundCommand": "背景之令",
         "scheduledTask": "定时差事",
         "generation": "生成之役",
-        "subtask": "子差事"
+        "subtask": "子差事",
+        "remoteOperation": "他器所发之操作",
+        "unknown": "状未可察之务"
       },
       "confirmButton": "仍要重启",
       "cancel": "罢",

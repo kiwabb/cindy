@@ -82,6 +82,7 @@ export const {
   getActiveControllers,
   getUpdateRelaunchControllers,
   hasInFlightRemoteInvokes,
+  hasInFlightRemoteOperations,
   pushSessionActivityToController,
   pushToTopicSubscribers,
   dropAllControllers,
