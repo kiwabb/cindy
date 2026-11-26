@@ -74,7 +74,7 @@ function flatten(value: unknown, prefix = ''): string[] {
  * `kill` and `sleep` are recorded, never real. macOS parses the snapshot with the real `/usr/bin/plutil`;
  * elsewhere an in-shell stand-in answers `-extract <keypath> raw` for scalar leaves and fails otherwise.
  */
-async function runWait(snapshot: object, options: { code?: number; births?: Record<number, string>; seconds?: number; classifyOnly?: boolean; grace?: number } = {}) {
+async function runWait(snapshot: object, options: { code?: number; births?: Record<number, string>; seconds?: number; classifyOnly?: boolean; grace?: number; stubborn?: number[] } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cindy-exit-wait-test-'));
   try {
     const births: Record<number, string> = {};
@@ -82,7 +82,12 @@ async function runWait(snapshot: object, options: { code?: number; births?: Reco
     Object.assign(births, options.births);
     const realPlutil = process.platform === 'darwin';
     const birthCases = Object.entries(births).map(([pid, birth]) => `    ${pid}) ${birth ? `printf '%s\n' ${sh(birth)}; return 0` : 'return 1'} ;;`).join('\n');
-    const liveCases = Object.entries(births).filter(([, b]) => b).map(([pid]) => pid).join('|') || 'none';
+    // Records the monitor may signal: live handlers at an exact Crashpad path whose start time still matches.
+    const livePids = (snapshot as { processes: ProcessRecord[] }).processes
+      .filter(p => !p.zombie && (PERSONAL_CRASHPAD_HANDLER_PATHS as readonly string[]).includes(p.executable) && births[p.pid])
+      .map(p => String(p.pid));
+    const liveCases = livePids.join('|') || 'none';
+    const liveCount = Math.max(livePids.length, 1);
     const functions = waitFunctions(transactionScript(root))
       .replace(/^CRASHPAD_GRACE=\d+$/m, `CRASHPAD_GRACE=${options.grace ?? 3}`)
       .replaceAll('/usr/bin/plutil', realPlutil ? '/usr/bin/plutil' : 'fake_plutil')
@@ -93,11 +98,15 @@ ROOT=${sh(slash(root))}
 HELPER=fake_helper
 APP=/Applications/Cindy.app
 EXIT_STATUS="$ROOT/exit-status.json"
-SLEPT=0; KILLED=0; KILLS=""
+SLEPT=0; KILLED=0; KILLS=""; KILLED_SET=" "; KILLED_COUNT=0
 sleep() { SLEPT=$((SLEPT + 1)); }
 record_kill() {
   KILLS="$KILLS$1 $2;"
-  case "$2" in ${liveCases}) KILLED=1 ;; esac
+  # The bundle empties only once every live record has been signalled; each signalled PID is gone.
+  # A stubborn PID ignores SIGTERM and leaves only on SIGKILL.
+  case "$1:$2" in ${(options.stubborn ?? []).map(pid => `-TERM:${pid}`).join('|') || 'none'}) return 0 ;; esac
+  case "$2" in ${liveCases}) case "$KILLED_SET" in *" $2 "*) ;; *) KILLED_SET="$KILLED_SET$2 "; KILLED_COUNT=$((KILLED_COUNT + 1)) ;; esac ;; esac
+  if [ "$KILLED_COUNT" -ge ${liveCount} ]; then KILLED=1; fi
 }
 fake_helper() {
   if [ "$1" = --bundle-status ]; then
@@ -105,6 +114,7 @@ fake_helper() {
     printf '%s\n' ${sh(JSON.stringify(snapshot))}; return ${options.code ?? 75}
   fi
   [ "$1" = --pid-birth ] && [ "$KILLED" = 0 ] || return 1
+  case "$KILLED_SET" in *" $2 "*) return 1 ;; esac
   case "$2" in
 ${birthCases}
   esac
@@ -160,6 +170,33 @@ describe.skipIf(!bash)('personal update wait for the old bundle to exit', () => 
     const result = await runWait(status([reused, crashpad()]));
     expect(result.outcome).toBe('exchange');
     expect(result.kills).toEqual(['-TERM 900']);
+  });
+
+  // 2026-11-26 (Mac sample): a handler left by an earlier run survives the next launch, so the next exchange can
+  // find two handlers: one under the unversioned `Helpers` path and one under `Versions/A`.
+  it('stops every lone old-bundle Crashpad handler, under either path form, before exchanging', async () => {
+    const result = await runWait(status([
+      crashpad(31444, '1764121000:1', PERSONAL_CRASHPAD_HANDLER_PATHS[1]),
+      crashpad(189, '1764121400:2', PERSONAL_CRASHPAD_HANDLER_PATHS[0]),
+    ]));
+    expect(result.outcome).toBe('exchange');
+    expect(result.kills).toEqual(['-TERM 31444', '-TERM 189']);
+    expect(result.stopRecord).toMatchObject({ stopRounds: 1, signals: ' -TERM:31444 -TERM:189' });
+  });
+
+  it('escalates only the handler that ignores SIGTERM among several', async () => {
+    // 189 is reported alive again after SIGTERM (same start time), so it alone receives SIGKILL.
+    const result = await runWait(status([
+      crashpad(31444, '1764121000:1', PERSONAL_CRASHPAD_HANDLER_PATHS[1]),
+      crashpad(189, '1764121400:2', PERSONAL_CRASHPAD_HANDLER_PATHS[0]),
+    ]), { stubborn: [189] });
+    expect(result.outcome).toBe('exchange');
+    expect(result.kills).toEqual(['-TERM 31444', '-TERM 189', '-KILL 189']);
+  });
+
+  it('keeps waiting without signals when two handlers remain beside the old main process', async () => {
+    const snapshot = status([mainApp, crashpad(31444, '1764121000:1', PERSONAL_CRASHPAD_HANDLER_PATHS[1]), crashpad(189, '1764121400:2')]);
+    expect((await runWait(snapshot, { classifyOnly: true })).outcome).toBe('wait');
   });
 
   it.each([
