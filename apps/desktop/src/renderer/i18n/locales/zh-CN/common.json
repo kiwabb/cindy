@@ -4106,6 +4106,7 @@
         "paymentUnlock": "付费解锁",
         "enableModel": "启用此模型",
         "capabilityGroupHint": "不会出现在对话模型选择中；开关控制对应功能是否列出。",
+        "subscriptionImageHint": "ChatGPT 订阅登录只提供一个生图入口，无法指定具体型号。要选 GPT Image 2.5、2.6 等具体型号，请在内置 OpenAI 连接中填写图像 API 密钥（按 API 用量计费）。",
         "accessWriteFailed": "停用设置未能保存，请重试",
         "visibilityWriteFailed": "模型显示设置未能保存，请重试；如果仍然失败，请重启 Cindy。",
         "disabledGroup": "已停用",

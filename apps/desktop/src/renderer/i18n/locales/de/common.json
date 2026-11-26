@@ -4152,6 +4152,7 @@
         "paymentUnlock": "Kostenpflichtig freischalten",
         "enableModel": "Dieses Modell aktivieren",
         "capabilityGroupHint": "Wird in der Chat-Modellauswahl nicht angezeigt. Der Schalter steuert die Sichtbarkeit in der entsprechenden Funktion.",
+        "subscriptionImageHint": "Eine Anmeldung mit ChatGPT-Abo bietet nur einen Eintrag für Bildgenerierung, ein bestimmtes Modell lässt sich nicht wählen. Um Modelle wie GPT Image 2.5 oder 2.6 zu wählen, hinterlege einen Bild-API-Schlüssel in der integrierten OpenAI-Verbindung (Abrechnung nach API-Nutzung).",
         "accessWriteFailed": "Änderung konnte nicht gespeichert werden. Bitte versuche es erneut.",
         "visibilityWriteFailed": "Die Einstellung zur Modellsichtbarkeit konnte nicht gespeichert werden. Versuche es erneut oder starte Cindy neu, falls das Problem weiterhin besteht.",
         "disabledGroup": "Deaktiviert",

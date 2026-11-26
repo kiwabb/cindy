@@ -4202,6 +4202,7 @@
         "paymentUnlock": "Payer pour débloquer",
         "enableModel": "Activer ce modèle",
         "capabilityGroupHint": "Non affiché dans le sélecteur de modèles de conversation. L'interrupteur contrôle la visibilité dans la fonctionnalité concernée.",
+        "subscriptionImageHint": "La connexion par abonnement ChatGPT ne fournit qu'une seule entrée de génération d'images et ne permet pas de choisir un modèle précis. Pour choisir des modèles comme GPT Image 2.5 ou 2.6, ajoutez une clé d'API d'images à la connexion OpenAI intégrée (facturée à l'usage de l'API).",
         "accessWriteFailed": "Impossible d'enregistrer la modification. Veuillez réessayer.",
         "visibilityWriteFailed": "Impossible d'enregistrer le paramètre de visibilité du modèle. Réessayez, ou redémarrez Cindy si le problème persiste.",
         "disabledGroup": "Désactivés",

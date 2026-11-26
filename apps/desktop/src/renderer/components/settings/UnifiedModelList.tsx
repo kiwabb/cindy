@@ -88,6 +88,7 @@ import {
   nativeModelAgents,
   resolveModelIconKind,
   markedSelectionAliasGroups, type SelectionAliasPreferences,
+  isOpenAiSubscriptionProvider,
 } from '@cindy/model-providers';
 import type { AgentKind, CatalogModel, ProviderView } from '@cindy/model-providers';
 import { modelCompactionTarget } from '../../../shared/modelContextLimit';
@@ -182,6 +183,15 @@ export interface UnionModelRow {
  */
 function canonicalModelKey(provider: ProviderView, agent: AgentKind, id: string): string {
   return modelCompactionTarget(provider, agent, id).modelId;
+}
+
+/** 订阅登录未配图像 API key 时，主进程把图片清单收敛成单个 GPT Image Gen
+ *  (`<provider>/gpt-image-2`，见 active-catalog)。此时公共 API 的具名型号不可选，
+ *  列表需要说明原因(导出供单测)。 */
+export function isSubscriptionHostedImageOnly(provider: ProviderView): boolean {
+  const images = provider.imageModels ?? [];
+  return isOpenAiSubscriptionProvider(provider) &&
+    images.length === 1 && images[0].id === `${provider.id}/gpt-image-2`;
 }
 
 /** 构建并集(导出供单测):行序 = 第一个 agent 的目录序,后续 agent 独占模型追加其后;
@@ -1336,6 +1346,14 @@ export function UnifiedModelList({
                       style={{ color: 'var(--text-tertiary)' }}
                     >
                       {t('settings.providers.models.capabilityGroupHint')}
+                    </span>
+                  )}
+                  {g.kind === 'image' && !collapsed && isSubscriptionHostedImageOnly(provider) && (
+                    <span
+                      className={cn('pb-1 text-11 leading-snug', showGroupHeaders && 'pl-[24px]')}
+                      style={{ color: 'var(--text-tertiary)' }}
+                    >
+                      {t('settings.providers.models.subscriptionImageHint')}
                     </span>
                   )}
                   {!collapsed && g.rows.map((row) => renderModelRow(row))}

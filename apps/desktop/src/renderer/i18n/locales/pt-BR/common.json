@@ -4202,6 +4202,7 @@
         "paymentUnlock": "Pague para desbloquear",
         "enableModel": "Ativar este modelo",
         "capabilityGroupHint": "Não exibido no seletor de modelos da conversa. A opção controla a visibilidade no recurso correspondente.",
+        "subscriptionImageHint": "O login com assinatura do ChatGPT oferece uma única entrada de geração de imagens e não permite escolher um modelo específico. Para escolher modelos como GPT Image 2.5 ou 2.6, adicione uma chave de API de imagens à conexão integrada da OpenAI (cobrada pelo uso da API).",
         "accessWriteFailed": "Não foi possível salvar a alteração. Tente novamente.",
         "visibilityWriteFailed": "Não foi possível salvar a configuração de visibilidade do modelo. Tente novamente ou reinicie a Cindy se o problema persistir.",
         "disabledGroup": "Desativado",
