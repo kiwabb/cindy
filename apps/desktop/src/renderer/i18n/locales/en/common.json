@@ -4152,6 +4152,7 @@
         "paymentUnlock": "Pay to unlock",
         "enableModel": "Enable This Model",
         "capabilityGroupHint": "Not shown in the chat model picker. The switch controls visibility in the relevant feature.",
+        "subscriptionImageHint": "A ChatGPT subscription sign-in provides one image generation entry and cannot target a specific model. To choose models such as GPT Image 2.5 or 2.6, add an image API key to the built-in OpenAI connection (billed by API usage).",
         "accessWriteFailed": "Couldn’t save the change. Try again.",
         "visibilityWriteFailed": "Couldn't save the model visibility setting. Try again, or restart Cindy if the problem continues.",
         "disabledGroup": "Disabled",
@@ -10724,6 +10725,7 @@
       "confirmTitle": "A task is still running",
       "confirmBusyHint": "Restarting will interrupt it",
       "confirmBusyActivities": "Restarting will interrupt {{activities}}.",
+      "relaunchBlocked": "Didn’t restart: it would interrupt {{activities}}. Select Relaunch again when it’s done.",
       "activityJoiner": ", ",
       "activityJoinerPair": " and ",
       "activityJoinerLast": ", and ",
@@ -10738,7 +10740,9 @@
         "backgroundCommand": "a background command",
         "scheduledTask": "a scheduled task",
         "generation": "a generation",
-        "subtask": "a subtask"
+        "subtask": "a subtask",
+        "remoteOperation": "an operation from another device",
+        "unknown": "work whose status couldn’t be confirmed"
       },
       "confirmButton": "Restart App Anyway",
       "cancel": "Cancel",

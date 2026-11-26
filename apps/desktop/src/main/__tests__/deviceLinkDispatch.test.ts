@@ -65,7 +65,7 @@ import {
 } from '../device-link/invoke-context';
 import * as subscriptions from '../device-link/subscriptions';
 import { createDesktopOnlyConfirmationRequestId } from '../cindy-brain/desktopOnlyConfirmationProjection';
-import { PLUGIN_OAUTH_CHANNEL } from '@cindy/device-link';
+import { PLUGIN_OAUTH_CHANNEL, REMOTE_AGENT_CHANNEL } from '@cindy/device-link';
 import { initializePluginOauthHost, invalidatePluginOauth, publishedPluginOauthIdentity } from '../plugin-oauth/runtime';
 import { OauthBox } from '../plugin-oauth/box';
 import { testOauthSigningKey } from '../plugin-oauth/__tests__/fixtures';
@@ -521,6 +521,7 @@ import {
   getActiveControllers,
   getUpdateRelaunchControllers,
   hasInFlightRemoteInvokes,
+  hasInFlightRemoteOperations,
   dropAllControllers,
   setRemoteAgentHandler,
   setProviderGroupRemoteHandler,
@@ -1137,6 +1138,36 @@ describe('被控端控制链路生命周期', () => {
       requestId: 'invoke-1',
       payload: { ok: true, result: ['s1'] },
     });
+  });
+
+  // 2026-11-26: an attached Remote Agent keeps one read long-poll open while idle. It still holds the
+  // unattended-update lease, but the explicit manual update guard must not treat it as an operation.
+  it('Remote Agent 长轮询计入 busy lease，但不算正在进行的远程操作', async () => {
+    remoteControlEnabled = true;
+    let resolvePoll: ((value: unknown) => void) | undefined;
+    let resolveList: ((value: string[]) => void) | undefined;
+    setRemoteAgentHandler({ handle: () => new Promise((resolve) => { resolvePoll = resolve; }), abortAll: vi.fn() } as never);
+    registry.register('maker:list-active', () => new Promise<string[]>((resolve) => { resolveList = resolve; }));
+    const { client, feed } = makeFakeClient();
+    wireInboundDispatch(client);
+
+    feed({
+      v: 1, kind: 'invoke', id: 'poll-1', src: 'ctrl-a',
+      payload: { channel: REMOTE_AGENT_CHANNEL, args: [{ op: 'poll', waitMs: 20_000 }] },
+    });
+    await vi.waitFor(() => expect(resolvePoll).toBeTypeOf('function'));
+    expect(hasInFlightRemoteInvokes()).toBe(true);
+    expect(hasInFlightRemoteOperations()).toBe(false);
+
+    feed({ v: 1, kind: 'invoke', id: 'list-1', src: 'ctrl-a', payload: { channel: 'maker:list-active', args: [] } });
+    await vi.waitFor(() => expect(hasInFlightRemoteOperations()).toBe(true));
+
+    resolveList?.([]);
+    await vi.waitFor(() => expect(hasInFlightRemoteOperations()).toBe(false));
+    expect(hasInFlightRemoteInvokes()).toBe(true);
+    resolvePoll?.({ events: [] });
+    await vi.waitFor(() => expect(hasInFlightRemoteInvokes()).toBe(false));
+    setRemoteAgentHandler(null);
   });
 
   it('同一控制端重复 invoke 复用在途/已完成结果，不重复执行副作用', async () => {

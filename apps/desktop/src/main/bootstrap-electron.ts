@@ -304,6 +304,7 @@ import {
   getUpdateLockPath,
   notifyUpdateAutoRelaunchBusyStateChanged,
   setUpdateAutoRelaunchBusyProbe,
+  setManualRelaunchGuard,
 } from './updateService';
 import {
   createUpdatePresentationRecoveryController,
@@ -343,6 +344,7 @@ import {
   evaluateRelaunchBusyActivity,
   type RelaunchBusyActivitySources,
 } from './relaunchBusyActivity';
+import { evaluateManualRelaunchGuard } from './manualRelaunchGuard.js';
 import { hasPersistedSessionHint } from './authSessionHint';
 import {
   hasExclusiveSharedLegacyUserDataAccess,
@@ -741,6 +743,7 @@ import { providerGroupReshare, registerProviderGroupReshare } from './provider-g
 import {
   getUpdateRelaunchControllers,
   hasInFlightRemoteInvokes,
+  hasInFlightRemoteOperations,
   setHistoryToolNameReader,
   setUsageWidgetSnapshotReader,
   pushSessionActivityToController,
@@ -7283,6 +7286,13 @@ const registerIpcHandlers = () => {
       registerRelaunchBusyActivityIpc(readRelaunchActivitySources, {
         describeTurns: () => describeRelaunchTurns(() => listInTurnSessionIds(getMakerIfReady())),
       });
+      // Personal builds: a clicked "restart to update" yields only to work the restart would cut off,
+      // not to another device passively viewing this one (manualRelaunchGuard.ts).
+      setManualRelaunchGuard(() => evaluateManualRelaunchGuard({
+        readLocalActivity: () => evaluateRelaunchBusyActivity(readRelaunchActivitySources()),
+        describeTurns: () => describeRelaunchTurns(() => listInTurnSessionIds(getMakerIfReady())),
+        hasInFlightRemoteOperations,
+      }));
       // Client mode returned above and never reaches the runtime assembly.
       // getMakerCore() 首次调用触发 Maker 构造，同时发起自定义 MCP 初始加载。
       // await 确保第一个会话的 mcpProviders 数组已填入已保存的自定义 MCP（P2 冷启动竞态修复）。

@@ -1269,6 +1269,8 @@ function isKnownUnroutable(deviceId: string): boolean {
 let onControllersChanged: ControllersChangedListener | null = null;
 let onRemoteInvokeBusyChanged: RemoteInvokeBusyChangedListener | null = null;
 let inFlightRemoteInvokeCount = 0;
+/** Of those, Remote Agent read long-polls: they wait for output and do not operate on this machine. */
+let inFlightRemoteHoldInvokeCount = 0;
 const REMOTE_INVOKE_IN_FLIGHT_LIMIT = 64;
 /** Host DB admission is independent of whether a read can share an in-flight snapshot. */
 const BACKGROUND_REMOTE_INVOKE_CHANNELS: ReadonlySet<string> = new Set([
@@ -1560,6 +1562,15 @@ function hasInFlightRemoteInvokes(): boolean {
   return inFlightRemoteInvokeCount > 0;
 }
 
+/**
+ * In-flight remote calls other than Remote Agent read long-polls. An attached remote session keeps one
+ * long-poll open while idle, so only the explicit manual update guard uses this narrower view; the
+ * unattended update and every other caller keep `hasInFlightRemoteInvokes`.
+ */
+function hasInFlightRemoteOperations(): boolean {
+  return inFlightRemoteInvokeCount - inFlightRemoteHoldInvokeCount > 0;
+}
+
 function notifyRemoteInvokeBusyChanged(busy: boolean): void {
   try {
     onRemoteInvokeBusyChanged?.(busy);
@@ -1568,9 +1579,10 @@ function notifyRemoteInvokeBusyChanged(busy: boolean): void {
   }
 }
 
-function acquireRemoteInvokeBusyLease(): () => void {
+function acquireRemoteInvokeBusyLease(hold = false): () => void {
   const wasBusy = hasInFlightRemoteInvokes();
   inFlightRemoteInvokeCount += 1;
+  if (hold) inFlightRemoteHoldInvokeCount += 1;
   if (!wasBusy) notifyRemoteInvokeBusyChanged(true);
 
   let released = false;
@@ -1578,6 +1590,7 @@ function acquireRemoteInvokeBusyLease(): () => void {
     if (released) return;
     released = true;
     inFlightRemoteInvokeCount = Math.max(0, inFlightRemoteInvokeCount - 1);
+    if (hold) inFlightRemoteHoldInvokeCount = Math.max(0, inFlightRemoteHoldInvokeCount - 1);
     if (!hasInFlightRemoteInvokes()) notifyRemoteInvokeBusyChanged(false);
   };
 }
@@ -3532,13 +3545,13 @@ async function handleInvoke(
     return;
   }
 
+  // 长轮询(远程 Agent poll)按协议挂起的时长不算慢执行。
+  const intendedHoldMs = payload ? invokeIntendedHoldMs(payload.channel, payload.args) : 0;
   const releaseBusyLease = shouldAcquireRemoteInvokeBusyLease(src, payload)
-    ? acquireRemoteInvokeBusyLease()
+    ? acquireRemoteInvokeBusyLease(intendedHoldMs > 0)
     : () => undefined;
   const handlerStartedAt = performance.now();
   const timing = new RemoteInvokeTiming();
-  // 长轮询(远程 Agent poll)按协议挂起的时长不算慢执行。
-  const intendedHoldMs = payload ? invokeIntendedHoldMs(payload.channel, payload.args) : 0;
   const finishDiagnostic = observeRemoteInvoke(timing, fields => executionDiagnostics.record('execution', {
     request: diagnosticRef(requestId), src: diagnosticRef(src), channel: diagnosticChannel(payload?.channel ?? 'unknown'),
     operation: payload ? diagnosticOperation(payload) : 'unknown', ...fields,
@@ -5584,6 +5597,7 @@ const __testing = {
   getActiveControllers,
   getUpdateRelaunchControllers,
   hasInFlightRemoteInvokes,
+  hasInFlightRemoteOperations,
   controllerSupports: subscriptions.controllerSupports,
   optionalControllerCapabilities,
   sendInvokeResultSafe,
@@ -5672,6 +5686,7 @@ return {
   getActiveControllers,
   getUpdateRelaunchControllers,
   hasInFlightRemoteInvokes,
+  hasInFlightRemoteOperations,
   pushSessionActivityToController,
   pushToTopicSubscribers,
   dropAllControllers,

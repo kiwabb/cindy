@@ -165,3 +165,27 @@ it.each(['evaluation', 'rerank'] as const)('toggles standalone %s models through
   await act(async () => { fireEvent.click(screen.getByRole('switch', { name: entry.name })); });
   expect(isModelEnabled('claude-code', 'xd', row.byAgent['claude-code']!)).toBe(true);
 });
+
+it('shows why a ChatGPT subscription has only the single hosted image entry', () => {
+  const subscription = (imageModels: Array<{ id: string; name: string }>): ProviderView => ({
+    ...provider,
+    id: 'openai',
+    name: 'OpenAI',
+    auth: { method: 'oauth' },
+    agents: ['codex'],
+    models: { codex: [{ ...models[0], id: 'gpt-6', name: 'GPT-6', defaultEnabled: true }] },
+    imageModels: imageModels.map((m) => ({ ...m, mode: 'image_generation' })),
+  });
+  const hint = 'settings.providers.models.subscriptionImageHint';
+  const { unmount } = render(
+    <UnifiedModelList provider={subscription([{ id: 'openai/gpt-image-2', name: 'GPT Image Gen' }])} />,
+  );
+  expect(screen.getByText(hint)).toBeTruthy();
+  unmount();
+  render(<UnifiedModelList provider={subscription([
+    { id: 'openai/gpt-image-2.6-flare', name: 'GPT Image 2.6 Flare' },
+    { id: 'openai/gpt-image-2', name: 'GPT Image 2' },
+  ])} />);
+  expect(screen.getByText('GPT Image 2.6 Flare')).toBeTruthy();
+  expect(screen.queryByText(hint)).toBeNull();
+});

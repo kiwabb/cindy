@@ -4106,6 +4106,7 @@
         "paymentUnlock": "付費解鎖",
         "enableModel": "啟此模型",
         "capabilityGroupHint": "不見於言談模型之選；開關定其於相應功能中列否",
+        "subscriptionImageHint": "以 ChatGPT 訂閱登入者，生圖唯一途，不得擇其型號。欲擇 GPT Image 2.5、2.6 諸型，請於內建 OpenAI 連線填圖像 API 金鑰（依 API 用量計費）。",
         "accessWriteFailed": "停用之設未能存，請再試",
         "visibilityWriteFailed": "模型顯示之設未能存，請再試；若仍未成，請重啟 Cindy。",
         "disabledGroup": "已停",
@@ -10677,6 +10678,7 @@
       "confirmTitle": "尚有差事方行",
       "confirmBusyHint": "重啟將斷方行之差事",
       "confirmBusyActivities": "重啟將斷{{activities}}。",
+      "relaunchBlocked": "未重啟：重啟將斷{{activities}}。待其畢，再點「即重啟」。",
       "activityJoiner": "、",
       "activityJoinerPair": "、",
       "activityJoinerLast": "、",
@@ -10691,7 +10693,9 @@
         "backgroundCommand": "背景之令",
         "scheduledTask": "定時差事",
         "generation": "生成之役",
-        "subtask": "子差事"
+        "subtask": "子差事",
+        "remoteOperation": "他器所發之操作",
+        "unknown": "狀未可察之務"
       },
       "confirmButton": "仍要重啟",
       "cancel": "罷",

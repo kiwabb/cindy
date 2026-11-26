@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { DownloadProgress } from '../../shared/downloadProgress';
+import { normalizeManualRelaunchBlock, type ManualRelaunchBlock } from '../../shared/manualRelaunchBlock';
 
 /**
  * useUpdateStatus — listens to the main-process `update-status` IPC channel
@@ -22,6 +23,8 @@ export function useUpdateStatus() {
   // `app-update-progress` channel; cleared once the update stops downloading.
   const [download, setDownload] = useState<DownloadProgress | undefined>();
   const [manualReason, setManualReason] = useState<UpdateStatusPayload['manualReason']>();
+  // Personal builds: why the last explicit restart did not happen. Any later status push clears it.
+  const [relaunchBlock, setRelaunchBlock] = useState<ManualRelaunchBlock | null>(null);
 
   useEffect(() => {
     const api = window.electronAPI;
@@ -50,6 +53,7 @@ export function useUpdateStatus() {
         setErrorCode(payload.errorCode);
         setDownloadUrl(payload.downloadUrl);
         setManualReason(payload.manualReason);
+        setRelaunchBlock(payload.status === 'ready' ? normalizeManualRelaunchBlock(payload.relaunchBlock) : null);
         setProgress(typeof payload.progress === 'number' ? payload.progress : undefined);
         if (payload.status !== 'downloading' && payload.status !== 'superseding')
           setDownload(undefined);
@@ -65,5 +69,5 @@ export function useUpdateStatus() {
     };
   }, []);
 
-  return { status, version, displayVersion, errorCode, progress, downloadUrl, download, manualReason };
+  return { status, version, displayVersion, errorCode, progress, downloadUrl, download, manualReason, relaunchBlock };
 }

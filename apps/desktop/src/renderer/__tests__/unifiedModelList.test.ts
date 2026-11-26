@@ -17,6 +17,7 @@ import {
   isCapabilityRow,
   isRowDisabled,
   isRowPaymentRequired,
+  isSubscriptionHostedImageOnly,
   loadCollapsedMap,
   modelVisibilityTargets,
 } from '@/components/settings/UnifiedModelList';
@@ -472,4 +473,25 @@ it('shows decision and rerank rows with the saved disable state and no chat memb
   expect(rows.every(row => isCapabilityRow(row, false))).toBe(true);
   expect(isRowDisabled(rows[1])).toBe(true);
   expect(view.models).toEqual({});
+});
+
+describe('isSubscriptionHostedImageOnly', () => {
+  const image = (id: string) => ({ id, name: id, mode: 'image_generation' as const });
+  const openai = (auth: Record<string, unknown>, imageModels: ReturnType<typeof image>[], id = 'openai') =>
+    ({ ...provider, id, source: 'builtin', auth, imageModels }) as unknown as ProviderView;
+
+  it('只在订阅登录且图片清单收敛为单个 GPT Image Gen 时为真', () => {
+    expect(isSubscriptionHostedImageOnly(openai({ method: 'oauth' }, [image('openai/gpt-image-2')]))).toBe(true);
+    expect(isSubscriptionHostedImageOnly(
+      openai({ method: 'oauth', native: 'codex' }, [image('acct-2/gpt-image-2')], 'acct-2'),
+    )).toBe(true);
+  });
+
+  it('配置图像 API key 后显示具名型号清单，或非订阅连接时不显示说明', () => {
+    expect(isSubscriptionHostedImageOnly(openai({ method: 'oauth' }, [
+      image('openai/gpt-image-2.6-flare'), image('openai/gpt-image-2.6-sunburst'), image('openai/gpt-image-2'),
+    ]))).toBe(false);
+    expect(isSubscriptionHostedImageOnly(openai({ method: 'api-key' }, [image('openai/gpt-image-2')]))).toBe(false);
+    expect(isSubscriptionHostedImageOnly(openai({ method: 'oauth' }, []))).toBe(false);
+  });
 });

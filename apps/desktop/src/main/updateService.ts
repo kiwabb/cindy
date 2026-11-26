@@ -100,6 +100,8 @@ import { CURRENT_CINDY_REGION } from '../shared/brandRegion';
 import { disposeAndroidAdb } from './mcp-integrations/android';
 import { getGhostNodeRuntimeBroker } from './cindy-brain/index';
 import { cleanOldUpdateFiles } from './updateArtifacts';
+import { manualRelaunchGuardNotReady, type ManualRelaunchGuardResult } from './manualRelaunchGuard.js';
+import type { ManualRelaunchBlock } from '../shared/manualRelaunchBlock.js';
 import {
   checkWindowsUpdaterPrerequisites,
   stageBundledWindowsUpdaterRuntime,
@@ -139,6 +141,11 @@ interface UpdateStatusPayload {
    * health check failed and the monitor kept the current app.
    */
   manualReason?: PersonalManualReason;
+  /**
+   * `ready` only, personal builds: the user's explicit restart was refused; fixed categories say by what.
+   * Sent once per refusal and not stored as the current status.
+   */
+  relaunchBlock?: ManualRelaunchBlock;
 }
 
 type PersonalManualReason = 'storage' | 'signing' | 'failed' | 'exit' | 'install';
@@ -686,6 +693,39 @@ export function isUpdateRelaunchImminent(): boolean {
   // Respecting the user's switch: with auto-relaunch off the patch just sits
   // there until they click the banner, which is not "imminent".
   return readAutoUpdateSettings().autoRelaunchOnIdle;
+}
+
+/** Explicit-click guard for personal builds (manualRelaunchGuard.ts). Refuses until it is wired. */
+let manualRelaunchGuard: () => Promise<ManualRelaunchGuardResult> = async () => manualRelaunchGuardNotReady();
+let manualRelaunchBlockId = 0;
+
+export function setManualRelaunchGuard(guard: () => Promise<ManualRelaunchGuardResult>): void {
+  manualRelaunchGuard = guard;
+}
+
+async function readManualRelaunchGuard(): Promise<ManualRelaunchGuardResult> {
+  try { return await manualRelaunchGuard(); } catch { return { ...manualRelaunchGuardNotReady(), reasons: ['manual-guard-failed'] }; }
+}
+
+/** Tells every window why the click did nothing, instead of returning silently. */
+function reportManualRelaunchBlocked(result: ManualRelaunchGuardResult, stage: string): void {
+  log.info('Personal update restart refused at %s', stage, { reasons: result.reasons, categories: result.categories });
+  manualRelaunchBlockId += 1;
+  broadcastStatus({ status: 'ready', version: readyVersion, ...displayVersionFor(readyVersion),
+    relaunchBlock: { id: manualRelaunchBlockId, categories: result.categories.length ? result.categories : ['unknown'] } });
+}
+
+/**
+ * Personal builds never interrupt work on restart. A user click (`manual`) yields only to work the restart
+ * would cut off; every other caller (the Agent install path) keeps the unattended probe.
+ */
+async function personalRelaunchBlocked(options: RelaunchOptions | undefined, stage: string): Promise<boolean> {
+  if (options?.manual) {
+    const result = await readManualRelaunchGuard();
+    if (result.blocked) reportManualRelaunchBlocked(result, stage);
+    return result.blocked;
+  }
+  return hasBusyTasks();
 }
 
 export function setUpdateAutoRelaunchBusyProbe(
@@ -2179,6 +2219,8 @@ function executeUpdateLinux(debPath: string, installation: LinuxUserInstallation
 
 interface RelaunchOptions {
   automatic?: boolean;
+  /** A click from the trusted app renderer. Only this relaxes the personal busy guard (see above). */
+  manual?: boolean;
   /**
    * Last check after Subagent reclaim, immediately before the platform updater
    * spawns. Returning false keeps the patch staged and does not restart.
@@ -2282,7 +2324,7 @@ async function executeRelaunchUnguarded(
 
   // An explicit personal update also waits for other tasks. Check before
   // reclaiming runners so refusing an update never stops an active task.
-  if (personalContext && await hasBusyTasks()) {
+  if (personalContext && await personalRelaunchBlocked(options, 'before runner reclaim')) {
     log.info('Personal update deferred before runner reclaim (busy)');
     isRelaunching = false;
     autoRelaunchInProgress = false;
@@ -2346,7 +2388,7 @@ async function executeRelaunchUnguarded(
   if (personalContext) {
     const blockReason = options?.automatic
       ? await getAutoRelaunchBlockReasonForCurrentState(true)
-      : (await hasBusyTasks() ? 'busy' : null);
+      : (await personalRelaunchBlocked(options, 'final apply boundary') ? 'busy' : null);
     const currentContext = personalUpdateContext();
     const currentPrepared = readPreparedPersonalUpdate();
     if (blockReason || !personalPrepared || !currentContext || !currentPrepared || syncObservedUpdateChannel()
@@ -2711,7 +2753,7 @@ export function initUpdateService(): void {
     // default and the .env'd-out look most users have.
     const resolved = theme === 'light' || theme === 'dark' ? theme : 'dark';
     resolvedRelaunchTheme = resolved;
-    void executeRelaunch(resolved);
+    void executeRelaunch(resolved, { manual: true });
   });
 
   ipcMain.handle(

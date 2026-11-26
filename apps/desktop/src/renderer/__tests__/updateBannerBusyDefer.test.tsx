@@ -45,6 +45,7 @@ const updateStatus = vi.hoisted(() => ({
     errorCode: string | null;
     downloadUrl?: string;
     manualReason?: 'storage' | 'signing' | 'failed' | 'exit' | 'install';
+    relaunchBlock?: { id: number; categories: Array<'conversation' | 'remote-operation' | 'unknown'> } | null;
   },
 }));
 
@@ -158,6 +159,20 @@ describe('UpdateBanner busy defer', () => {
 
     expect(await screen.findByRole('button', { name: EXPANDED })).toBeTruthy();
     expect(getUpdateBannerDismissState().reason).toBeNull();
+  });
+
+  // 2026-11-26 (personal Mac): a refused restart used to leave the banner unchanged, so the click looked dead.
+  it('says why main refused the restart, and hides that notice once the user clicks again', async () => {
+    anyActivityBlockingRelaunch.mockResolvedValue(false);
+    updateStatus.current = { status: 'ready', version: '1.2.3', errorCode: null,
+      relaunchBlock: { id: 1, categories: ['remote-operation'] } };
+    render(<UpdateBanner isCollapsed={false} />);
+
+    const notice = await screen.findByRole('status');
+    expect(notice.textContent).toBe('update.banner.relaunchBlocked');
+    fireEvent.click(screen.getByRole('button', { name: EXPANDED }));
+    await waitFor(() => expect(screen.queryByRole('status')).toBeNull());
+    await waitFor(() => expect(relaunchToUpdate).toHaveBeenCalledOnce());
   });
 
   it('hides the expanded banner when main reports live activity', async () => {

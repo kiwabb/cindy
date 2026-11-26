@@ -4106,6 +4106,7 @@
         "paymentUnlock": "有料で解放",
         "enableModel": "このモデルを有効にする",
         "capabilityGroupHint": "チャットのモデル選択には表示されません。スイッチで各機能での表示を切り替えます。",
+        "subscriptionImageHint": "ChatGPT サブスクリプションでのサインインでは画像生成の入口が 1 つだけで、特定のモデルは指定できません。GPT Image 2.5、2.6 などのモデルを選ぶには、内蔵の OpenAI 接続に画像 API キーを設定してください（API 使用量に応じて課金）。",
         "accessWriteFailed": "変更を保存できませんでした。もう一度お試しください。",
         "visibilityWriteFailed": "モデルの表示設定を保存できませんでした。もう一度お試しください。問題が解決しない場合は、Cindy を再起動してください。",
         "disabledGroup": "無効",
@@ -10677,6 +10678,7 @@
       "confirmTitle": "実行中のタスクがあります",
       "confirmBusyHint": "再起動すると中断されます",
       "confirmBusyActivities": "再起動すると、{{activities}}が中断されます。",
+      "relaunchBlocked": "再起動しませんでした。{{activities}}が中断されるためです。終わってからもう一度「再起動」を選んでください。",
       "activityJoiner": "、",
       "activityJoinerPair": "、",
       "activityJoinerLast": "、",
@@ -10691,7 +10693,9 @@
         "backgroundCommand": "バックグラウンドコマンド",
         "scheduledTask": "スケジュールタスク",
         "generation": "生成タスク",
-        "subtask": "サブタスク"
+        "subtask": "サブタスク",
+        "remoteOperation": "別のデバイスからの操作",
+        "unknown": "状態を確認できない処理"
       },
       "confirmButton": "それでもアプリを再起動",
       "cancel": "キャンセル",

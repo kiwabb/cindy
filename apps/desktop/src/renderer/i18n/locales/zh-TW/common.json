@@ -4106,6 +4106,7 @@
         "paymentUnlock": "付費解鎖",
         "enableModel": "啟用此模型",
         "capabilityGroupHint": "不會出現在對話模型選擇中；開關控制對應功能是否列出",
+        "subscriptionImageHint": "ChatGPT 訂閱登入只提供一個生圖入口，無法指定特定型號。要選 GPT Image 2.5、2.6 等特定型號，請在內建 OpenAI 連線中填入圖像 API 金鑰（依 API 用量計費）。",
         "accessWriteFailed": "停用設定未能儲存，請重試",
         "visibilityWriteFailed": "模型顯示設定未能儲存，請重試；如果仍然失敗，請重新啟動 Cindy。",
         "disabledGroup": "已停用",
@@ -10677,6 +10678,7 @@
       "confirmTitle": "仍有任務在執行中",
       "confirmBusyHint": "重啟會中斷執行中的任務",
       "confirmBusyActivities": "重啟會中斷{{activities}}。",
+      "relaunchBlocked": "沒有重啟：重啟會中斷{{activities}}。結束後再點「立即重啟」。",
       "activityJoiner": "、",
       "activityJoinerPair": "、",
       "activityJoinerLast": "、",
@@ -10691,7 +10693,9 @@
         "backgroundCommand": "背景命令",
         "scheduledTask": "定時任務",
         "generation": "生成任務",
-        "subtask": "子任務"
+        "subtask": "子任務",
+        "remoteOperation": "其他裝置發來的操作",
+        "unknown": "狀態無法確認的任務"
       },
       "confirmButton": "仍要重啟應用程式",
       "cancel": "取消",

@@ -4152,6 +4152,7 @@
         "paymentUnlock": "Kostenpflichtig freischalten",
         "enableModel": "Dieses Modell aktivieren",
         "capabilityGroupHint": "Wird in der Chat-Modellauswahl nicht angezeigt. Der Schalter steuert die Sichtbarkeit in der entsprechenden Funktion.",
+        "subscriptionImageHint": "Eine Anmeldung mit ChatGPT-Abo bietet nur einen Eintrag für Bildgenerierung, ein bestimmtes Modell lässt sich nicht wählen. Um Modelle wie GPT Image 2.5 oder 2.6 zu wählen, hinterlege einen Bild-API-Schlüssel in der integrierten OpenAI-Verbindung (Abrechnung nach API-Nutzung).",
         "accessWriteFailed": "Änderung konnte nicht gespeichert werden. Bitte versuche es erneut.",
         "visibilityWriteFailed": "Die Einstellung zur Modellsichtbarkeit konnte nicht gespeichert werden. Versuche es erneut oder starte Cindy neu, falls das Problem weiterhin besteht.",
         "disabledGroup": "Deaktiviert",
@@ -10724,6 +10725,7 @@
       "confirmTitle": "Eine Aufgabe läuft noch",
       "confirmBusyHint": "Ein Neustart unterbricht sie",
       "confirmBusyActivities": "Ein Neustart unterbricht {{activities}}.",
+      "relaunchBlocked": "Nicht neu gestartet: Das würde {{activities}} unterbrechen. Wähle „Neu starten“ erneut, sobald es fertig ist.",
       "activityJoiner": ", ",
       "activityJoinerPair": " und ",
       "activityJoinerLast": " und ",
@@ -10738,7 +10740,9 @@
         "backgroundCommand": "einen Hintergrundbefehl",
         "scheduledTask": "eine geplante Aufgabe",
         "generation": "eine Generierung",
-        "subtask": "eine Teilaufgabe"
+        "subtask": "eine Teilaufgabe",
+        "remoteOperation": "einen Vorgang von einem anderen Gerät",
+        "unknown": "eine Aufgabe, deren Status sich nicht prüfen ließ"
       },
       "confirmButton": "App trotzdem neu starten",
       "cancel": "Abbrechen",

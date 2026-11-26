@@ -4202,6 +4202,7 @@
         "paymentUnlock": "Pagar para desbloquear",
         "enableModel": "Habilitar este modelo",
         "capabilityGroupHint": "No se muestra en el selector de modelo de chat. El interruptor controla la visibilidad en la función relevante.",
+        "subscriptionImageHint": "El inicio de sesión con suscripción de ChatGPT ofrece una sola entrada de generación de imágenes y no permite elegir un modelo concreto. Para elegir modelos como GPT Image 2.5 o 2.6, añade una clave de API de imágenes a la conexión integrada de OpenAI (se factura por uso de la API).",
         "accessWriteFailed": "No se pudo guardar el cambio. Por favor inténtalo de nuevo.",
         "visibilityWriteFailed": "No se pudo guardar la configuración de visibilidad del modelo. Inténtelo de nuevo o reinicie Cindy si el problema continúa.",
         "disabledGroup": "Desactivado",
@@ -10802,6 +10803,7 @@
       "confirmTitle": "Hay una tarea en ejecución",
       "confirmBusyHint": "Reiniciar la interrumpirá",
       "confirmBusyActivities": "Reiniciar interrumpirá {{activities}}.",
+      "relaunchBlocked": "No se reinició: interrumpiría {{activities}}. Vuelve a elegir «Reiniciar» cuando termine.",
       "activityJoiner": ", ",
       "activityJoinerPair": " y ",
       "activityJoinerLast": ", y ",
@@ -10816,7 +10818,9 @@
         "backgroundCommand": "un comando en segundo plano",
         "scheduledTask": "una tarea programada",
         "generation": "una generación",
-        "subtask": "una subtarea"
+        "subtask": "una subtarea",
+        "remoteOperation": "una operación desde otro dispositivo",
+        "unknown": "una tarea cuyo estado no se pudo confirmar"
       },
       "confirmButton": "Reiniciar de todos modos",
       "cancel": "Cancelar",
