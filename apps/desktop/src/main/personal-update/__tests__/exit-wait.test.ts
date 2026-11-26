@@ -206,6 +206,93 @@ describe.skipIf(!bash)('personal update wait for the old bundle to exit', () => 
   });
 });
 
+// 2026-11-26: every pre-exchange failure left a full unswapped app copy in /Applications
+// (`.Cindy-personal-backup-<nonce>.app`) plus its extraction, and only committed receipts were ever pruned.
+describe.skipIf(!bash)('personal update rollback removes only its own unswapped copy', () => {
+  interface Case { failedFrom: string; appIs?: number; backupIs?: number | 'partial'; backupLink?: boolean }
+
+  /**
+   * Runs the emitted `discard_unswapped_copy` with real directories and `/bin/rm`. Only the code-signature
+   * check (`matches`) is replaced: it reports a directory as the revision written in its `revision` file.
+   */
+  async function runDiscard(c: Case) {
+    const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'cindy-discard-test-')));
+    try {
+      const script = transactionScript(root).replaceAll('\r\n', '\n');
+      const begin = script.indexOf('discard_unswapped_copy() {');
+      const end = script.indexOf('rollback() {', begin);
+      expect(begin).toBeGreaterThan(0);
+      const app = path.join(root, 'Applications', 'Cindy.app');
+      const backup = path.join(root, 'Applications', '.Cindy-personal-backup-test.app');
+      const extract = path.join(root, 'extract-test');
+      const attempt = path.join(root, 'attempt-test');
+      const outside = path.join(root, 'elsewhere.app');
+      for (const dir of [app, extract, attempt, outside]) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(app, 'revision'), String(c.appIs ?? 41));
+      fs.writeFileSync(path.join(extract, 'payload'), 'x');
+      fs.writeFileSync(path.join(outside, 'revision'), '42');
+      if (c.backupLink) fs.symlinkSync(outside, backup, process.platform === 'win32' ? 'junction' : 'dir');
+      else {
+        fs.mkdirSync(backup);
+        if (c.backupIs !== 'partial') fs.writeFileSync(path.join(backup, 'revision'), String(c.backupIs ?? 42));
+      }
+      const program = `set -eu
+APP=${sh(slash(app))}
+BACKUP=${sh(slash(backup))}
+EXTRACT=${sh(slash(extract))}
+EXIT_STATUS=${sh(slash(path.join(attempt, 'exit-status.json')))}
+FAILED_FROM=${sh(c.failedFrom)}
+matches() { [ -f "$1/revision" ] && [ "$(cat "$1/revision")" = "$2" ]; }
+${script.slice(begin, end)}
+discard_unswapped_copy || true
+`;
+      const result = await new Promise<{ code: number; stderr: string }>(resolve => {
+        const child = execFile(bash!, ['-s'], { encoding: 'utf8' }, (error, _stdout, stderr) =>
+          resolve({ code: error ? 1 : 0, stderr }));
+        child.stdin!.end(program);
+      });
+      expect(result.code, result.stderr).toBe(0);
+      return {
+        backup: fs.existsSync(backup), extract: fs.existsSync(extract), app: fs.existsSync(path.join(app, 'revision')),
+        linkTarget: fs.existsSync(path.join(outside, 'revision')),
+        recorded: fs.existsSync(path.join(attempt, 'unswapped-copy-removed.json')),
+      };
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+  }
+
+  it.each(['waiting-for-exit', 'prepared'])('removes the verified unswapped copy and extraction after a failure in %s', async failedFrom => {
+    expect(await runDiscard({ failedFrom })).toEqual({ backup: false, extract: false, app: true, linkTarget: true, recorded: true });
+  });
+
+  it.each([
+    ['the journal reached the exchange', { failedFrom: 'swapping' }],
+    ['the new app was waiting for its health receipt', { failedFrom: 'awaiting-health' }],
+    ['the failed phase is unknown', { failedFrom: '' }],
+    ['the canonical app is not the previous revision', { failedFrom: 'waiting-for-exit', appIs: 42 }],
+    ['the copy does not verify as this target', { failedFrom: 'waiting-for-exit', backupIs: 43 }],
+    ['the copy is partial', { failedFrom: 'prepared', backupIs: 'partial' as const }],
+  ])('keeps everything when %s', async (_label, c) => {
+    expect(await runDiscard(c)).toEqual({ backup: true, extract: true, app: true, linkTarget: true, recorded: false });
+  });
+
+  it('never follows a link placed at the backup path', async () => {
+    const result = await runDiscard({ failedFrom: 'waiting-for-exit', backupLink: true });
+    expect(result).toMatchObject({ backup: true, extract: true, linkTarget: true, recorded: false });
+  });
+
+  it('runs the cleanup after the failure marker is written and before the lock is released', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cindy-discard-order-'));
+    try {
+      const script = transactionScript(root);
+      const body = script.slice(script.indexOf('rollback() {'));
+      const marker = body.indexOf('/bin/cp "$JOURNAL"'), discard = body.indexOf('discard_unswapped_copy || true'), unlock = body.indexOf('/bin/rm -rf "$LOCK"');
+      expect(marker).toBeGreaterThan(0);
+      expect(discard).toBeGreaterThan(marker);
+      expect(unlock).toBeGreaterThan(discard);
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+  });
+});
+
 describe('personal update failure marker after the macOS monitor rolls back', () => {
   const journalCopy = (failureReason: string | undefined, failedFromPhase: string) =>
     ({ schemaVersion: 1, phase: 'failed', failedFromPhase, ...(failureReason ? { failureReason } : {}), identity: { revision: 42 } });

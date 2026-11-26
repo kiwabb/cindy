@@ -162,6 +162,7 @@ export function buildPersonalMacTransaction(journal: PersonalJournal, root: stri
     `APP=${q(journal.canonicalApp)}`, `BACKUP=${q(journal.backup)}`, `HEALTH=${q(journal.health)}`,
     `REQUIREMENT=${q(requirement)}`,
     `EXIT_STATUS=${q(path.join(root, `attempt-${journal.nonce}`, 'exit-status.json'))}`,
+    `EXTRACT=${q(extract)}`,
     "FAILURE_REASON=transaction_command_failed",
     'bundle_alive() {',
     `  if "$HELPER" --bundle-status "$APP" ${journal.previousPid} ${q(journal.previousProcessBirth ?? '-')} > "$EXIT_STATUS.tmp"; then`,
@@ -208,6 +209,19 @@ export function buildPersonalMacTransaction(journal: PersonalJournal, root: stri
     `  [ "$(/usr/bin/plutil -extract identity.storageIdentity raw "$JOURNAL")" = ${q(journal.identity.storageIdentity)} ] || exit 75`,
     'fi',
     '/bin/mkdir -p "$LOCK"',
+    // A failure before the exchange leaves this attempt's own new-app copy (BACKUP) and its extraction
+    // unused. Remove exactly those, and only when the journal never reached `swapping`, the canonical app
+    // still verifies as the previous revision, and the copy is a real directory verifying as this target.
+    // A swapped, swapped-back, partial or otherwise unproven copy is kept for review.
+    'discard_unswapped_copy() {',
+    '  case "${FAILED_FROM:-}" in prepared|waiting-for-exit) ;; *) return 0 ;; esac',
+    '  [ -d "$BACKUP" ] && [ ! -L "$BACKUP" ] || return 0',
+    `  matches "$APP" ${journal.previousIdentity.revision} ${q(journal.previousIdentity.sourceCommit)} || return 0`,
+    `  matches "$BACKUP" ${journal.identity.revision} ${q(journal.identity.sourceCommit)} || return 0`,
+    '  /bin/rm -rf "$BACKUP" || return 1',
+    '  if [ -d "$EXTRACT" ] && [ ! -L "$EXTRACT" ]; then /bin/rm -rf "$EXTRACT" || return 1; fi',
+    `  printf '{"removed":true}\\n' > "\${EXIT_STATUS%/*}/unswapped-copy-removed.json" || true`,
+    '}',
     'rollback() {',
     '  trap - EXIT HUP INT TERM',
     `  if matches "$APP" ${journal.identity.revision} ${q(journal.identity.sourceCommit)} && matches "$BACKUP" ${journal.previousIdentity.revision} ${q(journal.previousIdentity.sourceCommit)}; then`,
@@ -221,6 +235,7 @@ export function buildPersonalMacTransaction(journal: PersonalJournal, root: stri
     '  phase failed || true',
     `  /bin/cp "$JOURNAL" ${q(failed)}`,
     `  "$HELPER" --sync ${q(failed)} || true`,
+    '  discard_unswapped_copy || true',
     '  /bin/rm -rf "$LOCK"',
     '  /usr/bin/open "$APP" || true',
     '}',
