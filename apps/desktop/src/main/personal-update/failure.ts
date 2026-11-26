@@ -31,6 +31,11 @@ export const PERSONAL_FAILURE_CODES = [
   'PERSONAL_UPDATE_PREPARED_RESULT_INVALID',
   'PERSONAL_UPDATE_WORKER_START_FAILED',
   'PERSONAL_UPDATE_JOB_CLEANUP_BLOCKED',
+  // macOS transaction monitor (read back from the journal copy in `failed-<revision>.json`).
+  'PERSONAL_UPDATE_OLD_APP_EXIT_TIMEOUT',
+  'PERSONAL_UPDATE_OLD_APP_REAPPEARED',
+  'PERSONAL_UPDATE_EXIT_STATUS_UNAVAILABLE',
+  'PERSONAL_UPDATE_NEW_APP_HEALTH_FAILED',
   // Generic fallbacks.
   'PERSONAL_UPDATE_PREPARATION_FAILED',
   'PERSONAL_UPDATE_APPLY_FAILED',
@@ -77,27 +82,90 @@ const SIGNING_CODES = new Set<PersonalFailureCode>([
   'PERSONAL_UPDATE_HELPER_SIGNATURE',
 ]);
 
-export type PersonalFailureKind = 'signing' | 'failed';
+/** Install-step failures: preparation succeeded; the monitor rolled back and kept the current app. */
+const APPLY_CODES = new Set<PersonalFailureCode>([
+  'PERSONAL_UPDATE_APPLY_FAILED',
+  'PERSONAL_UPDATE_EXIT_STATUS_UNAVAILABLE',
+  'PERSONAL_UPDATE_NEW_APP_HEALTH_FAILED',
+]);
+
+/** The old app did not fully leave its bundle before the exchange; the verified package itself is fine. */
+const EXIT_CODES = new Set<PersonalFailureCode>([
+  'PERSONAL_UPDATE_OLD_APP_EXIT_TIMEOUT',
+  'PERSONAL_UPDATE_OLD_APP_REAPPEARED',
+]);
+
+/** `failed`: preparation; `install`: the swap step; `exit`: waiting for the old app to quit before the swap. */
+export type PersonalFailureKind = 'signing' | 'failed' | 'install' | 'exit';
 
 export function personalFailureKind(code: PersonalFailureCode): PersonalFailureKind {
-  return SIGNING_CODES.has(code) ? 'signing' : 'failed';
+  if (SIGNING_CODES.has(code)) return 'signing';
+  if (EXIT_CODES.has(code)) return 'exit';
+  return APPLY_CODES.has(code) ? 'install' : 'failed';
 }
 
-export interface PersonalFailureMarker { reason: PersonalFailureCode }
+export interface PersonalFailureMarker {
+  reason: PersonalFailureCode;
+  /** macOS monitor only: the journal phase the transaction failed from (a closed set). */
+  failedFromPhase?: PersonalMonitorPhase;
+}
+
+const MONITOR_PHASES = ['prepared', 'waiting-for-exit', 'swapping', 'awaiting-health'] as const;
+type PersonalMonitorPhase = typeof MONITOR_PHASES[number];
+
+/** `failureReason` values written by the transaction script; anything else stays the generic apply code. */
+const MONITOR_REASONS: Record<string, PersonalFailureCode> = {
+  old_bundle_exit_timeout: 'PERSONAL_UPDATE_OLD_APP_EXIT_TIMEOUT',
+  stale_crashpad_not_stopped: 'PERSONAL_UPDATE_OLD_APP_EXIT_TIMEOUT',
+  bundle_reappeared_before_swap: 'PERSONAL_UPDATE_OLD_APP_REAPPEARED',
+  bundle_status_unavailable: 'PERSONAL_UPDATE_EXIT_STATUS_UNAVAILABLE',
+};
+
+function monitorFailure(value: { failureReason?: unknown; failedFromPhase?: unknown }): PersonalFailureMarker {
+  const phase = MONITOR_PHASES.find(candidate => candidate === value.failedFromPhase);
+  const mapped = typeof value.failureReason === 'string' && Object.hasOwn(MONITOR_REASONS, value.failureReason)
+    ? MONITOR_REASONS[value.failureReason] : undefined;
+  const reason = mapped ?? (phase === 'awaiting-health' ? 'PERSONAL_UPDATE_NEW_APP_HEALTH_FAILED' : 'PERSONAL_UPDATE_APPLY_FAILED');
+  return phase ? { reason, failedFromPhase: phase } : { reason };
+}
 
 /**
- * Reads `failed-<revision>.json`. The file's existence alone still means "never retry this revision";
+ * Reads `failed-<revision>.json`. The file's existence alone still means "do not retry this revision";
  * the reason is best effort. Older clients wrote `{revision, phase}` or a copy of the macOS transaction
  * journal, so unknown or unreadable content maps to a generic code and never throws.
  */
 export function readPersonalFailureMarker(root: string, revision: number): PersonalFailureMarker | null {
   const file = path.join(root, `failed-${revision}.json`);
   if (!fs.existsSync(file)) return null;
-  let value: { reason?: unknown; phase?: unknown } | null = null;
+  let value: { reason?: unknown; phase?: unknown; failureReason?: unknown; failedFromPhase?: unknown } | null = null;
   try { value = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { /* unreadable: generic reason */ }
   if (isPersonalFailureCode(value?.reason)) return { reason: value.reason };
   const phase = value?.phase;
-  // 'windows-apply-failed' (Windows updater) and the copied macOS journal ('failed') are apply failures.
-  if (phase === 'windows-apply-failed' || phase === 'failed') return { reason: 'PERSONAL_UPDATE_APPLY_FAILED' };
+  // The copied macOS journal ('failed') records the monitor's own phase and reason.
+  if (phase === 'failed') return monitorFailure(value!);
+  if (phase === 'windows-apply-failed') return { reason: 'PERSONAL_UPDATE_APPLY_FAILED' };
   return { reason: 'PERSONAL_UPDATE_PREPARATION_FAILED' };
+}
+
+/** Automatic attempts allowed for a revision whose only failure was the old app not quitting in time. */
+export const PERSONAL_EXIT_TIMEOUT_ATTEMPTS = 2;
+
+/**
+ * An exit-wait failure happens after the package was downloaded, re-signed and smoke-tested, and the
+ * monitor restored the current app before touching it. That revision gets one more automatic attempt
+ * (through the normal idle or explicit install gate) instead of being skipped forever. The first marker is
+ * kept as `exit-retry-<revision>-<n>.json`; a second failure of any kind stays a permanent skip.
+ * Returns true when the revision was released for that retry.
+ */
+export function releaseRetryablePersonalFailure(root: string, revision: number): boolean {
+  try {
+    const failure = readPersonalFailureMarker(root, revision);
+    if (!failure || personalFailureKind(failure.reason) !== 'exit') return false;
+    const failed = path.join(root, `failed-${revision}.json`);
+    const retries = fs.readdirSync(root).filter(name => name.startsWith(`exit-retry-${revision}-`) && name.endsWith('.json')).length;
+    if (retries + 1 >= PERSONAL_EXIT_TIMEOUT_ATTEMPTS) return false;
+    // Rename is atomic: the revision is either still skipped or released with its evidence kept.
+    fs.renameSync(failed, path.join(root, `exit-retry-${revision}-${retries + 1}.json`));
+    return true;
+  } catch { return false; }
 }

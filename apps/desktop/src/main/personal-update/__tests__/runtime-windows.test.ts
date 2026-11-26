@@ -87,7 +87,7 @@ describe('Windows personal update feed check', () => {
     ['a marker with a known reason', { revision: 43, phase: 'preparation-failed', reason: 'PERSONAL_UPDATE_HELPER_SIGNATURE' }, 'PERSONAL_UPDATE_HELPER_SIGNATURE'],
     ['an older preparation marker', { revision: 43, phase: 'preparation-failed' }, 'PERSONAL_UPDATE_PREPARATION_FAILED'],
     ['an older Windows apply marker', { revision: 43, phase: 'windows-apply-failed' }, 'PERSONAL_UPDATE_APPLY_FAILED'],
-    ['a copied macOS transaction journal', { phase: 'failed', failureReason: 'old_bundle_exit_timeout', zip: '/x/personal-43.zip' }, 'PERSONAL_UPDATE_APPLY_FAILED'],
+    ['a copied macOS transaction journal', { phase: 'failed', failedFromPhase: 'swapping', failureReason: 'transaction_command_failed', zip: '/x/personal-43.zip' }, 'PERSONAL_UPDATE_APPLY_FAILED'],
     ['an unknown reason, which is not echoed', { revision: 43, reason: 'codesign failed: /Users/someone/Cindy.app' }, 'PERSONAL_UPDATE_PREPARATION_FAILED'],
     ['an unreadable marker', 'not json', 'PERSONAL_UPDATE_PREPARATION_FAILED'],
   ] as const)('reports a failed newer revision as skipped with a reason (%s)', async (_label, marker, reason) => {
@@ -95,6 +95,23 @@ describe('Windows personal update feed check', () => {
     touch('failed-43.json', typeof marker === 'string' ? marker : JSON.stringify(marker));
     serve(feed(43, identity.storageIdentity));
     await expect(checkPersonalManifest()).resolves.toEqual(expect.objectContaining({ kind: 'skipped', reason, manifest: expect.objectContaining({ revision: 43 }) }));
+  });
+
+  // Regression (2026-11-25, personal Mac): the old app's Crashpad handler outlived a normal quit, the wait
+  // before the exchange timed out, and the verified, signed package was skipped forever. That case now gets
+  // exactly one more automatic attempt; a second exit-wait failure is skipped with its real reason.
+  it('retries an exit-wait failure once, then skips it with the exit-timeout reason', async () => {
+    fs.writeFileSync(optIn(), '{"enabled":true}');
+    const exitTimeout = JSON.stringify({ phase: 'failed', failedFromPhase: 'waiting-for-exit', failureReason: 'old_bundle_exit_timeout' });
+    touch('failed-43.json', exitTimeout);
+    serve(feed(43, identity.storageIdentity));
+    // A read-only caller (the Agent's status query) sees the skip and leaves the marker alone.
+    await expect(checkPersonalManifest()).resolves.toEqual(expect.objectContaining({ kind: 'skipped', reason: 'PERSONAL_UPDATE_OLD_APP_EXIT_TIMEOUT' }));
+    serve(feed(43, identity.storageIdentity));
+    await expect(checkPersonalManifest({ releaseRetryable: true })).resolves.toEqual(expect.objectContaining({ kind: 'install' }));
+    touch('failed-43.json', exitTimeout);
+    serve(feed(43, identity.storageIdentity));
+    await expect(checkPersonalManifest({ releaseRetryable: true })).resolves.toEqual(expect.objectContaining({ kind: 'skipped', reason: 'PERSONAL_UPDATE_OLD_APP_EXIT_TIMEOUT' }));
   });
 });
 

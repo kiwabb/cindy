@@ -44,7 +44,7 @@ const updateStatus = vi.hoisted(() => ({
     displayVersion?: string;
     errorCode: string | null;
     downloadUrl?: string;
-    manualReason?: 'storage' | 'signing' | 'failed';
+    manualReason?: 'storage' | 'signing' | 'failed' | 'exit' | 'install';
   },
 }));
 
@@ -389,12 +389,16 @@ describe('update banner for a release that needs a manual install', () => {
   it.each([
     ['signing', 'update.banner.manualReasonSigning'],
     ['failed', 'update.banner.manualReasonFailed'],
+    // 2026-11-25: an old app that did not quit in time before the exchange was shown as "preparation failed".
+    ['exit', 'update.banner.manualReasonExitTimeout'],
+    ['install', 'update.banner.manualReasonInstallFailed'],
     ['storage', null],
   ] as const)('explains a %s manual install', (manualReason, key) => {
     updateStatus.current = { ...manual('personal-r1'), manualReason };
     render(<UpdateBanner isCollapsed={false} />);
     expect(screen.getByText('update.banner.manualTitle')).toBeTruthy();
-    for (const reason of ['update.banner.manualReasonSigning', 'update.banner.manualReasonFailed']) {
+    for (const reason of ['update.banner.manualReasonSigning', 'update.banner.manualReasonFailed',
+      'update.banner.manualReasonExitTimeout', 'update.banner.manualReasonInstallFailed']) {
       expect(Boolean(screen.queryByText(reason))).toBe(reason === key);
     }
   });

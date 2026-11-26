@@ -10752,7 +10752,9 @@
       "manualButton": "Installer herunterladen",
       "manualAria": "Installer für {{version}} herunterladen",
       "manualReasonSigning": "Diese Installation ist nicht mit deinem Entwicklungsteam signiert und kann sich daher nicht automatisch aktualisieren. Du kannst das Installationsprogramm herunterladen und manuell installieren.",
-      "manualReasonFailed": "Die automatische Installation konnte nicht vorbereitet werden, daher wurde diese Version übersprungen. Du kannst das Installationsprogramm herunterladen und manuell installieren."
+      "manualReasonFailed": "Die automatische Installation konnte nicht vorbereitet werden, daher wurde diese Version übersprungen. Du kannst das Installationsprogramm herunterladen und manuell installieren.",
+      "manualReasonExitTimeout": "Die vorherige Version wurde auch nach einem erneuten Versuch nicht rechtzeitig vollständig beendet, daher wurde diese Version übersprungen. Du kannst das Installationsprogramm herunterladen und manuell installieren.",
+      "manualReasonInstallFailed": "Die automatische Installation konnte den Austausch nicht abschließen. Die aktuelle Version wurde beibehalten und diese Version übersprungen. Du kannst das Installationsprogramm herunterladen und manuell installieren."
     },
     "notice": {
       "title": "Neuigkeiten",

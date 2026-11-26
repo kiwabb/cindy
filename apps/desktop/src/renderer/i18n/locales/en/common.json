@@ -10752,7 +10752,9 @@
       "manualButton": "Download installer",
       "manualAria": "Download the installer for {{version}}",
       "manualReasonSigning": "This installation isn’t signed by your development team, so it can’t update automatically. You can download the installer and install it manually.",
-      "manualReasonFailed": "Automatic installation couldn’t be prepared, so this version was skipped. You can download the installer and install it manually."
+      "manualReasonFailed": "Automatic installation couldn’t be prepared, so this version was skipped. You can download the installer and install it manually.",
+      "manualReasonExitTimeout": "The previous version didn’t fully quit in time, even after a retry, so this version was skipped. You can download the installer and install it manually.",
+      "manualReasonInstallFailed": "Automatic installation didn’t finish replacing the app, so the current version was kept and this version was skipped. You can download the installer and install it manually."
     },
     "notice": {
       "title": "What's New",

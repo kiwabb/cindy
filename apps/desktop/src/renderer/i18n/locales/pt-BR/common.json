@@ -10830,7 +10830,9 @@
       "manualButton": "Baixar instalador",
       "manualAria": "Baixar o instalador da versão {{version}}",
       "manualReasonSigning": "Esta instalação não foi assinada pela sua equipe de desenvolvimento, então não pode ser atualizada automaticamente. Você pode baixar o instalador e instalar manualmente.",
-      "manualReasonFailed": "Não foi possível preparar a instalação automática, então esta versão foi ignorada. Você pode baixar o instalador e instalar manualmente."
+      "manualReasonFailed": "Não foi possível preparar a instalação automática, então esta versão foi ignorada. Você pode baixar o instalador e instalar manualmente.",
+      "manualReasonExitTimeout": "A versão anterior não terminou de fechar a tempo, mesmo após uma nova tentativa, então esta versão foi ignorada. Você pode baixar o instalador e instalar manualmente.",
+      "manualReasonInstallFailed": "A instalação automática não conseguiu concluir a substituição, então a versão atual foi mantida e esta versão foi ignorada. Você pode baixar o instalador e instalar manualmente."
     },
     "notice": {
       "title": "Novidades",

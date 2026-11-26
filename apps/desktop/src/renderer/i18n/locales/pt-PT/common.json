@@ -10830,7 +10830,9 @@
       "manualButton": "Transferir instalador",
       "manualAria": "Transferir o instalador da versão {{version}}",
       "manualReasonSigning": "Esta instalação não foi assinada pela sua equipa de desenvolvimento, por isso não pode ser atualizada automaticamente. Pode transferir o instalador e instalar manualmente.",
-      "manualReasonFailed": "Não foi possível preparar a instalação automática, por isso esta versão foi ignorada. Pode transferir o instalador e instalar manualmente."
+      "manualReasonFailed": "Não foi possível preparar a instalação automática, por isso esta versão foi ignorada. Pode transferir o instalador e instalar manualmente.",
+      "manualReasonExitTimeout": "A versão anterior não terminou de fechar a tempo, mesmo após uma nova tentativa, por isso esta versão foi ignorada. Pode transferir o instalador e instalar manualmente.",
+      "manualReasonInstallFailed": "A instalação automática não conseguiu concluir a substituição, por isso a versão atual foi mantida e esta versão foi ignorada. Pode transferir o instalador e instalar manualmente."
     },
     "notice": {
       "title": "Novidades",

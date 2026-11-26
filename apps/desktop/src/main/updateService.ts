@@ -134,12 +134,14 @@ interface UpdateStatusPayload {
   /**
    * Personal `manual` only: why it cannot install automatically. `storage`: incompatible data format;
    * `signing`: this Mac's install lacks the development-team signature; `failed`: preparation failed
-   * and the revision is skipped.
+   * and the revision is skipped; `exit`: the prepared package was not installed because the old app did
+   * not fully quit before the exchange (already retried once); `install`: the exchange or the new app's
+   * health check failed and the monitor kept the current app.
    */
   manualReason?: PersonalManualReason;
 }
 
-type PersonalManualReason = 'storage' | 'signing' | 'failed';
+type PersonalManualReason = 'storage' | 'signing' | 'failed' | 'exit' | 'install';
 
 interface PatchInfo {
   version: string;
@@ -1252,7 +1254,7 @@ async function doCheckPersonalUpdate(): Promise<CheckForUpdateResult> {
     // A ready patch or pending manual install stays on screen during the periodic re-check;
     // the result below replaces it.
     if (currentStatus !== 'manual' && currentStatus !== 'ready') setStatus('checking');
-    const check = await checkPersonalManifest();
+    const check = await checkPersonalManifest({ releaseRetryable: true });
     manualUpdate = undefined;
     if (!check) {
       readyFilePath = undefined;

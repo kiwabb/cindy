@@ -10705,7 +10705,9 @@
       "manualButton": "取安装包",
       "manualAria": "取 {{version}} 安装包",
       "manualReasonSigning": "今所装者非开发团队所签，不能自更。可下载安装包手装之。",
-      "manualReasonFailed": "自装之备未成，此版已略。可下载安装包手装之。"
+      "manualReasonFailed": "自装之备未成，此版已略。可下载安装包手装之。",
+      "manualReasonExitTimeout": "旧版未及尽退，再试仍未成，此版已略。可下载安装包手装之。",
+      "manualReasonInstallFailed": "自装易换未成，今版仍留，此版已略。可下载安装包手装之。"
     },
     "notice": {
       "title": "新版之告",
